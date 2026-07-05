@@ -17,6 +17,8 @@ const { getImageUrl } = require('../../../../utils/ImageUrlHelper')
 const multer = require('multer')
 const ExcelJS = require('exceljs')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
+const ProductCodeGenerator = require('../../../../utils/ProductCodeGenerator')
+const SeriesSeqAllocator = require('../../../../utils/SeriesSeqAllocator')
 
 /** 路由保留字 — 防止 "export"/"import" 等被 /:id 参数捕获 */
 const RESERVED_PATHS = new Set(['export', 'import', 'batch', 'generate-skus', 'skus'])
@@ -154,14 +156,34 @@ router.get(
 
     const exportData = rows.map((item, idx) => {
       const plain = item.get ? item.get({ plain: true }) : { ...item }
+      const withImage = toItemWithImage(item)
+      /*
+       * 手册导出清单（商品编码体系 §8.3 必备项3）：
+       * - 商品编码：SP 码展示形 SP-XXXX-XXXX-XXXX（凡展示编码处一律输出展示形，§3.5 落地约束2）
+       * - 系列号：series_code + 补零序号（如 SLNB-001，双轨制可读系列号，未归系列留空）
+       * - 图片/价格列：印刷手册需要的"商品名 + SP 码 + 图片 + 价格"要素
+       */
+      const seriesNo =
+        plain.series && plain.series_seq != null
+          ? SeriesSeqAllocator.format(
+              plain.series.series_code,
+              plain.series_seq,
+              plain.series.seq_pad
+            )
+          : ''
       return {
         序号: idx + 1,
+        商品编码: plain.item_code ? ProductCodeGenerator.format(plain.item_code) : '',
+        系列号: seriesNo,
         商品ID: plain.exchange_item_id,
         商品名称: plain.item_name || '',
         品类ID: plain.category_id || '',
         状态: plain.status || '',
         稀有度: plain.rarity_code || '',
         空间: plain.space || '',
+        展示价: plain.min_cost_amount ?? '',
+        计价资产: plain.min_cost_asset_code || '',
+        图片URL: withImage.primary_image?.url || '',
         排序: plain.sort_order ?? 0,
         描述: plain.description || '',
         卖点: plain.sell_point || '',
@@ -508,6 +530,43 @@ router.post(
     })
 
     return res.apiSuccess(sku.get ? sku.get({ plain: true }) : sku, '创建 SKU 成功')
+  })
+)
+
+/**
+ * GET /:id/supplier-links — 商品的供应商关联行（商品编辑表单「多供应商区块」回显）
+ *
+ * 返回：[{ id, supplier_id, supplier_item_code, is_primary, supplier: { supplier_name } }]
+ */
+router.get(
+  '/:id/supplier-links',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const supplierService = req.app.locals.services.getService('supplier_service')
+    const links = await supplierService.getItemSupplierLinks(req.params.id)
+    return res.apiSuccess({ links }, '获取商品供应商关联成功')
+  })
+)
+
+/**
+ * PUT /:id/supplier-links — 全量替换商品的供应商关联行（多供应商 + 各自货号 + 主供货商标记）
+ *
+ * Body: `{ links: [{ supplier_id, supplier_item_code?, is_primary? }] }`；传空数组 = 解除全部关联。
+ */
+router.put(
+  '/:id/supplier-links',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const supplierService = req.app.locals.services.getService('supplier_service')
+    const { links } = req.body || {}
+
+    const replaced = await TransactionManager.execute(async transaction => {
+      return await supplierService.replaceItemSupplierLinks(req.params.id, links, { transaction })
+    })
+
+    return res.apiSuccess({ links: replaced }, '设置商品供应商关联成功')
   })
 )
 

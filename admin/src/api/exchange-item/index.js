@@ -41,7 +41,21 @@ export const EXCHANGE_ITEM_ENDPOINTS = {
   ATTRIBUTE_OPTION_UPDATE: `${CONSOLE_PREFIX}/attributes/options/:option_id`,
   ATTRIBUTE_OPTION_DELETE: `${CONSOLE_PREFIX}/attributes/options/:option_id`,
   ITEM_EXPORT: `${CONSOLE_PREFIX}/exchange/items/export`,
-  ITEM_IMPORT: `${CONSOLE_PREFIX}/exchange/items/import`
+  ITEM_IMPORT: `${CONSOLE_PREFIX}/exchange/items/import`,
+  // 商品编码体系（供应商/系列/货号辅助查询/健康统计，直接反映后端路由）
+  ITEM_SUPPLIER_LINKS: `${CONSOLE_PREFIX}/exchange/items/:id/supplier-links`,
+  SUPPLIER_LIST: `${CONSOLE_PREFIX}/exchange/suppliers`,
+  SUPPLIER_DETAIL: `${CONSOLE_PREFIX}/exchange/suppliers/:supplier_id`,
+  SUPPLIER_CREATE: `${CONSOLE_PREFIX}/exchange/suppliers`,
+  SUPPLIER_UPDATE: `${CONSOLE_PREFIX}/exchange/suppliers/:supplier_id`,
+  SUPPLIER_DELETE: `${CONSOLE_PREFIX}/exchange/suppliers/:supplier_id`,
+  SUPPLIER_CODE_SEARCH: `${CONSOLE_PREFIX}/exchange/suppliers/code-search`,
+  SUPPLIER_HEALTH_STATS: `${CONSOLE_PREFIX}/exchange/suppliers/health-stats`,
+  PRODUCT_SERIES_LIST: `${CONSOLE_PREFIX}/exchange/product-series`,
+  PRODUCT_SERIES_DETAIL: `${CONSOLE_PREFIX}/exchange/product-series/:series_id`,
+  PRODUCT_SERIES_CREATE: `${CONSOLE_PREFIX}/exchange/product-series`,
+  PRODUCT_SERIES_UPDATE: `${CONSOLE_PREFIX}/exchange/product-series/:series_id`,
+  PRODUCT_SERIES_DELETE: `${CONSOLE_PREFIX}/exchange/product-series/:series_id`
 }
 
 /**
@@ -369,12 +383,18 @@ export const ExchangeItemAPI = {
   },
 
   /**
-   * 导出兑换商品列表（CSV/Excel 下载）
-   * @param {Object} [params={}] 筛选参数
-   * @returns {Promise<Object>} 标准 API 响应
+   * 导出兑换商品列表（后端 exceljs 产出 xlsx 二进制流）
+   *
+   * 后端 GET /export 返回的是 xlsx 二进制（Content-Type 为 spreadsheetml.sheet），
+   * 必须以 blob 方式接收，交由调用方 createObjectURL 触发下载；不可按 json 解析。
+   * @param {Object} [params={}] 筛选参数（status 等）
+   * @returns {Promise<Blob>} xlsx 文件的 Blob
    */
   async exportItems(params = {}) {
-    return request({ url: EXCHANGE_ITEM_ENDPOINTS.ITEM_EXPORT + buildQueryString(params) })
+    return request({
+      url: EXCHANGE_ITEM_ENDPOINTS.ITEM_EXPORT + buildQueryString(params),
+      responseType: 'blob'
+    })
   },
 
   /**
@@ -386,6 +406,162 @@ export const ExchangeItemAPI = {
     const formData = new FormData()
     formData.append('file', file)
     return request({ url: EXCHANGE_ITEM_ENDPOINTS.ITEM_IMPORT, method: 'POST', data: formData })
+  },
+
+  /* ==================== 商品编码体系：供应商 / 系列 / 货号辅助查询 ==================== */
+
+  /**
+   * 获取商品的供应商关联行（商品编辑表单「多供应商区块」回显）
+   * @param {string|number} exchangeItemId 商品 ID
+   * @returns {Promise<Object>} 标准 API 响应（data.links）
+   */
+  async getItemSupplierLinks(exchangeItemId) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ITEM_SUPPLIER_LINKS, { id: exchangeItemId })
+    })
+  },
+
+  /**
+   * 全量替换商品的供应商关联行（多供应商 + 各自货号 + 主供货商标记；空数组=解除全部关联）
+   * @param {string|number} exchangeItemId 商品 ID
+   * @param {Array<Object>} links 关联行数组 [{ supplier_id, supplier_item_code?, is_primary? }]
+   * @returns {Promise<Object>} 标准 API 响应
+   */
+  async setItemSupplierLinks(exchangeItemId, links) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ITEM_SUPPLIER_LINKS, { id: exchangeItemId }),
+      method: 'PUT',
+      data: { links }
+    })
+  },
+
+  /**
+   * 供应商分页列表
+   * @param {Object} [params={}] 查询参数（status/keyword/page/page_size）
+   * @returns {Promise<Object>} 标准 API 响应
+   */
+  async listSuppliers(params = {}) {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.SUPPLIER_LIST + buildQueryString(params) })
+  },
+
+  /**
+   * 供应商详情（含供货 SPU 关联行）
+   * @param {string|number} supplierId 供应商 ID
+   * @returns {Promise<Object>} 标准 API 响应
+   */
+  async getSupplier(supplierId) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SUPPLIER_DETAIL, { supplier_id: supplierId })
+    })
+  },
+
+  /**
+   * 创建供应商（supplier_name 唯一，防重复建档）
+   * @param {Object} data 请求体（supplier_name/contact_name?/contact_phone?/status?/notes?）
+   * @returns {Promise<Object>} 标准 API 响应
+   */
+  async createSupplier(data) {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.SUPPLIER_CREATE, method: 'POST', data })
+  },
+
+  /**
+   * 更新供应商
+   * @param {string|number} supplierId 供应商 ID
+   * @param {Object} data 请求体
+   * @returns {Promise<Object>} 标准 API 响应
+   */
+  async updateSupplier(supplierId, data) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SUPPLIER_UPDATE, { supplier_id: supplierId }),
+      method: 'PUT',
+      data
+    })
+  },
+
+  /**
+   * 删除供应商（存在商品关联时后端 409 拒绝）
+   * @param {string|number} supplierId 供应商 ID
+   * @returns {Promise<Object>} 标准 API 响应
+   */
+  async deleteSupplier(supplierId) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SUPPLIER_DELETE, { supplier_id: supplierId }),
+      method: 'DELETE'
+    })
+  },
+
+  /**
+   * 货号辅助查询（按供应商货号找货：模糊 + 供应商筛选 + 组合定位，多条命中不去重）
+   * @param {Object} [params={}] 查询参数（supplier_item_code?/supplier_id?/page/page_size）
+   * @returns {Promise<Object>} 标准 API 响应
+   */
+  async searchBySupplierItemCode(params = {}) {
+    return request({
+      url: EXCHANGE_ITEM_ENDPOINTS.SUPPLIER_CODE_SEARCH + buildQueryString(params)
+    })
+  },
+
+  /**
+   * 商品主数据健康统计（item_code 回填/货号缺失/重复货号/供货分布，dashboard 健康看板用）
+   * @returns {Promise<Object>} 标准 API 响应
+   */
+  async getProductCodeHealthStats() {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.SUPPLIER_HEALTH_STATS })
+  },
+
+  /**
+   * 产品系列分页列表
+   * @param {Object} [params={}] 查询参数（status/keyword/page/page_size）
+   * @returns {Promise<Object>} 标准 API 响应
+   */
+  async listProductSeries(params = {}) {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.PRODUCT_SERIES_LIST + buildQueryString(params) })
+  },
+
+  /**
+   * 系列详情
+   * @param {string|number} seriesId 系列 ID
+   * @returns {Promise<Object>} 标准 API 响应
+   */
+  async getProductSeries(seriesId) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.PRODUCT_SERIES_DETAIL, { series_id: seriesId })
+    })
+  },
+
+  /**
+   * 创建系列（series_code 唯一 + 后端全大写归一化）
+   * @param {Object} data 请求体（series_code/series_name/seq_pad?/status?）
+   * @returns {Promise<Object>} 标准 API 响应
+   */
+  async createProductSeries(data) {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.PRODUCT_SERIES_CREATE, method: 'POST', data })
+  },
+
+  /**
+   * 更新系列（next_seq 由后端发号器维护，不可人工改）
+   * @param {string|number} seriesId 系列 ID
+   * @param {Object} data 请求体
+   * @returns {Promise<Object>} 标准 API 响应
+   */
+  async updateProductSeries(seriesId, data) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.PRODUCT_SERIES_UPDATE, { series_id: seriesId }),
+      method: 'PUT',
+      data
+    })
+  },
+
+  /**
+   * 删除系列（存在归属商品时后端 409 拒绝）
+   * @param {string|number} seriesId 系列 ID
+   * @returns {Promise<Object>} 标准 API 响应
+   */
+  async deleteProductSeries(seriesId) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.PRODUCT_SERIES_DELETE, { series_id: seriesId }),
+      method: 'DELETE'
+    })
   }
 }
 

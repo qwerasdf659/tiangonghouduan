@@ -132,7 +132,6 @@
 const BusinessError = require('../../utils/BusinessError')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const PerformanceMonitor = require('./utils/PerformanceMonitor')
-const { AssetCode } = require('../../constants/AssetCode')
 const CacheManager = require('./utils/CacheManager')
 
 /**
@@ -154,6 +153,8 @@ const models = require('../../models')
 const { Sequelize } = require('sequelize')
 const BalanceService = require('../asset/BalanceService')
 const LotteryQuotaService = require('../lottery/LotteryQuotaService')
+// 活动入场资产解析（双层货币可见层：points/event_points 扣费分桶，方案 §12.7 / §23.5 遗留项①）
+const EventBudgetService = require('../lottery/EventBudgetService')
 
 /**
  * V4统一抽奖引擎核心类
@@ -356,7 +357,12 @@ class UnifiedLotteryEngine {
           /** 虚拟物品展示字段（碎片配额修复方案新增） */
           material_asset_code: settleResult.material_asset_code || null,
           material_amount: settleResult.material_amount || null,
-          budget_cost: settleResult.budget_cost || 0
+          budget_cost: settleResult.budget_cost || 0,
+          /*
+           * 水晶倍率摘要（水晶奖品倍率活动 §16.4）：命中翻倍时非空 { base_quantity, applied_multiplier, final_quantity, reason }，
+           * 供小程序展示"基础×倍率=最终"；未翻倍/非水晶时为 null，前端不展示倍率角标。
+           */
+          crystal_multiplier: settleResult.crystal_multiplier || null
         }
       },
       // 元数据
@@ -850,7 +856,7 @@ class UnifiedLotteryEngine {
         throw new BusinessError('抽奖次数必须在1-10之间', 'ENGINE_REQUIRED', 400)
       }
 
-      // 🔧 V4.3修复：使用新的资产系统获取用户积分信息
+      // 🔧 V4.3修复：使用新的资产系统获取用户账户
       const userAccountEntity = await BalanceService.getOrCreateAccount(
         { user_id },
         { transaction }
@@ -858,28 +864,35 @@ class UnifiedLotteryEngine {
       if (!userAccountEntity || userAccountEntity.status !== 'active') {
         throw new BusinessError('用户账户不存在或已冻结', 'ENGINE_NOT_FOUND', 404)
       }
-      const userPointsBalance = await BalanceService.getOrCreateBalance(
-        userAccountEntity.account_id,
-        AssetCode.POINTS,
-        { transaction }
-      )
-      if (!userPointsBalance) {
-        throw new BusinessError('用户积分账户不存在', 'ENGINE_NOT_FOUND', 404)
-      }
-      // 构造积分账户结构对象
-      const userAccount = {
-        account_id: userAccountEntity.account_id,
-        user_id,
-        available_points: userPointsBalance ? Number(userPointsBalance.available_amount) : 0
-      }
 
-      // 🔴 获取活动配置（用于读取定价配置）
+      // 🔴 获取活动配置（用于读取定价配置 + 入场资产配置）
       const campaign = await models.LotteryCampaign.findByPk(lottery_campaign_id, {
         transaction
       })
 
       if (!campaign) {
         throw new BusinessError('活动不存在', 'ENGINE_NOT_FOUND', 404)
+      }
+
+      /*
+       * 🆕 入场资产解析（双层货币可见层，方案 §12.7 / §23.5 遗留项①）
+       * 常驻活动扣全局 points（默认，语义与历史一致）；限时活动扣活动专属 event_points（EVENT_<code> 桶隔离，到期清零）。
+       * 扣费资产与分桶键统一由 EventBudgetService.resolveEntryAsset 收口，避免多处硬编码。
+       */
+      const entryAsset = EventBudgetService.resolveEntryAsset(campaign)
+      const entryAssetBalance = await BalanceService.getOrCreateBalance(
+        userAccountEntity.account_id,
+        entryAsset.asset_code,
+        { transaction, lottery_campaign_id: entryAsset.lottery_campaign_id }
+      )
+      if (!entryAssetBalance) {
+        throw new BusinessError('用户入场资产账户不存在', 'ENGINE_NOT_FOUND', 404)
+      }
+      // 构造入场资产账户结构对象（available_points 语义 = 当前入场资产可用余额）
+      const userAccount = {
+        account_id: userAccountEntity.account_id,
+        user_id,
+        available_points: entryAssetBalance ? Number(entryAssetBalance.available_amount) : 0
       }
 
       /**
@@ -967,10 +980,11 @@ class UnifiedLotteryEngine {
         used: quotaResult.used
       })
 
-      // 🆕 积分充足性预检查（连抽事务安全的关键保护）
+      // 🆕 入场资产充足性预检查（连抽事务安全的关键保护；event_points 活动则校验活动专属代币余额）
       if (userAccount.available_points < requiredPoints) {
+        const assetLabel = entryAsset.is_event ? '活动积分' : '积分'
         throw new BusinessError(
-          `积分不足：需要${requiredPoints}积分，当前仅有${userAccount.available_points}积分`,
+          `${assetLabel}不足：需要${requiredPoints}${assetLabel}，当前仅有${userAccount.available_points}${assetLabel}`,
           'ENGINE_INSUFFICIENT',
           400
         )
@@ -997,7 +1011,7 @@ class UnifiedLotteryEngine {
         'consume'
       )
 
-      // 步骤1：统一扣除折扣后的总积分（在事务中执行）
+      // 步骤1：统一扣除折扣后的总入场资产（在事务中执行；points 或活动专属 event_points）
       const burnAccount = await BalanceService.getOrCreateAccount(
         { system_code: 'SYSTEM_BURN' },
         { transaction }
@@ -1006,8 +1020,10 @@ class UnifiedLotteryEngine {
       const assetChangeResult = await BalanceService.changeBalance(
         {
           user_id,
-          asset_code: AssetCode.POINTS,
+          asset_code: entryAsset.asset_code,
           delta_amount: -requiredPoints,
+          // event_points 为按活动分桶资产，必须携带 EVENT_<code> 桶键（BalanceService 强校验）
+          lottery_campaign_id: entryAsset.lottery_campaign_id,
           business_type: 'lottery_consume',
           idempotency_key: consumeIdempotencyKey,
           lottery_session_id: lotterySessionId,
@@ -1128,7 +1144,9 @@ class UnifiedLotteryEngine {
                   /** 虚拟物品展示字段（碎片配额修复方案新增） */
                   material_asset_code: drawResult.data.draw_result.material_asset_code || null,
                   material_amount: drawResult.data.draw_result.material_amount || null,
-                  budget_cost: drawResult.data.draw_result.budget_cost || 0
+                  budget_cost: drawResult.data.draw_result.budget_cost || 0,
+                  /** 水晶倍率摘要（§16.4，命中翻倍时非空，透传给 C 端展示"基础×倍率=最终"） */
+                  crystal_multiplier: drawResult.data.draw_result.crystal_multiplier || null
                 }
               : null,
             points_cost: drawResult.data?.draw_result?.points_cost || 0
@@ -1163,7 +1181,8 @@ class UnifiedLotteryEngine {
       const updatedAccountEntity = await BalanceService.getOrCreateAccount({ user_id })
       const updatedPointsBalance = await BalanceService.getOrCreateBalance(
         updatedAccountEntity.account_id,
-        AssetCode.POINTS
+        entryAsset.asset_code,
+        { lottery_campaign_id: entryAsset.lottery_campaign_id }
       )
 
       const remainingPoints = updatedPointsBalance

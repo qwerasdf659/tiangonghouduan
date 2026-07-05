@@ -20,6 +20,7 @@ const { assertAndGetTransaction } = require('../../../utils/transactionHelpers')
 const MediaService = require('../../MediaService')
 const { MediaFile } = require('../../../models')
 const AssetProductGuard = require('../../shared/AssetProductGuard')
+const ProductCodeGenerator = require('../../../utils/ProductCodeGenerator')
 
 /**
  * 兑换市场管理 - 商品（SPU）管理服务（实例服务，依赖 models）
@@ -237,8 +238,15 @@ class ItemManagementService {
     // 门店专属兑换券业务线：核销范围配置归一化（applicable_scope/scoped_store_ids/merchant_id）
     const scopeFields = ItemManagementService._normalizeApplicableScope(itemData)
 
+    // 生成 SPU 平台展示码 item_code（无意义随机码 SP+12 位，唯一索引兜底，撞码重试）
+    const itemCode = await ProductCodeGenerator.generateUnique('SP', async code => {
+      const existing = await this.ExchangeItem.findOne({ where: { item_code: code }, transaction })
+      return !existing
+    })
+
     const item = await this.ExchangeItem.create(
       {
+        item_code: itemCode,
         item_name: name.trim(),
         description: description.trim(),
         primary_media_id: itemData.primary_media_id ?? null,
@@ -266,7 +274,11 @@ class ItemManagementService {
     const { ExchangeItemSku: ExchangeItemSkuModel, ExchangeChannelPrice: ChannelPriceModel } =
       this.models
     if (ExchangeItemSkuModel) {
-      const defaultSkuCode = `default_${item.exchange_item_id}`
+      // 默认 SKU 码统一为无意义随机码 SK+12 位（替代 default_{id}，收口到编码体系）
+      const defaultSkuCode = await ProductCodeGenerator.generateUnique('SK', async code => {
+        const existing = await ExchangeItemSkuModel.findOne({ where: { sku_code: code }, transaction })
+        return !existing
+      })
       const sku = await ExchangeItemSkuModel.create(
         {
           exchange_item_id: item.exchange_item_id,

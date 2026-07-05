@@ -100,6 +100,20 @@ function dashboardPanelPage() {
     merchantTrendChart: null,
     merchantPieChart: null,
 
+    // ==================== Tab 7: 商品主数据健康（商品编码体系 §8.3 看板 7/12/13） ====================
+    productCodeHealth: {
+      spu_total: 0,
+      item_code_null_count: 0,
+      in_series_count: 0,
+      sku_total: 0,
+      barcode_null_count: 0,
+      no_supplier_item_count: 0,
+      missing_supplier_code_count: 0,
+      supplier_link_total: 0,
+      duplicate_supplier_codes: [],
+      supplier_distribution: []
+    },
+
     /**
      * 初始化页面
      */
@@ -160,6 +174,9 @@ function dashboardPanelPage() {
           case 'merchant':
             await this.loadMerchantData()
             break
+          case 'product-code':
+            await this.loadProductCodeHealth()
+            break
         }
 
         this.lastUpdateTime = new Date().toLocaleTimeString('zh-CN', {
@@ -174,6 +191,29 @@ function dashboardPanelPage() {
     },
 
     // Tab 1 方法已移至 composables/dashboard-overview.js
+
+    // ==================== Tab 7: 商品主数据健康（商品编码体系） ====================
+    /**
+     * 加载商品主数据健康统计（真实库聚合：item_code 回填进度 / 货号缺失 / 重复货号 / 供货分布）
+     * 数据源：GET /api/v4/console/exchange/suppliers/health-stats（SupplierService 实连真实库统计）
+     * @returns {Promise<void>}
+     */
+    async loadProductCodeHealth() {
+      logger.info('[DashboardPanel] 加载商品主数据健康统计')
+      try {
+        const result = await request({
+          url: `${API_PREFIX}/console/exchange/suppliers/health-stats`
+        })
+        if (result.success && result.data) {
+          Object.assign(this.productCodeHealth, result.data)
+        } else {
+          logger.error('[DashboardPanel] loadProductCodeHealth 返回失败:', result.message)
+        }
+      } catch (e) {
+        // API 失败直接报错，不使用模拟数据（暴露问题）
+        logger.error('[DashboardPanel] loadProductCodeHealth 失败:', e.message)
+      }
+    },
 
     // ==================== Tab 2: 抽奖分析 ====================
     /**
@@ -764,8 +804,8 @@ function dashboardPanelPage() {
           // 根据后端实际数据构建流入流出
           const inflows = [
             {
-            type: 'lottery_win',
-            label: '回馈获得',
+              type: 'lottery_win',
+              label: '回馈获得',
               amount: points_stats?.points_earned_today || 0
             },
             { type: 'activity', label: '活动奖励', amount: inventory_stats?.new_items_today || 0 }
@@ -773,8 +813,8 @@ function dashboardPanelPage() {
 
           const outflows = [
             {
-            type: 'lottery_cost',
-            label: '回馈消耗',
+              type: 'lottery_cost',
+              label: '回馈消耗',
               amount: lottery_stats?.total_points_consumed || 0
             },
             {

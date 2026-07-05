@@ -438,6 +438,9 @@ class AdminSystemService {
     maintenance_mode: '维护模式',
     maintenance_message: '维护公告',
     maintenance_end_time: '维护结束时间',
+    maintenance_mode_wechat_mp: '微信小程序维护模式',
+    maintenance_message_wechat_mp: '小程序维护公告',
+    maintenance_end_time_wechat_mp: '小程序维护结束时间',
 
     // ===== 积分设置 (points) =====
     lottery_cost_points: '抽奖消耗积分',

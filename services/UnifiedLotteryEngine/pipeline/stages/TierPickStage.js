@@ -570,10 +570,21 @@ class TierPickStage extends BaseStage {
 
       /*
        * 查询用户信息用于分群规则匹配
-       * 注意：users 表当前没有 last_active_at 字段，使用 updated_at 作为替代
+       * 必须取全 segment_field_registry 白名单字段（含 D-2 扩充的 login_count/last_login），
+       * 否则条件引用缺失字段时求值恒 false，且与 CrystalMultiplierService 的分群命中不同源（D-1）。
        */
       const user = await User.findByPk(user_id, {
-        attributes: ['user_id', 'created_at', 'updated_at']
+        attributes: [
+          'user_id',
+          'created_at',
+          'updated_at', // 内置回退规则（SEGMENT_RULE_VERSIONS）引用 user.updated_at，须保留
+          'last_active_at',
+          'history_total_points',
+          'user_level',
+          'consecutive_fail_count',
+          'login_count',
+          'last_login'
+        ]
       })
 
       if (!user) {

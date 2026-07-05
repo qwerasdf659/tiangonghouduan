@@ -88,12 +88,25 @@ module.exports = sequelize => {
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE'
       },
-      /** 全局唯一 SKU 编码 */
+      /**
+       * SKU 平台展示码（无意义随机码，系统生成）
+       * 规范形 = SK + 12 位 Base32 随机字符（如 SK4N8PTX2H9QYR），展示形 SK-XXXX-XXXX-XXXX。
+       * 编码不含业务语义，业务含义落在 SKU 销售属性表；由 ProductCodeGenerator('SK') 统一生成。
+       */
       sku_code: {
-        type: DataTypes.STRING(100),
+        type: DataTypes.STRING(14),
         allowNull: false,
         unique: true,
-        comment: 'SKU 唯一编码（如 dragon_gem_blue_L）'
+        comment: 'SKU 平台展示码(无意义随机码 SK+12位规范形,系统生成)'
+      },
+      /**
+       * 国际标准条码（UPC/EAN-13/GTIN，预留字段，可空）
+       * 对接商超/海外/扫码枪用；区别于供应商货号（supplier_item_code），当前留空不参与逻辑。
+       */
+      barcode: {
+        type: DataTypes.STRING(20),
+        allowNull: true,
+        comment: '国际标准条码(UPC/EAN/GTIN,预留,可空)'
       },
       /** 可售库存 */
       stock: {

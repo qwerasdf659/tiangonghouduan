@@ -316,9 +316,8 @@ export function usePropShopMethods() {
       if (!exchangeItemId) {
         throw new Error('创建商品未返回 exchange_item_id')
       }
-      // 步骤3：建默认 SKU
+      // 步骤3：建默认 SKU（sku_code 由后端 ProductCodeGenerator 统一生成 SK+12 位随机码，不接受人工传入——商品编码体系落地）
       const skuRes = await ExchangeItemAPI.createSku(exchangeItemId, {
-        sku_code: `prop_${exchangeItemId}_default`,
         stock: Number(f.stock) || 0,
         cost_price: 0,
         status: f.status || 'active'
@@ -332,8 +331,6 @@ export function usePropShopMethods() {
       await ExchangeItemAPI.setChannelPrices(skuId, [
         { cost_asset_code: PROP_STAR_STONE, cost_amount: Number(f.star_stone_price) }
       ])
-    },
+    }
   }
 }
-
-

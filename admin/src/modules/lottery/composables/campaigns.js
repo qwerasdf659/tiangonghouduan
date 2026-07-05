@@ -48,6 +48,8 @@ export function useCampaignsState() {
       pick_method: 'tier_first',
       /** 预算模式：user=用户预算扣减 / pool=活动池预算扣减 / none=不限制（测试用） */
       budget_mode: 'user',
+      /** 入场资产码（双层货币可见层）：points=全局可见积分(默认,常驻活动) / event_points=活动专属代币(限时活动,到期清零) */
+      entry_asset_code: 'points',
       /** 预设预算策略：follow_campaign=遵循budget_mode / pool_first=先pool后user / user_first=先user后pool */
       preset_budget_policy: 'follow_campaign',
       /** 默认用户配额（pool+quota模式按需初始化时使用） */
@@ -123,6 +125,11 @@ export function useCampaignsState() {
       { value: 'user', label: '用户预算', desc: '从用户预算账户扣减' },
       { value: 'pool', label: '活动池预算', desc: '从活动池预算扣减' },
       { value: 'none', label: '不限制（测试用）', desc: '无预算限制，仅用于测试' }
+    ],
+    /** @type {Array} 入场资产选项（对应 entry_asset_code 字段，双层货币可见层 §12.7） */
+    entryAssetOptions: [
+      { value: 'points', label: '全局积分（默认）', desc: '常驻活动扣全局可见积分 points，语义与历史一致' },
+      { value: 'event_points', label: '活动专属积分', desc: '限时活动扣活动专属代币 event_points，按活动隔离、到期清零（防囤积套利）' }
     ],
     /** @type {Array} 预设预算策略选项（对应 preset_budget_policy 字段） */
     presetBudgetPolicyOptions: [
@@ -382,6 +389,7 @@ export function useCampaignsMethods(_context) {
         // 抽奖引擎核心配置
         pick_method: fullCampaign.pick_method || 'tier_first',
         budget_mode: fullCampaign.budget_mode || 'user',
+        entry_asset_code: fullCampaign.entry_asset_code || 'points',
         preset_budget_policy: fullCampaign.preset_budget_policy || 'follow_campaign',
         default_quota: fullCampaign.default_quota ?? 0,
         quota_init_mode: fullCampaign.quota_init_mode || 'on_demand',
@@ -460,6 +468,7 @@ export function useCampaignsMethods(_context) {
           // ======== 抽奖引擎核心配置 ========
           pick_method: this.campaignForm.pick_method || 'tier_first',
           budget_mode: this.campaignForm.budget_mode || 'user',
+          entry_asset_code: this.campaignForm.entry_asset_code || 'points',
           preset_budget_policy: this.campaignForm.preset_budget_policy || 'follow_campaign',
           default_quota: parseFloat(this.campaignForm.default_quota) || 0,
           quota_init_mode: this.campaignForm.quota_init_mode || 'on_demand',

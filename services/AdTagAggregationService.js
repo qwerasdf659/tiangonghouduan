@@ -12,10 +12,12 @@
  */
 
 const logger = require('../utils/logger').logger
-const { UserAdTag, User, LotteryDraw, AccountAssetBalance, ExchangeRecord } = require('../models')
+const { UserAdTag, User, LotteryDraw, ExchangeRecord } = require('../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { AssetCode } = require('../constants/AssetCode')
+// 资产余额读取统一走 BalanceService（余额按 account_id 存储、字段 available_amount；不可用 user_id/balance 直查）
+const BalanceService = require('./asset/BalanceService')
 
 /**
  * 广告标签聚合服务类
@@ -178,7 +180,7 @@ class AdTagAggregationService {
       const lotteryCount7d = await LotteryDraw.count({
         where: {
           user_id: userId,
-          draw_time: { [Op.gte]: sevenDaysAgo }
+          created_at: { [Op.gte]: sevenDaysAgo }
         },
         transaction
       })
@@ -190,7 +192,7 @@ class AdTagAggregationService {
       const lotteryCount30d = await LotteryDraw.count({
         where: {
           user_id: userId,
-          draw_time: { [Op.gte]: thirtyDaysAgo }
+          created_at: { [Op.gte]: thirtyDaysAgo }
         },
         transaction
       })
@@ -203,31 +205,25 @@ class AdTagAggregationService {
       })
       tags.set('lottery_total_count', String(totalLotteryCount))
 
-      // 4. star_stone_balance: 当前星石余额
-      const starStoneBalance = await AccountAssetBalance.findOne({
-        where: {
-          user_id: userId,
-          asset_code: AssetCode.STAR_STONE
-        },
-        attributes: ['balance'],
-        transaction
-      })
-      const starStoneBalanceValue = starStoneBalance ? parseFloat(starStoneBalance.balance) : 0
+      // 4. star_stone_balance: 当前星石余额（经 BalanceService 按 account_id 读取 available_amount）
+      const starStoneBalance = await BalanceService.getBalance(
+        { user_id: userId, asset_code: AssetCode.STAR_STONE },
+        { transaction }
+      )
+      const starStoneBalanceValue = starStoneBalance
+        ? parseFloat(starStoneBalance.available_amount)
+        : 0
       tags.set('star_stone_balance', String(starStoneBalanceValue))
 
       // 5. star_stone_rich: 星石余额 > 1000
       tags.set('star_stone_rich', starStoneBalanceValue > 1000 ? 'true' : 'false')
 
-      // 6. has_red_core_shard: 红源晶碎片余额 > 0
-      const redShardBalance = await AccountAssetBalance.findOne({
-        where: {
-          user_id: userId,
-          asset_code: AssetCode.RED_CORE_SHARD
-        },
-        attributes: ['balance'],
-        transaction
-      })
-      const redShardValue = redShardBalance ? parseFloat(redShardBalance.balance) : 0
+      // 6. has_red_core_shard: 红源晶碎片余额 > 0（经 BalanceService 按 account_id 读取 available_amount）
+      const redShardBalance = await BalanceService.getBalance(
+        { user_id: userId, asset_code: AssetCode.RED_CORE_SHARD },
+        { transaction }
+      )
+      const redShardValue = redShardBalance ? parseFloat(redShardBalance.available_amount) : 0
       tags.set('has_red_core_shard', redShardValue > 0 ? 'true' : 'false')
 
       // 7. exchange_buyer: 有官方兑换/直购记录（B2C，C2C 交易市场已下线）

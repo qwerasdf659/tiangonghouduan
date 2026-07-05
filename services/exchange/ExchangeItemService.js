@@ -10,6 +10,8 @@ const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
 const { logger } = require('../../utils/logger')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const BusinessError = require('../../utils/BusinessError')
+const ProductCodeGenerator = require('../../utils/ProductCodeGenerator')
+const SeriesSeqAllocator = require('../../utils/SeriesSeqAllocator')
 
 /** 兑换订单视为「已完成/不可删 SKU」的状态（业务上已占用该 SKU） */
 const EXCHANGE_RECORD_BLOCKING_STATUSES = ['approved', 'shipped', 'received', 'rated', 'completed']
@@ -66,7 +68,26 @@ class ExchangeItemService {
     if (filters.space) where.space = filters.space
     if (filters.rarity_code) where.rarity_code = filters.rarity_code
     if (filters.keyword && String(filters.keyword).trim()) {
-      where.item_name = { [Op.like]: `%${String(filters.keyword).trim()}%` }
+      /*
+       * 管理端关键词搜索（编码 + 名称双入口，商品编码体系 §8.3 必备项2）：
+       * - 命中 SP 编码格式（容错大小写/横线/空格）→ item_code 精确匹配；
+       * - 命中 SK 编码格式 → 反查 SKU 所属 SPU 精确定位；
+       * - 未命中编码格式 → item_name 模糊匹配（原有行为）。
+       */
+      const trimmedKeyword = String(filters.keyword).trim()
+      const codeHit = ProductCodeGenerator.detect(trimmedKeyword)
+      if (codeHit.matched && codeHit.prefix === 'SP') {
+        where.item_code = codeHit.normalized
+      } else if (codeHit.matched && codeHit.prefix === 'SK') {
+        const skuRow = await ExchangeItemSku.findOne({
+          where: { sku_code: codeHit.normalized },
+          attributes: ['exchange_item_id']
+        })
+        // SK 码未命中给不可能 ID，返回空列表（编码查询语义是精确查找，不做模糊兜底）
+        where.exchange_item_id = skuRow ? skuRow.exchange_item_id : -1
+      } else {
+        where.item_name = { [Op.like]: `%${trimmedKeyword}%` }
+      }
     }
     /*
      * 低库存预警筛选（看板三 2026-06-24）：仅看 active 且 SPU 库存 <= 预警阈值（stock_alert_threshold，默认 5）。
@@ -100,6 +121,13 @@ class ExchangeItemService {
         { model: Category, as: 'category', required: false },
         { model: RarityDef, as: 'rarityDef', required: false },
         { model: MediaFile, as: 'primary_media', required: false },
+        // 所属产品系列（连号系列号轨道，可空）：管理端列表/手册导出展示 series_code + series_seq
+        {
+          model: this.models.ProductSeries,
+          as: 'series',
+          attributes: ['series_id', 'series_code', 'series_name', 'seq_pad'],
+          required: false
+        },
         {
           model: ItemTemplate,
           as: 'itemTemplate',
@@ -165,6 +193,27 @@ class ExchangeItemService {
         { model: RarityDef, as: 'rarityDef', required: false },
         { model: ItemTemplate, as: 'itemTemplate', required: false },
         { model: MediaFile, as: 'primary_media', required: false },
+        // 所属产品系列（连号系列号轨道，可空）：详情页展示系列号 series_code-series_seq
+        {
+          model: this.models.ProductSeries,
+          as: 'series',
+          attributes: ['series_id', 'series_code', 'series_name', 'seq_pad'],
+          required: false
+        },
+        // 供应商关联行（多供应商 + 各自货号 + 主供货商标记，商品编码体系 §3.8）
+        {
+          model: this.models.ExchangeItemSupplier,
+          as: 'supplierLinks',
+          required: false,
+          include: [
+            {
+              model: this.models.Supplier,
+              as: 'supplier',
+              attributes: ['supplier_id', 'supplier_name', 'status'],
+              required: false
+            }
+          ]
+        },
         {
           model: ExchangeItemAttributeValue,
           as: 'attributeValues',
@@ -210,9 +259,23 @@ class ExchangeItemService {
     const { ExchangeItem } = this.models
 
     const payload = ExchangeItemService._pickExchangeItemPayload(data)
+
+    // 生成 SPU 平台展示码 item_code（无意义随机码 SP+12 位，唯一索引兜底，撞码重试）
+    payload.item_code = await ProductCodeGenerator.generateUnique('SP', async code => {
+      const existing = await ExchangeItem.findOne({ where: { item_code: code }, transaction })
+      return !existing
+    })
+
+    // 选填系列：归入系列时在事务内分配连续序号 series_seq（行锁防并发重号）
+    if (payload.series_id != null) {
+      const { series_seq } = await SeriesSeqAllocator.allocate(payload.series_id, transaction)
+      payload.series_seq = series_seq
+    }
+
     const created = await ExchangeItem.create(payload, { transaction })
     logger.info('ExchangeItemService.createExchangeItem 成功', {
       exchange_item_id: created.exchange_item_id,
+      item_code: created.item_code,
       ts: BeijingTimeHelper.apiTimestamp()
     })
     return created
@@ -294,7 +357,6 @@ class ExchangeItemService {
    *
    * @param {number|string} exchangeItemId - 商品 ID
    * @param {Object} data - SKU 数据
-   * @param {string} [data.sku_code] - SKU 编码（唯一）；不传则后端自动生成 P{pid}_{时间戳}_{随机}
    * @param {number} [data.stock] - 库存数量
    * @param {number} [data.cost_price] - 成本价
    * @param {string} [data.status] - SKU 状态
@@ -320,14 +382,11 @@ class ExchangeItemService {
     }
 
     /*
-     * sku_code 自动生成（2026-06-12 拍板：后端自动生成）：
-     * 手动建单规格 SKU 时前端不再要求填写 sku_code；未传入则按 P{pid}_{时间戳}{随机} 规则生成，
-     * 并校验全局唯一（sku_code 为唯一索引），与笛卡尔生成路径 P{pid}_ 前缀风格一致。
-     * 显式传入 sku_code 时沿用传入值（保留批量导入/迁移场景）。
+     * sku_code 统一由系统生成（商品编码体系落地）：
+     * 移除人工传入口子，所有 SKU 码统一为无意义随机码 SK+12 位规范形（ProductCodeGenerator），
+     * 唯一索引兜底、撞码重试，杜绝人工填错与属性语义耦合。
      */
-    const skuCode = data.sku_code
-      ? String(data.sku_code)
-      : await this._generateUniqueSkuCode(pid, transaction)
+    const skuCode = await this._generateUniqueSkuCode(transaction)
 
     const sku = await ExchangeItemSku.create(
       {
@@ -397,7 +456,7 @@ class ExchangeItemService {
     }
 
     const patch = {}
-    if (data.sku_code != null) patch.sku_code = String(data.sku_code)
+    // sku_code 为系统生成的不可变展示码，不接受人工修改（编码体系铁律：杜绝人工填错）
     if (data.stock != null) patch.stock = Number(data.stock)
     if (data.cost_price !== undefined) patch.cost_price = data.cost_price
     if (data.status != null) patch.status = data.status
@@ -553,6 +612,33 @@ class ExchangeItemService {
     const combos = ExchangeItemService._cartesian(optionArrays)
     const created = []
 
+    /*
+     * 幂等去重（编码体系落地后由"属性组合签名"判断，替代旧的按确定性编码去重）：
+     * sku_code 已改为无意义随机码，无法再靠编码识别"同一组合"；改为以该 SPU 现有 SKU 的
+     * 销售属性值集合作为签名，重复组合跳过创建，保证重复调用不产生重复 SKU（业务语义更准）。
+     */
+    const comboSignature = pairs =>
+      [...pairs]
+        .sort((a, b) => a.attribute_id - b.attribute_id)
+        .map(p => `${p.attribute_id}:${p.option_id}`)
+        .join('__')
+
+    const existingSkus = await ExchangeItemSku.findAll({
+      where: { exchange_item_id: pid },
+      include: [{ model: SkuAttributeValue, as: 'attributeValues', required: false }],
+      transaction
+    })
+    const existingSignatures = new Set(
+      existingSkus.map(s =>
+        comboSignature(
+          (s.attributeValues || []).map(v => ({
+            attribute_id: v.attribute_id,
+            option_id: v.option_id
+          }))
+        )
+      )
+    )
+
     for (const combo of combos) {
       for (const pair of combo) {
         // eslint-disable-next-line no-await-in-loop
@@ -569,16 +655,14 @@ class ExchangeItemService {
         }
       }
 
-      const skuCode = ExchangeItemService._buildCartesianSkuCode(pid, combo)
-      // eslint-disable-next-line no-await-in-loop
-      const existing = await ExchangeItemSku.findOne({ where: { sku_code: skuCode }, transaction })
-      if (existing) {
-        logger.warn('ExchangeItemService.generateSkuCartesian 跳过已存在 sku_code', {
-          sku_code: skuCode
-        })
+      const signature = comboSignature(combo)
+      if (existingSignatures.has(signature)) {
+        logger.warn('ExchangeItemService.generateSkuCartesian 跳过已存在属性组合', { signature })
         continue
       }
 
+      // eslint-disable-next-line no-await-in-loop
+      const skuCode = await this._generateUniqueSkuCode(transaction)
       // eslint-disable-next-line no-await-in-loop
       const sku = await ExchangeItemSku.create(
         {
@@ -598,6 +682,7 @@ class ExchangeItemService {
       }))
       // eslint-disable-next-line no-await-in-loop
       await SkuAttributeValue.bulkCreate(rows, { transaction })
+      existingSignatures.add(signature)
       created.push(sku)
     }
 
@@ -749,6 +834,8 @@ class ExchangeItemService {
       'is_recommended',
       'attributes_json',
       'max_quantity_per_order',
+      // 商品编码体系：所属系列可选（series_seq 由系统在事务内发号，item_code 由系统生成，均不接受人工传入）
+      'series_id',
       // 门店专属兑换券业务线：核销范围配置（前端零映射直传后端字段）
       'applicable_scope',
       'scoped_store_ids',
@@ -869,47 +956,29 @@ class ExchangeItemService {
   }
 
   /**
-   * 根据属性组合生成 SKU 编码（如 P5_1_2__3_4）
-   * @private
-   * @param {number} exchangeItemId - 商品 ID
-   * @param {Array<{attribute_id: number, option_id: number}>} combo - 属性选项组合
-   * @returns {string} 生成的 SKU 编码
-   */
-  static _buildCartesianSkuCode(exchangeItemId, combo) {
-    const parts = [...combo]
-      .sort((a, b) => a.attribute_id - b.attribute_id)
-      .map(p => `${p.attribute_id}_${p.option_id}`)
-    return `P${exchangeItemId}_${parts.join('__')}`
-  }
-
-  /**
-   * 生成全局唯一的 SKU 编码（手动建单规格 SKU 用，无销售属性组合时）
+   * 生成全局唯一的 SKU 平台展示码（无意义随机码 SK+12 位规范形）
    *
-   * 规则：P{exchange_item_id}_{北京时间紧凑时间戳}_{4位随机}，与笛卡尔路径 P{pid}_ 前缀风格一致。
-   * 校验 sku_code 唯一索引：极小概率撞码时重试，最多 5 次仍冲突则抛错（不静默兜底）。
+   * 编码体系铁律：sku_code 不含业务语义，统一由 ProductCodeGenerator 生成，唯一索引兜底、
+   * 撞码重试，5 次仍冲突则显式抛错（不静默兜底）。手动建单与笛卡尔批量均收口到此方法。
    *
-   * @param {number} exchangeItemId - 商品 ID（SPU 主键）
-   * @param {Object} transaction - Sequelize 事务实例（与 createSku 同一事务）
-   * @returns {Promise<string>} 唯一的 sku_code（长度 <= 100，符合模型约束）
+   * @param {Object} transaction - Sequelize 事务实例（与调用方同一事务，唯一性在事务内校验）
+   * @returns {Promise<string>} 唯一的 sku_code（SK+12 位，长度 14，符合模型约束）
    * @private
    */
-  async _generateUniqueSkuCode(exchangeItemId, transaction) {
+  async _generateUniqueSkuCode(transaction) {
     const { ExchangeItemSku } = this.models
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const compactTs = BeijingTimeHelper.apiTimestamp().replace(/[^0-9]/g, '')
-      const rand = Math.random().toString(36).slice(2, 6)
-      const skuCode = `P${exchangeItemId}_${compactTs}_${rand}`
-      // eslint-disable-next-line no-await-in-loop
-      const existing = await ExchangeItemSku.findOne({ where: { sku_code: skuCode }, transaction })
-      if (!existing) {
-        return skuCode
-      }
+    try {
+      return await ProductCodeGenerator.generateUnique('SK', async code => {
+        const existing = await ExchangeItemSku.findOne({ where: { sku_code: code }, transaction })
+        return !existing
+      })
+    } catch (error) {
+      throw new BusinessError(
+        `sku_code 自动生成失败：${error.message}`,
+        'PRODUCT_CENTER_SKU_CODE_GENERATE_FAILED',
+        500
+      )
     }
-    throw new BusinessError(
-      'sku_code 自动生成多次冲突，请重试',
-      'PRODUCT_CENTER_SKU_CODE_GENERATE_FAILED',
-      500
-    )
   }
 
   /**

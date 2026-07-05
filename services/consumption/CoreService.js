@@ -31,6 +31,7 @@ const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
 const { AssetCode } = require('../../constants/AssetCode')
 const AdminSystemService = require('../AdminSystemService')
 const ContentAuditEngine = require('../ContentAuditEngine')
+const EventBudgetService = require('../lottery/EventBudgetService')
 
 /**
  * 消费记录核心服务类
@@ -392,6 +393,20 @@ class CoreService {
     )
 
     if (budgetPointsToAllocate > 0) {
+      /*
+       * 活动预算归集判定（水晶奖品倍率活动设计方案 §12.10 / §18.4 防囤积套利）：
+       * - 命中活动归集规则 → 预算全额重定向进该活动专属桶 EVENT_<活动code>（防7 全量重定向），
+       *   并按规则比率同步发放活动积分 event_points（可见层入场代币，§12.7 双层货币）。
+       * - 未命中 → 维持全局桶 CONSUMPTION_DEFAULT（常驻活动/日常消费不受影响）。
+       * 归集去向由后端规则自动判定，小程序/商家端无人工选择口（防9）。
+       */
+      const collectionTarget = await EventBudgetService.resolveCollectionTarget({
+        store_id: record.store_id,
+        merchant_id: record.merchant_id,
+        transaction
+      })
+      const budgetBucketKey = collectionTarget ? collectionTarget.bucket_key : 'CONSUMPTION_DEFAULT'
+
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
       const budgetResult = await BalanceService.changeBalance(
         {
@@ -400,22 +415,63 @@ class CoreService {
           delta_amount: budgetPointsToAllocate,
           business_type: 'consumption_budget_allocation',
           idempotency_key: `consumption_budget:approve:${recordId}`,
-          lottery_campaign_id: 'CONSUMPTION_DEFAULT',
+          lottery_campaign_id: budgetBucketKey,
           counterpart_account_id: mintAccount.account_id,
           meta: {
             reference_type: 'consumption',
             reference_id: recordId,
             consumption_amount: record.consumption_amount,
             budget_ratio: budgetRatio,
-            description: `消费${record.consumption_amount}元，分配预算积分${budgetPointsToAllocate}`
+            ...(collectionTarget
+              ? {
+                  collection_rule_id: Number(collectionTarget.rule.collection_rule_id),
+                  event_campaign_id: collectionTarget.campaign.lottery_campaign_id
+                }
+              : {}),
+            description: `消费${record.consumption_amount}元，分配预算积分${budgetPointsToAllocate}（桶：${budgetBucketKey}）`
           }
         },
         { transaction }
       )
 
       logger.info(
-        `💰 预算分配成功: user_id=${record.user_id}, 预算积分=${budgetPointsToAllocate}, lottery_campaign_id=CONSUMPTION_DEFAULT, 幂等=${budgetResult.is_duplicate ? '重复' : '新增'}`
+        `💰 预算分配成功: user_id=${record.user_id}, 预算积分=${budgetPointsToAllocate}, lottery_campaign_id=${budgetBucketKey}, 幂等=${budgetResult.is_duplicate ? '重复' : '新增'}`
       )
+
+      // 命中归集规则时同步发放活动积分 event_points（可见层入场代币，按活动分桶，到期清零）
+      if (collectionTarget && collectionTarget.event_points_ratio > 0) {
+        const eventPointsToIssue = Math.round(
+          parseFloat(record.consumption_amount) * collectionTarget.event_points_ratio
+        )
+        if (eventPointsToIssue > 0) {
+          // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
+          const eventPointsResult = await BalanceService.changeBalance(
+            {
+              user_id: record.user_id,
+              asset_code: AssetCode.EVENT_POINTS,
+              delta_amount: eventPointsToIssue,
+              business_type: 'consumption_event_points_allocation',
+              idempotency_key: `consumption_event_points:approve:${recordId}`,
+              lottery_campaign_id: budgetBucketKey,
+              counterpart_account_id: mintAccount.account_id,
+              meta: {
+                reference_type: 'consumption',
+                reference_id: recordId,
+                consumption_amount: record.consumption_amount,
+                event_points_ratio: collectionTarget.event_points_ratio,
+                collection_rule_id: Number(collectionTarget.rule.collection_rule_id),
+                event_campaign_id: collectionTarget.campaign.lottery_campaign_id,
+                description: `活动"${collectionTarget.campaign.campaign_name}"期间消费${record.consumption_amount}元，获得活动积分${eventPointsToIssue}`
+              }
+            },
+            { transaction }
+          )
+
+          logger.info(
+            `🎪 活动积分发放成功: user_id=${record.user_id}, event_points=${eventPointsToIssue}, 桶=${budgetBucketKey}, 幂等=${eventPointsResult.is_duplicate ? '重复' : '新增'}`
+          )
+        }
+      }
     }
 
     let starStoneQuotaAllocated = 0

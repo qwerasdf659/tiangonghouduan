@@ -74,6 +74,14 @@
                 <button @click="exitSortMode()" class="action-btn action-btn-secondary">取消</button>
               </div>
             </template>
+            <!-- 扫码/输码快速定位（§8.3 增强项6）：输码或扫码枪录入后回车，精确直达单品详情，供客服/对账高频使用 -->
+            <div x-show="!sortMode" class="flex items-center gap-1 ml-2" x-cloak>
+              <input type="text" x-model="quickLocateCode" @keyup.enter="quickLocate(quickLocateCode)"
+                     placeholder="扫码/输码直达单品"
+                     class="w-44 px-3 py-2 text-sm border rounded-lg themed-border focus:ring-2 focus:ring-rose-500 focus:border-rose-500 font-mono">
+              <button type="button" @click="quickLocate(quickLocateCode)"
+                      class="px-3 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-colors" title="扫码或输入商品编码直达单品详情">🎯 定位</button>
+            </div>
           </div>
           <!-- 网格/列表视图切换（与下方 data-table 共用数据源） -->
           <div class="flex gap-1 items-center shrink-0" x-show="!sortMode" x-cloak>
@@ -135,6 +143,17 @@
             </button>
           </div>
 
+          <!-- 编码/名称搜索框（商品编码体系：输 SP/SK 编码精确定位，容错大小写/横线/空格；输文字按名称模糊搜） -->
+          <div class="flex items-center gap-2 mb-3">
+            <input type="text" x-model="searchKeyword" @keyup.enter="applyKeywordSearch()"
+                   placeholder="输入商品编码（SP-XXXX-XXXX-XXXX / SK 码）或商品名称"
+                   class="flex-1 max-w-md px-3 py-2 text-sm border rounded-lg themed-border focus:ring-2 focus:ring-green-500 focus:border-green-500 font-mono">
+            <button type="button" @click="applyKeywordSearch()"
+                    class="px-4 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">🔍 搜索</button>
+            <button type="button" x-show="searchKeyword" @click="clearKeywordSearch()"
+                    class="px-3 py-2 text-sm border rounded-lg themed-border themed-text-muted hover:bg-gray-50 transition-colors">✕ 清空</button>
+          </div>
+
           <!-- 批量操作栏（选中商品时显示） -->
           <div x-show="hasSelected" x-cloak class="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200 flex items-center gap-3 flex-wrap">
             <span class="text-sm text-blue-700 font-medium">已选 <span x-text="selectedCount"></span> 个商品</span>
@@ -142,7 +161,8 @@
             <button @click="$dispatch('batch-status', { ids: selectedRows, status: 'inactive' })" class="px-3 py-1.5 bg-gray-500 text-white text-sm rounded hover:bg-gray-600">批量下架</button>
             <button @click="$dispatch('batch-price-modal', { ids: selectedRows })" class="px-3 py-1.5 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600">批量改价</button>
             <button @click="$dispatch('batch-category-modal', { ids: selectedRows })" class="px-3 py-1.5 bg-purple-500 text-white text-sm rounded hover:bg-purple-600">批量修改分类</button>
-            <button @click="exportItems()" class="px-3 py-1.5 bg-indigo-500 text-white text-sm rounded hover:bg-indigo-600">导出 CSV</button>
+            <button @click="exportItems()" class="px-3 py-1.5 bg-indigo-500 text-white text-sm rounded hover:bg-indigo-600">导出 xlsx</button>
+            <button @click="exportManualPdf()" class="px-3 py-1.5 bg-rose-500 text-white text-sm rounded hover:bg-rose-600">导出手册 PDF</button>
             <label class="px-3 py-1.5 bg-teal-500 text-white text-sm rounded hover:bg-teal-600 cursor-pointer">
               导入 Excel/CSV
               <input type="file" accept=".xlsx,.csv" class="hidden" @change="importItems($event)">
@@ -169,6 +189,10 @@
                   </div>
                   <div class="p-3 flex-1 flex flex-col gap-2">
                     <h3 class="font-medium text-sm line-clamp-2" x-text="row.item_name || '-'"></h3>
+                    <!-- 商品编码（展示形 SP-XXXX-XXXX-XXXX，手册/对账主标识） -->
+                    <div x-show="row.item_code" class="text-xs font-mono text-indigo-600"
+                         x-text="formatItemCode(row.item_code)"
+                         title="平台商品展示码（SPU）"></div>
                     <div class="text-sm text-green-600 font-mono">
                       <span x-text="row.min_cost_amount ?? 0"></span>
                       <span class="text-xs text-gray-500" x-text="' ' + getAssetTypeName(row.min_cost_asset_code)"></span>
@@ -758,6 +782,18 @@
             <label class="block text-sm font-medium themed-text-secondary mb-1">商品名称 <span class="text-red-500">*</span></label>
             <input type="text" x-model="itemForm.item_name" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" required>
           </div>
+          <!-- 商品编码（商品编码体系：系统生成只读；展示形 + 二维码，扫码结果=编码可作搜索输入） -->
+          <div x-show="editingItemId && editingItemCode" class="rounded-lg border border-indigo-100 bg-indigo-50/50 px-4 py-3 flex items-center gap-4">
+            <div class="flex-1">
+              <p class="text-xs font-semibold text-indigo-500 mb-1">平台商品编码（系统生成，印刷手册用）</p>
+              <p class="font-mono text-base font-bold text-indigo-700" x-text="formatItemCodeDisplay(editingItemCode)"></p>
+              <p x-show="editingSeriesNo" class="text-xs text-teal-600 mt-1">
+                系列号：<span class="font-mono font-semibold" x-text="editingSeriesNo"></span>
+              </p>
+            </div>
+            <!-- 二维码（拍1 方案A：admin 纯 JS qrcode 端侧渲染，内容=编码规范形） -->
+            <canvas id="item-code-qr-canvas" width="96" height="96" class="border rounded bg-white" title="扫码得到商品编码，可作为搜索输入"></canvas>
+          </div>
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">商品描述</label>
             <div class="border rounded-lg overflow-hidden">
@@ -909,6 +945,43 @@
               <label class="block text-sm font-medium themed-text-secondary mb-1">原价（划线价）</label>
               <input type="number" x-model.number="itemForm.original_price" min="0" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="留空表示无原价">
             </div>
+          </div>
+          <!-- 所属系列（商品编码体系双轨制：归入系列时后端事务内自动发连续序号 series_seq） -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">所属系列 <span class="text-xs themed-text-muted">(选填；归入系列后系统自动分配连号，如 SLNB-001)</span></label>
+            <select x-model="itemForm.series_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+              <option :value="null">不归入系列</option>
+              <template x-for="s in seriesOptions" :key="s.series_id">
+                <option :value="s.series_id" x-text="s.series_code + ' - ' + s.series_name"></option>
+              </template>
+            </select>
+            <p class="text-xs text-gray-400 mt-1">系列在「产品系列管理」页维护；序号连续不回收，下架商品序号留空号</p>
+          </div>
+          <!-- 供应商关联（商品编码体系 §3.8：多供应商 + 各自货号 + 主供货商标记；货号可空可重复仅对账参考） -->
+          <div class="rounded-lg border border-cyan-200 bg-cyan-50/40 p-3">
+            <div class="flex justify-between items-center mb-2">
+              <label class="text-sm font-medium themed-text-secondary">🏭 供应商关联 <span class="text-xs themed-text-muted">(选填；不挂供应商=自营/未知来源)</span></label>
+              <button type="button" @click="addSupplierLink()" class="text-xs px-2 py-1 bg-cyan-500 text-white rounded hover:bg-cyan-600">+ 添加供应商</button>
+            </div>
+            <div x-show="itemSupplierLinks.length === 0" class="text-xs themed-text-muted py-1">暂无供应商关联（自营/未知来源）</div>
+            <template x-for="(link, idx) in itemSupplierLinks" :key="idx">
+              <div class="flex items-center gap-2 mb-2">
+                <select x-model="link.supplier_id" class="flex-1 px-2 py-1.5 text-sm border rounded focus:ring-2 focus:ring-cyan-500">
+                  <option value="">选择供应商</option>
+                  <template x-for="s in supplierOptions" :key="s.supplier_id">
+                    <option :value="s.supplier_id" x-text="s.supplier_name"></option>
+                  </template>
+                </select>
+                <input type="text" x-model="link.supplier_item_code" placeholder="该供应商货号（可空，如 CB4385）"
+                       class="flex-1 px-2 py-1.5 text-sm border rounded font-mono focus:ring-2 focus:ring-cyan-500">
+                <label class="flex items-center gap-1 text-xs whitespace-nowrap cursor-pointer" title="主供货商（展示/默认对账，最多一个）">
+                  <input type="checkbox" :checked="link.is_primary" @change="setPrimarySupplierLink(idx)" class="w-3.5 h-3.5 text-cyan-500 rounded">
+                  主供
+                </label>
+                <button type="button" @click="removeSupplierLink(idx)" class="text-red-500 hover:text-red-700 text-sm px-1" title="移除该行">✕</button>
+              </div>
+            </template>
+            <p class="text-xs text-gray-400">货号是供应商自有编码（可重复可空），仅采购对账参考；系统内部只认我方 SP 商品编码</p>
           </div>
           <!-- 门店专属兑换券：履约类型 + 核销范围（业务线2） -->
           <div class="grid grid-cols-2 gap-4 p-3 rounded-lg bg-amber-50 border border-amber-200">
@@ -1116,6 +1189,7 @@
               <table class="w-full text-sm border">
                 <thead class="themed-bg-base">
                   <tr>
+                    <th class="px-3 py-2 text-left">SKU编码</th>
                     <th class="px-3 py-2 text-left">规格值</th>
                     <th class="px-3 py-2 text-left">价格</th>
                     <th class="px-3 py-2 text-left">库存</th>
@@ -1127,6 +1201,10 @@
                 <tbody class="divide-y">
                   <template x-for="sku in itemSkus" :key="sku.sku_id">
                     <tr class="themed-hover-bg">
+                      <!-- SKU 平台展示码（SK-XXXX-XXXX-XXXX，系统生成不可改） -->
+                      <td class="px-3 py-2">
+                        <span class="font-mono text-xs text-indigo-600" x-text="formatSkuCode(sku.sku_code)" title="SKU 平台展示码（系统生成）"></span>
+                      </td>
                       <td class="px-3 py-2">
                         <template x-for="(val, key) in (sku.spec_values || {})" :key="key">
                           <span class="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs mr-1" x-text="key + ':' + val"></span>

@@ -229,6 +229,41 @@ export function formatPercent(value, decimals = 2) {
   return (value * 100).toFixed(decimals) + '%'
 }
 
+/**
+ * 格式化商品编码为展示形（商品编码体系：规范形 → 前缀-4-4-4 分组）
+ *
+ * 业务规则（与后端 utils/ProductCodeGenerator.format 完全一致）：
+ * - 数据库存规范形（如 SP7K9MQ3RWX2NV），凡展示处一律输出展示形 SP-7K9M-Q3RW-X2NV
+ * - 末尾 12 位为随机体，其余为前缀（SP=SPU 商品码 / SK=SKU 规格码）
+ *
+ * @param {string} code - 规范形编码（后端 item_code / sku_code 字段原值）
+ * @returns {string} 展示形编码（如 'SP-7K9M-Q3RW-X2NV'）；入参为空返回 '-'
+ *
+ * @example
+ * formatProductCode('SP7K9MQ3RWX2NV') // 'SP-7K9M-Q3RW-X2NV'
+ */
+export function formatProductCode(code) {
+  if (!code || typeof code !== 'string') return '-'
+  const clean = code.toUpperCase().replace(/[^0-9A-Z]/g, '')
+  if (clean.length <= 12) return clean || '-'
+  const prefix = clean.slice(0, clean.length - 12)
+  const body = clean.slice(-12)
+  return `${prefix}-${body.slice(0, 4)}-${body.slice(4, 8)}-${body.slice(8, 12)}`
+}
+
+/**
+ * 格式化系列号展示形（商品编码体系双轨制：series_code + 补零序号）
+ *
+ * @param {string} seriesCode - 可读系列码（如 'SLNB'）
+ * @param {number} seq - 系列内连续序号
+ * @param {number} [pad=3] - 补零位数（product_series.seq_pad）
+ * @returns {string} 展示形系列号（如 'SLNB-001'）；缺参返回 '-'
+ */
+export function formatSeriesNo(seriesCode, seq, pad = 3) {
+  if (!seriesCode || seq === null || seq === undefined) return '-'
+  return `${String(seriesCode).toUpperCase()}-${String(seq).padStart(pad || 3, '0')}`
+}
+
 // ========== Toast 消息 ==========
 
 /**
@@ -371,6 +406,9 @@ export default {
   formatNumber,
   formatFileSize,
   formatPercent,
+  // 商品编码体系
+  formatProductCode,
+  formatSeriesNo,
   // Toast
   showToast,
   showSuccess,

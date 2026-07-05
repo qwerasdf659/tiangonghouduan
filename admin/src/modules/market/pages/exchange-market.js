@@ -11,7 +11,13 @@
  * @requires composables - 各子模块的状态和方法
  */
 
-import { logger, $confirmDanger, $confirm } from '../../../utils/index.js'
+import {
+  logger,
+  $confirmDanger,
+  $confirm,
+  formatProductCode,
+  formatSeriesNo
+} from '../../../utils/index.js'
 import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
 import { request } from '../../../api/base.js'
 import { EXCHANGE_ENDPOINTS, ExchangeAPI } from '../../../api/market/exchange.js'
@@ -525,6 +531,30 @@ document.addEventListener('alpine:init', () => {
       columns: [
         { key: 'exchange_item_id', label: '商品ID', sortable: true },
         {
+          /*
+           * 商品编码（商品编码体系 §8.3 必备项1）：SP 码展示形 SP-XXXX-XXXX-XXXX。
+           * 直读后端同名字段 item_code（禁映射），运营对手册/对账以编码为主标识。
+           */
+          key: 'item_code',
+          label: '商品编码',
+          render: val =>
+            val
+              ? `<span class="font-mono text-xs text-indigo-600" title="平台商品展示码（SPU）">${formatProductCode(val)}</span>`
+              : '<span class="text-gray-400 text-xs">未生成</span>'
+        },
+        {
+          /*
+           * 系列号（双轨制可读系列号轨道）：series_code + 补零序号（如 SLNB-001）。
+           * 未归入系列的商品显示 '-'（系列归属可空）。
+           */
+          key: 'series_seq',
+          label: '系列号',
+          render: (val, row) =>
+            row.series && val != null
+              ? `<span class="font-mono text-xs text-teal-600" title="可读系列号（成套印刷用）">${formatSeriesNo(row.series.series_code, val, row.series.seq_pad)}</span>`
+              : '<span class="text-gray-400 text-xs">-</span>'
+        },
+        {
           key: 'primary_image',
           label: '图片',
           render: val => {
@@ -595,6 +625,41 @@ document.addEventListener('alpine:init', () => {
 
     /** 空间视角：all=全部 / lucky=幸运空间 / premium=臻选空间（直接用后端 space 字段筛选） */
     table.spaceView = 'all'
+
+    /**
+     * 编码/名称搜索关键词（商品编码体系 §8.3 必备项2）：
+     * 输入 SP/SK 编码（容错大小写/横线/空格）→ 后端归一化精确匹配；输入普通文字 → 名称模糊匹配。
+     * 归一化在后端做（与小程序同一入口语义），前端原样透传 keyword。
+     */
+    table.searchKeyword = ''
+
+    /** 应用关键词搜索：透传 keyword 给后端 listExchangeItems，回第一页重载 */
+    table.applyKeywordSearch = function () {
+      const kw = String(this.searchKeyword || '').trim()
+      if (kw) {
+        this.activeFilters.keyword = kw
+      } else {
+        delete this.activeFilters.keyword
+      }
+      this.current_page = 1
+      this.selectedRows = []
+      this.loadData()
+    }
+
+    /** 清空关键词搜索并重载 */
+    table.clearKeywordSearch = function () {
+      this.searchKeyword = ''
+      this.applyKeywordSearch()
+    }
+
+    /**
+     * 商品编码展示形格式化（宫格卡片用；表格列走 columns render）
+     * @param {string} code - 规范形 item_code
+     * @returns {string} 展示形 SP-XXXX-XXXX-XXXX
+     */
+    table.formatItemCode = function (code) {
+      return formatProductCode(code)
+    }
 
     /**
      * 切换空间视角，通过 data-table 的 activeFilters.space 透传后端

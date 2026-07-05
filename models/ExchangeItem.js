@@ -73,6 +73,28 @@ class ExchangeItem extends Model {
       })
     }
 
+    // 所属产品系列（连号系列号轨道，可空；商品可只有随机主码不归系列）
+    if (models.ProductSeries) {
+      ExchangeItem.belongsTo(models.ProductSeries, {
+        foreignKey: 'series_id',
+        as: 'series'
+      })
+    }
+
+    // 商品-供应商多对多（货号挂关联行；一个 SPU 可多源采购）
+    if (models.Supplier && models.ExchangeItemSupplier) {
+      ExchangeItem.belongsToMany(models.Supplier, {
+        through: models.ExchangeItemSupplier,
+        foreignKey: 'exchange_item_id',
+        otherKey: 'supplier_id',
+        as: 'suppliers'
+      })
+      ExchangeItem.hasMany(models.ExchangeItemSupplier, {
+        foreignKey: 'exchange_item_id',
+        as: 'supplierLinks'
+      })
+    }
+
     if (models.ExchangeItemAttributeValue) {
       ExchangeItem.hasMany(models.ExchangeItemAttributeValue, {
         foreignKey: 'exchange_item_id',
@@ -145,6 +167,33 @@ module.exports = sequelize => {
         primaryKey: true,
         autoIncrement: true,
         comment: '兑换商品主键（SPU）'
+      },
+      /**
+       * 平台商品展示码（SPU 无意义随机码，系统生成）
+       * 规范形 = SP + 12 位 Base32 随机字符（如 SP7K9MQ3RWX2NV），展示形 SP-XXXX-XXXX-XXXX。
+       * 对外标识 / 手册查找 / 小程序搜索 / 防枚举；由 ProductCodeGenerator('SP') 生成。
+       */
+      item_code: {
+        type: DataTypes.STRING(14),
+        allowNull: false,
+        unique: true,
+        comment: '平台商品展示码(SPU,无意义随机码 SP+12位规范形)'
+      },
+      /**
+       * 所属产品系列（product_series.series_id，可空）
+       * 归入系列时由 SeriesSeqAllocator 在事务内分配连续 series_seq。
+       */
+      series_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        references: { model: 'product_series', key: 'series_id' },
+        comment: '所属系列(product_series.series_id,可空)'
+      },
+      /** 系列内连续序号（展示形 = series_code + 补零，如 SLNB-001） */
+      series_seq: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '系列内连续序号'
       },
       item_name: {
         type: DataTypes.STRING(200),

@@ -127,7 +127,11 @@ document.addEventListener('alpine:init', () => {
     maintenanceForm: {
       enabled: false,
       message: '系统正在升级维护中，预计30分钟后恢复，给您带来不便敬请谅解。',
-      end_time: ''
+      end_time: '',
+      /* 微信小程序分端维护（§21：只维护小程序，Web 后台/商家端不受影响） */
+      wechat_mp_enabled: false,
+      wechat_mp_message: '小程序正在升级维护中，预计30分钟后恢复，敬请谅解。',
+      wechat_mp_end_time: ''
     },
     /** @type {Object} 新建配置项的表单数据 */
     newConfig: { key: '', value: '', description: '', type: 'string' },
@@ -390,6 +394,24 @@ document.addEventListener('alpine:init', () => {
             const endTime = new Date(maintenanceEndTime.parsed_value)
             this.maintenanceForm.end_time = endTime.toISOString().slice(0, 16)
           }
+
+          /* 微信小程序分端维护三项（maintenance_*_wechat_mp，§21 分端隔离） */
+          const wechatMpEnabled = settings.find(s => s.setting_key === 'maintenance_mode_wechat_mp')
+          const wechatMpMessage = settings.find(
+            s => s.setting_key === 'maintenance_message_wechat_mp'
+          )
+          const wechatMpEndTime = settings.find(
+            s => s.setting_key === 'maintenance_end_time_wechat_mp'
+          )
+
+          this.maintenanceForm.wechat_mp_enabled = wechatMpEnabled?.parsed_value || false
+          this.maintenanceForm.wechat_mp_message =
+            wechatMpMessage?.parsed_value || '小程序正在升级维护中，预计30分钟后恢复，敬请谅解。'
+
+          if (wechatMpEndTime?.parsed_value) {
+            const endTime = new Date(wechatMpEndTime.parsed_value)
+            this.maintenanceForm.wechat_mp_end_time = endTime.toISOString().slice(0, 16)
+          }
         }
       } catch (error) {
         logger.error('加载维护模式配置失败:', error)
@@ -409,11 +431,19 @@ document.addEventListener('alpine:init', () => {
       try {
         const settings = {
           maintenance_mode: this.maintenanceForm.enabled,
-          maintenance_message: this.maintenanceForm.message
+          maintenance_message: this.maintenanceForm.message,
+          /* 微信小程序分端维护三项一并提交（§21：只维护小程序，其他端不受影响） */
+          maintenance_mode_wechat_mp: this.maintenanceForm.wechat_mp_enabled,
+          maintenance_message_wechat_mp: this.maintenanceForm.wechat_mp_message
         }
 
         if (this.maintenanceForm.end_time) {
           settings.maintenance_end_time = new Date(this.maintenanceForm.end_time).toISOString()
+        }
+        if (this.maintenanceForm.wechat_mp_end_time) {
+          settings.maintenance_end_time_wechat_mp = new Date(
+            this.maintenanceForm.wechat_mp_end_time
+          ).toISOString()
         }
 
         const response = await apiRequest(SYSTEM_ENDPOINTS.SETTING_BASIC, {
@@ -829,6 +859,49 @@ document.addEventListener('alpine:init', () => {
           this.maintenanceForm.enabled = newMode
           this.showSuccess(newMode ? '维护模式已开启' : '维护模式已关闭')
           this.hideModal('maintenanceModal')
+        } else {
+          throw new Error(response?.message || '操作失败')
+        }
+      } catch (error) {
+        this.showError('操作失败：' + error.message)
+      } finally {
+        hideLoading()
+      }
+    },
+
+    /**
+     * 保存微信小程序分端维护设置（§21 分端隔离）
+     * @async
+     * @description 只保存 maintenance_*_wechat_mp 三项：开启后仅微信小程序端 API 返回 503，
+     * Web 管理后台与商家端不受影响；与全站维护模式并存正交。
+     * @returns {Promise<void>}
+     * @fires SYSTEM_ENDPOINTS.SETTING_BASIC
+     */
+    async saveWechatMpMaintenance() {
+      showLoading()
+      try {
+        const settings = {
+          maintenance_mode_wechat_mp: this.maintenanceForm.wechat_mp_enabled,
+          maintenance_message_wechat_mp: this.maintenanceForm.wechat_mp_message
+        }
+
+        if (this.maintenanceForm.wechat_mp_end_time) {
+          settings.maintenance_end_time_wechat_mp = new Date(
+            this.maintenanceForm.wechat_mp_end_time
+          ).toISOString()
+        }
+
+        const response = await apiRequest(SYSTEM_ENDPOINTS.SETTING_BASIC, {
+          method: 'PUT',
+          data: { settings }
+        })
+
+        if (response && response.success) {
+          this.showSuccess(
+            this.maintenanceForm.wechat_mp_enabled
+              ? '小程序维护模式已开启（仅影响微信小程序）'
+              : '小程序维护模式已关闭'
+          )
         } else {
           throw new Error(response?.message || '操作失败')
         }

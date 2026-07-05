@@ -1463,7 +1463,11 @@ class DataSanitizer {
         sanitized.showcase_images = sanitized.showcase_images || []
       }
 
-      // 黑名单：删除敏感字段（成本价仅管理员可见）
+      /*
+       * 黑名单：删除敏感字段（成本价仅管理员可见）。
+       * 注意：item_code（SPU 平台展示码）有意【不删】——C 端策略为「只进不出」（商品编码体系 §3.5/§15.2 修4）：
+       * 字段下发供搜索回显（用户照手册输码搜索时前端可确认命中），但小程序不将其渲染为商品信息字段。
+       */
       if (dataLevel !== 'full') {
         delete sanitized.cost_price
       }

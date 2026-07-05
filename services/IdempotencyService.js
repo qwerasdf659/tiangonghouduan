@@ -224,6 +224,9 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/audit-logs/cleanup': 'ADMIN_AUDIT_LOG_CLEANUP', // 清理审计日志（修复：console/cleanup → console/audit-logs/cleanup）
 
   // ===== 活动预算 =====
+  /* ===== 水晶奖品倍率规则（水晶奖品倍率活动设计方案 §16.1 / D-11 console 自接幂等）===== */
+  '/api/v4/console/multiplier-rules': 'ADMIN_MULTIPLIER_RULE_CREATE', // 创建水晶倍率规则
+
   '/api/v4/console/campaign-budget/campaigns/:id': 'ADMIN_CAMPAIGN_UPDATE', // 更新活动
   '/api/v4/console/campaign-budget/campaigns/:id/validate': 'ADMIN_CAMPAIGN_VALIDATE', // 验证活动
   '/api/v4/console/campaign-budget/campaigns/:id/pool/add': 'ADMIN_CAMPAIGN_POOL_ADD', // 添加预算池
@@ -389,6 +392,13 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/exchange/items/skus/:id': 'ADMIN_EXCHANGE_SKU_UPDATE', // 更新/删除 SKU（PUT/DELETE，:sku_id → :id）
   '/api/v4/console/exchange/items/skus/:id/stock': 'ADMIN_EXCHANGE_SKU_STOCK_ADJUST', // SKU 库存增量调整
   '/api/v4/console/exchange/items/skus/:id/channel-prices': 'ADMIN_EXCHANGE_SKU_CHANNEL_PRICES', // SKU 渠道价格设置
+
+  // ===== 商品编码体系（供应商 / 产品系列，2026-07-06 商品编码体系设计方案落地）=====
+  '/api/v4/console/exchange/suppliers': 'ADMIN_SUPPLIER_CREATE', // 创建供应商（POST）
+  '/api/v4/console/exchange/suppliers/:id': 'ADMIN_SUPPLIER_UPDATE', // 更新/删除供应商（PUT/DELETE，:supplier_id → :id）
+  '/api/v4/console/exchange/product-series': 'ADMIN_PRODUCT_SERIES_CREATE', // 创建产品系列（POST）
+  '/api/v4/console/exchange/product-series/:id': 'ADMIN_PRODUCT_SERIES_UPDATE', // 更新/删除产品系列（PUT/DELETE，:series_id → :id）
+  '/api/v4/console/exchange/items/:id/supplier-links': 'ADMIN_EXCHANGE_ITEM_SUPPLIER_LINKS_SET', // 全量替换商品供应商关联行（PUT）
   // 注：C2C 二级市场管理写操作（/console/marketplace/listings/*）已随 C2C 下线移除（2026-06-05 阶段五）
 
   // ===== 用户层级 =====

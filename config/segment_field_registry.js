@@ -41,6 +41,21 @@ const SEGMENT_FIELDS = {
     label: '连续未获回馈次数',
     type: 'number',
     operators: ['gte', 'lte', 'eq']
+  },
+  /*
+   * D-2 扩充（水晶奖品倍率活动设计方案 §19，2026-07-06）：
+   * 倍率活动人群定向需要按"登录粘性/回流"圈人（如"老用户回流翻倍""高频用户专属加成"），
+   * 以下两个字段均为 User 模型真实列、安全可暴露（不含 PII）。
+   */
+  login_count: {
+    label: '登录次数',
+    type: 'number',
+    operators: ['gte', 'lte', 'eq', 'between']
+  },
+  last_login: {
+    label: '最后登录时间',
+    type: 'date',
+    operators: ['days_within', 'days_exceed']
   }
 }
 

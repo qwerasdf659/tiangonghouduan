@@ -717,6 +717,23 @@ module.exports = sequelize => {
         comment: '预算模式：user=用户预算账户扣减，pool=活动池预算扣减，none=不限制预算（测试用）'
       },
 
+      /**
+       * 抽奖入场资产码（扣费货币）
+       * @type {string}
+       * @业务含义 控制本活动抽奖时扣减哪种「可见层」资产（双层货币模型可见层，方案 §12.7）
+       * @枚举值
+       * - points：全局可见积分（默认，常驻活动；语义与历史完全一致）
+       * - event_points：活动专属可见代币（限时稀缺翻倍活动；按 EVENT_<campaign_code> 桶隔离，活动结束清零，根治囤积套利）
+       * @设计 软业务码，收口 constants/AssetCode.js（同 account_asset_balances.asset_code 范式，无外键）
+       */
+      entry_asset_code: {
+        type: DataTypes.STRING(50),
+        allowNull: false,
+        defaultValue: 'points',
+        comment:
+          '抽奖入场资产码(扣费货币)：points=全局可见积分(默认,常驻活动)/event_points=活动专属代币(限时活动,按EVENT_<campaign_code>桶隔离到期清零)'
+      },
+
       // ======================== 统一抽奖架构新字段 ========================
 
       /**

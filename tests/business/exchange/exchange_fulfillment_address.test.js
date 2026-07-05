@@ -26,6 +26,8 @@ const {
 } = require('../../../models')
 const TransactionManager = require('../../../utils/TransactionManager')
 const { generateStandaloneIdempotencyKey } = require('../../../utils/IdempotencyHelper')
+// 商品编码体系：测试数据准备与业务同源——编码统一由 ProductCodeGenerator 生成（SP/SK 无意义随机码）
+const ProductCodeGenerator = require('../../../utils/ProductCodeGenerator')
 
 describe('实物兑换发货链路 - 履约类型与收货地址（P0+P1）', () => {
   let ExchangeService
@@ -52,7 +54,11 @@ describe('实物兑换发货链路 - 履约类型与收货地址（P0+P1）', ()
     })
   }
 
-  /** 创建一个测试兑换商品（指定履约类型），返回 { exchange_item_id, sku_id } */
+  /**
+   * 创建一个测试兑换商品（指定履约类型），返回 { exchange_item_id, sku_id }
+   * 商品编码体系落地后：item_code NOT NULL、sku_code 为 SK+12 位规范形（VARCHAR(14)），
+   * 测试数据与业务同源，编码经 ProductCodeGenerator 生成（非硬编码）。
+   */
   async function createTestItem(fulfillmentType) {
     const item = await ExchangeItem.create({
       item_name: `【测试】${fulfillmentType}履约商品`,
@@ -60,12 +66,13 @@ describe('实物兑换发货链路 - 履约类型与收货地址（P0+P1）', ()
       status: 'active',
       fulfillment_type: fulfillmentType,
       mint_instance: false,
-      sort_order: 1
+      sort_order: 1,
+      item_code: ProductCodeGenerator.generate('SP')
     })
     createdItemIds.push(item.exchange_item_id)
     const sku = await ExchangeItemSku.create({
       exchange_item_id: item.exchange_item_id,
-      sku_code: `FULFILL_TEST_${fulfillmentType}_${Date.now()}`,
+      sku_code: ProductCodeGenerator.generate('SK'),
       stock: 100,
       cost_price: 10,
       status: 'active',

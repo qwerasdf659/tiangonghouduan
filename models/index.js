@@ -450,6 +450,54 @@ models.ExchangeItemSku = require('./ExchangeItemSku')(sequelize, DataTypes)
 models.SkuAttributeValue = require('./SkuAttributeValue')(sequelize, DataTypes)
 models.ExchangeChannelPrice = require('./ExchangeChannelPrice')(sequelize, DataTypes)
 models.ExchangeRedeemRequirement = require('./ExchangeRedeemRequirement')(sequelize, DataTypes)
+
+// 🔴 商品编码体系（2026-07-06 商品编码体系设计方案落地）
+models.ProductSeries = require('./ProductSeries')(sequelize, DataTypes)
+/*
+ * ✅ ProductSeries：产品系列（连号系列号主数据，双轨制之可读系列号轨道）
+ *    - 表名：product_series，主键：series_id，唯一键：series_code
+ *    - 业务场景：系列归类、手册/包装成套连号印刷；序号由 SeriesSeqAllocator 事务内发号
+ */
+models.Supplier = require('./Supplier')(sequelize, DataTypes)
+/*
+ * ✅ Supplier：供货商主数据（区别于核销 merchants，彻底分表）
+ *    - 表名：suppliers，主键：supplier_id，唯一键：supplier_name
+ *    - 业务场景：商品进货来源，多源采购经 exchange_item_suppliers 关联
+ */
+models.ExchangeItemSupplier = require('./ExchangeItemSupplier')(sequelize, DataTypes)
+/*
+ * ✅ ExchangeItemSupplier：商品-供应商多对多关联（货号挂关联行）
+ *    - 表名：exchange_item_suppliers，主键：id，唯一：(exchange_item_id, supplier_id)
+ *    - 货号 supplier_item_code 可空可重复，仅采购对账参考，加普通索引加速辅助查询
+ */
+models.ProductBatch = require('./ProductBatch')(sequelize, DataTypes)
+/*
+ * ✅ ProductBatch：产品批次（S2 一批一码，与系列号正交）
+ *    - 表名：product_batches，主键：batch_id，唯一键：batch_code
+ *    - 施工边界：本次仅建表 + 模型，不接入业务流
+ */
+models.PurchaseOrder = require('./PurchaseOrder')(sequelize, DataTypes)
+models.PurchaseOrderItem = require('./PurchaseOrderItem')(sequelize, DataTypes)
+/*
+ * ✅ PurchaseOrder/PurchaseOrderItem：采购单头/明细（S1 进货管理，仅建表不接业务流）
+ *    - 表名：purchase_orders / purchase_order_items
+ */
+models.ProductBundle = require('./ProductBundle')(sequelize, DataTypes)
+models.ProductBundleItem = require('./ProductBundleItem')(sequelize, DataTypes)
+/*
+ * ✅ ProductBundle/ProductBundleItem：组合商品主体/BOM 明细（S4，仅建表不接业务流）
+ *    - 表名：product_bundles / product_bundle_items；组合自身也是 SPU
+ */
+models.ExternalChannelMapping = require('./ExternalChannelMapping')(sequelize, DataTypes)
+/*
+ * ✅ ExternalChannelMapping：外部平台商品ID↔我方item_code映射（S5，仅建表不接业务流）
+ *    - 表名：external_channel_mappings，唯一：(channel, external_item_id)
+ */
+models.ConsignmentOrder = require('./ConsignmentOrder')(sequelize, DataTypes)
+/*
+ * ✅ ConsignmentOrder：二手寄卖单（S3，仅建表不接业务流；转赠复用 item_ledger）
+ *    - 表名：consignment_orders，唯一键：order_no
+ */
 // 🎨 星石虚拟装饰体系（模块D：纯展示零数值，星石明码标价）
 models.DecorationSeason = require('./DecorationSeason')(sequelize, DataTypes)
 models.DecorationSku = require('./DecorationSku')(sequelize, DataTypes)
@@ -682,6 +730,23 @@ models.WebSocketStartupLog = require('./WebSocketStartupLog')(sequelize, DataTyp
  * - 材料余额真相：account_asset_balances / asset_transactions（统一账本）
  */
 models.MaterialAssetType = require('./MaterialAssetType')(sequelize, DataTypes)
+
+/*
+ * 🔴 水晶奖品倍率规则模型（水晶奖品倍率活动设计方案 §18.1）
+ * - RewardMultiplierCampaign：倍率规则主表（绑定抽奖活动，活动间隔离）
+ * - RewardMultiplierTarget：倍率规则作用对象（仅引用现网人群标识 segment/tag/growth_level/user）
+ * 倍率只作用于 SettleStage material 分支发放数量放大，不动抽奖概率/预算/非水晶奖品。
+ */
+models.RewardMultiplierCampaign = require('./RewardMultiplierCampaign')(sequelize, DataTypes)
+models.RewardMultiplierTarget = require('./RewardMultiplierTarget')(sequelize, DataTypes)
+
+/*
+ * 🔴 活动预算归集规则模型（水晶奖品倍率活动设计方案 §12.10 / §18.4 防囤积套利）
+ * - 限时翻倍活动期间消费预算全额重定向进 EVENT_<活动code> 专属桶 + 发放 event_points 活动积分
+ * - 运营在 Web 后台配置，小程序/商家端无人工选择口（防9）
+ */
+models.EventBudgetCollectionRule = require('./EventBudgetCollectionRule')(sequelize, DataTypes)
+
 // 🔴 统一资产转换规则模型（2026-04-05 合并 ExchangeRate + MaterialConversionRule）
 models.AssetConversionRule = require('./AssetConversionRule')(sequelize, DataTypes)
 /*

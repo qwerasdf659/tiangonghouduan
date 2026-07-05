@@ -79,6 +79,14 @@ class Item extends Model {
         as: 'itemTemplate'
       })
     }
+
+    // 所属批次（product_batches.batch_id，预留；S2 批次管理启用时接入业务流）
+    if (models.ProductBatch) {
+      Item.belongsTo(models.ProductBatch, {
+        foreignKey: 'batch_id',
+        as: 'batch'
+      })
+    }
   }
 
   /**
@@ -264,6 +272,45 @@ module.exports = sequelize => {
         comment: '首次查看时间（UTC 存储，北京时间展示）'
       },
 
+      /** NFC 芯片硬件 UID（实物防伪载体，预留，可空；验真流程为后续路线图） */
+      nfc_uid: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
+        comment: 'NFC芯片UID(防伪,预留)'
+      },
+
+      /** 防伪码（扫码验真用，预留，可独立于 tracking_code） */
+      anti_fake_code: {
+        type: DataTypes.STRING(32),
+        allowNull: true,
+        comment: '防伪码(扫码验真,预留)'
+      },
+
+      /** 被验真次数（判断盗刷，预留） */
+      verify_count: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '被验真次数(判断盗刷)'
+      },
+
+      /** 首次验真时间（UTC 存储，北京时间展示，预留） */
+      first_verified_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: '首次验真时间(预留)'
+      },
+
+      /** 所属批次（product_batches.batch_id，预留；S2 批次管理启用时使用） */
+      batch_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        references: { model: 'product_batches', key: 'batch_id' },
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE',
+        comment: '所属批次(product_batches.batch_id,预留)'
+      },
+
       created_at: {
         type: DataTypes.DATE,
         allowNull: false,
@@ -302,6 +349,10 @@ module.exports = sequelize => {
         {
           name: 'idx_items_type',
           fields: ['item_type']
+        },
+        {
+          name: 'idx_items_batch',
+          fields: ['batch_id']
         }
       ]
     }

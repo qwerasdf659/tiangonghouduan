@@ -25,6 +25,23 @@
 'use strict'
 
 const logger = require('../utils/logger').logger
+const { detectLoginPlatform } = require('../utils/platformDetector')
+
+/**
+ * 分端维护模式配置键映射（§21 分端隔离，Q3 唯一扩展点）
+ *
+ * 未来加端（app/douyin_mp/alipay_mp）只需在此登记映射 + 白名单加对应 3 个配置键，
+ * 中间件主体零改动。当前只做微信小程序 wechat_mp（Q3 拍板）。
+ *
+ * @constant {Object<string, {mode: string, message: string, end_time: string}>}
+ */
+const PLATFORM_MAINTENANCE_KEYS = {
+  wechat_mp: {
+    mode: 'maintenance_mode_wechat_mp',
+    message: 'maintenance_message_wechat_mp',
+    end_time: 'maintenance_end_time_wechat_mp'
+  }
+}
 
 /**
  * 维护模式下放行的路径前缀白名单
@@ -109,6 +126,56 @@ function createMaintenanceMiddleware() {
           data: responseData,
           timestamp: new Date().toISOString()
         })
+      }
+
+      /*
+       * 分端维护判断（§21：全站未维护时，对特定端叠加独立开关）
+       * - 平台识别：X-Platform 头（小程序统一携带，Q1 双保险）→ Referer servicewechat.com → UA
+       * - 前端区分口径（Q2）：复用 SYSTEM_MAINTENANCE 码，靠 data.platform='wechat_mp' 区分"仅小程序维护"
+       */
+      const platform = detectLoginPlatform(req)
+      const platformKeys = PLATFORM_MAINTENANCE_KEYS[platform]
+      if (platformKeys) {
+        const platformMaintenanceOn = await AdminSystemService.getSettingValue(
+          'basic',
+          platformKeys.mode,
+          false
+        )
+        if (platformMaintenanceOn === true || platformMaintenanceOn === 'true') {
+          const [platformMessage, platformEndTime] = await Promise.all([
+            AdminSystemService.getSettingValue(
+              'basic',
+              platformKeys.message,
+              '小程序正在维护中，请稍后再试。'
+            ),
+            AdminSystemService.getSettingValue('basic', platformKeys.end_time, '')
+          ])
+
+          logger.info('[维护模式] 分端拦截用户请求', {
+            platform,
+            path: req.path,
+            method: req.method,
+            ip: req.ip
+          })
+
+          const platformResponseData = {
+            maintenance: true,
+            platform,
+            message: platformMessage,
+            end_time: platformEndTime || null
+          }
+
+          if (typeof res.apiError === 'function') {
+            return res.apiError(platformMessage, 'SYSTEM_MAINTENANCE', platformResponseData, 503)
+          }
+          return res.status(503).json({
+            success: false,
+            code: 'SYSTEM_MAINTENANCE',
+            message: platformMessage,
+            data: platformResponseData,
+            timestamp: new Date().toISOString()
+          })
+        }
       }
 
       next()

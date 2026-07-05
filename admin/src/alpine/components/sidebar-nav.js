@@ -161,6 +161,11 @@ export function sidebarNav() {
             url: '/admin/presets.html'
           },
           {
+            id: 'multiplier-management',
+            name: '✨ 水晶倍率活动',
+            url: '/admin/multiplier-management.html'
+          },
+          {
             id: 'exchange-page-config',
             name: '🛍️ 兑换页面配置',
             url: '/admin/exchange-page-config.html'
@@ -181,12 +186,22 @@ export function sidebarNav() {
         items: [
           { id: 'asset-mgmt', name: '资产管理', url: '/admin/asset-management.html' },
           { id: 'asset-adj', name: '资产调整', url: '/admin/asset-adjustment.html' },
-          { id: 'conversion-rules', name: '🔄 资产转换规则', url: '/admin/conversion-rule-management.html' },
+          {
+            id: 'conversion-rules',
+            name: '🔄 资产转换规则',
+            url: '/admin/conversion-rule-management.html'
+          },
           { id: 'item-lifecycle', name: '物品追踪', url: '/admin/item-lifecycle.html' },
           { id: 'reconciliation', name: '对账报告', url: '/admin/reconciliation.html' },
           { id: 'exchange', name: '兑换市场', url: '/admin/exchange-market.html' },
           { id: 'prop-shop', name: '🎮 道具商城', url: '/admin/prop-shop.html' },
-          { id: 'bid-mgmt', name: '竞价管理', url: '/admin/bid-management.html' }
+          { id: 'bid-mgmt', name: '竞价管理', url: '/admin/bid-management.html' },
+          { id: 'supplier-mgmt', name: '🏭 供应商管理', url: '/admin/supplier-management.html' },
+          {
+            id: 'product-series-mgmt',
+            name: '📚 产品系列管理',
+            url: '/admin/product-series-management.html'
+          }
         ]
       },
 
@@ -228,7 +243,11 @@ export function sidebarNav() {
             url: '/admin/ad-management.html',
             badgeKey: 'adPendingReviewCount'
           },
-          { id: 'platform-star-stone', name: '平台星石管理', url: '/admin/platform-star-stone.html' },
+          {
+            id: 'platform-star-stone',
+            name: '平台星石管理',
+            url: '/admin/platform-star-stone.html'
+          },
           { id: 'zone-management', name: '地域管理', url: '/admin/zone-management.html' },
           { id: 'dict-mgmt', name: '字典管理', url: '/admin/dict-management.html' },
           { id: 'message-center', name: '消息中心', url: '/admin/message-center.html' }
@@ -254,15 +273,35 @@ export function sidebarNav() {
         icon: '⚙️',
         items: [
           { id: 'prize-config', name: '奖品配置', icon: '🎁', url: '/admin/prize-config.html' },
-          { id: 'prize-definitions', name: '奖品目录', icon: '🏆', url: '/admin/prize-definitions.html' },
+          {
+            id: 'prize-definitions',
+            name: '奖品目录',
+            icon: '🏆',
+            url: '/admin/prize-definitions.html'
+          },
           { id: 'ops-rules', name: '运营规则', icon: '📊', url: '/admin/ops-rules.html' },
           { id: 'feature-flags', name: '功能开关', icon: '🔀', url: '/admin/feature-flags.html' },
           { id: 'item-templates', name: '物品模板', icon: '📦', url: '/admin/item-templates.html' },
           { id: 'dict-mgmt', name: '数据字典', icon: '📖', url: '/admin/dict-management.html' },
           { id: 'sys-maintain', name: '系统维护', icon: '🔧', url: '/admin/sys-maintain.html' },
-          { id: 'app-version-config', name: '版本闸门', icon: '📱', url: '/admin/app-version-config.html' },
-          { id: 'app-theme-config', name: '全局主题', icon: '🎨', url: '/admin/app-theme-config.html' },
-          { id: 'agreement-config', name: '协议管理', icon: '📜', url: '/admin/agreement-config.html' },
+          {
+            id: 'app-version-config',
+            name: '版本闸门',
+            icon: '📱',
+            url: '/admin/app-version-config.html'
+          },
+          {
+            id: 'app-theme-config',
+            name: '全局主题',
+            icon: '🎨',
+            url: '/admin/app-theme-config.html'
+          },
+          {
+            id: 'agreement-config',
+            name: '协议管理',
+            icon: '📜',
+            url: '/admin/agreement-config.html'
+          },
           { id: 'data-mgmt', name: '数据管理', icon: '🗄️', url: '/admin/data-management.html' }
         ]
       }

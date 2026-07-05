@@ -65,6 +65,28 @@ function assetTransactionNoPlaceholder() {
 const BALANCE_SAFETY_LIMIT = 1_000_000_000
 
 /**
+ * 按活动分桶的资产码（lottery_campaign_id 隔离规则）
+ *
+ * - budget_points：预算积分（隐藏层成本，按活动隔离）
+ * - event_points：活动积分（可见层活动专属代币，按活动隔离，到期清零；水晶奖品倍率活动 §12.7 双层货币）
+ *
+ * 这两类资产的余额行必须携带 lottery_campaign_id（字符串桶键，如 CONSUMPTION_DEFAULT / EVENT_<活动code>），
+ * 读写时按桶隔离，杜绝跨活动串桶。
+ *
+ * @constant {string[]}
+ */
+const CAMPAIGN_BUCKETED_ASSETS = [AssetCode.BUDGET_POINTS, AssetCode.EVENT_POINTS]
+
+/**
+ * 判断资产是否按活动分桶（需强制携带 lottery_campaign_id）
+ * @param {string} asset_code - 资产代码
+ * @returns {boolean} 是否分桶资产
+ */
+function isCampaignBucketedAsset(asset_code) {
+  return CAMPAIGN_BUCKETED_ASSETS.includes(asset_code)
+}
+
+/**
  * 余额操作服务类
  *
  * @class BalanceService
@@ -191,9 +213,9 @@ class BalanceService {
     const { transaction, lottery_campaign_id } = options
 
     // 🔥 BUDGET_POINTS 必须指定 lottery_campaign_id
-    if (asset_code === AssetCode.BUDGET_POINTS && !lottery_campaign_id) {
+    if (isCampaignBucketedAsset(asset_code) && !lottery_campaign_id) {
       throw new BusinessError(
-        'BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）',
+        `${asset_code} 为按活动分桶资产，必须指定 lottery_campaign_id 参数（活动隔离规则）`,
         'ASSET_REQUIRED',
         400
       )
@@ -206,7 +228,7 @@ class BalanceService {
     }
 
     // BUDGET_POINTS 按活动隔离（lottery_campaign_id 隔离规则）
-    if (asset_code === AssetCode.BUDGET_POINTS && lottery_campaign_id) {
+    if (isCampaignBucketedAsset(asset_code) && lottery_campaign_id) {
       whereCondition.lottery_campaign_id = String(lottery_campaign_id)
     }
 
@@ -219,7 +241,7 @@ class BalanceService {
     }
 
     // BUDGET_POINTS 需要记录 lottery_campaign_id（活动隔离）
-    if (asset_code === AssetCode.BUDGET_POINTS && lottery_campaign_id) {
+    if (isCampaignBucketedAsset(asset_code) && lottery_campaign_id) {
       defaults.lottery_campaign_id = String(lottery_campaign_id)
     }
 
@@ -310,9 +332,9 @@ class BalanceService {
     }
 
     // 🔥 BUDGET_POINTS 必须指定 lottery_campaign_id（活动隔离规则）
-    if (asset_code === AssetCode.BUDGET_POINTS && !lottery_campaign_id) {
+    if (isCampaignBucketedAsset(asset_code) && !lottery_campaign_id) {
       throw new BusinessError(
-        'BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）',
+        `${asset_code} 为按活动分桶资产，必须指定 lottery_campaign_id 参数（活动隔离规则）`,
         'ASSET_REQUIRED',
         400
       )
@@ -359,7 +381,7 @@ class BalanceService {
       }
 
       // BUDGET_POINTS 按活动隔离查询
-      if (asset_code === AssetCode.BUDGET_POINTS && lottery_campaign_id) {
+      if (isCampaignBucketedAsset(asset_code) && lottery_campaign_id) {
         balanceWhereCondition.lottery_campaign_id = String(lottery_campaign_id)
       }
 
@@ -1316,9 +1338,9 @@ class BalanceService {
     const { transaction } = options
 
     // 🔥 BUDGET_POINTS 必须指定 lottery_campaign_id
-    if (asset_code === AssetCode.BUDGET_POINTS && !lottery_campaign_id) {
+    if (isCampaignBucketedAsset(asset_code) && !lottery_campaign_id) {
       throw new BusinessError(
-        'BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）',
+        `${asset_code} 为按活动分桶资产，必须指定 lottery_campaign_id 参数（活动隔离规则）`,
         'ASSET_REQUIRED',
         400
       )
@@ -1335,7 +1357,7 @@ class BalanceService {
       }
 
       // BUDGET_POINTS 按活动隔离查询
-      if (asset_code === AssetCode.BUDGET_POINTS && lottery_campaign_id) {
+      if (isCampaignBucketedAsset(asset_code) && lottery_campaign_id) {
         whereCondition.lottery_campaign_id = String(lottery_campaign_id)
       }
 

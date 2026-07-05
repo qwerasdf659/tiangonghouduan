@@ -52,6 +52,10 @@ const OrderNoGenerator = require('../../../../utils/OrderNoGenerator')
 const BalanceService = require('../../../asset/BalanceService')
 const ItemService = require('../../../asset/ItemService')
 const { AssetCode } = require('../../../../constants/AssetCode')
+// 水晶奖品倍率服务（只作用于抽中水晶材料的发放数量放大，水晶奖品倍率活动设计方案 §18.3）
+const CrystalMultiplierService = require('../../../lottery/CrystalMultiplierService')
+// 活动入场资产解析（points/event_points 扣费分桶，双层货币可见层，方案 §12.7 / §23.5 遗留项①）
+const EventBudgetService = require('../../../lottery/EventBudgetService')
 const {
   getInstance: getLotteryMetricsCollector
 } = require('../../../lottery/LotteryMetricsCollector') // 🆕 实时Redis指标采集
@@ -195,6 +199,16 @@ class SettleStage extends BaseStage {
          */
         const consume_idempotency_key = `${idempotency_key}:consume`
 
+        /*
+         * 🆕 入场资产解析（双层货币可见层，方案 §12.7 / §23.5 遗留项①）
+         * 单抽直扣路径：按活动 entry_asset_code 扣对应资产（points 或活动专属 event_points 桶）。
+         * 连抽由外层 execute_draw 统一扣费并 skip_points_deduction=true，不进入本分支。
+         */
+        const settle_campaign = (this.getContextData(context, 'LoadCampaignStage.data') || {})
+          .campaign
+        const entryAsset = EventBudgetService.resolveEntryAsset(settle_campaign)
+        const entryAssetLabel = entryAsset.is_event ? '活动积分' : '积分'
+
         const burnAccount = await BalanceService.getOrCreateAccount(
           { system_code: 'SYSTEM_BURN' },
           { transaction }
@@ -203,8 +217,10 @@ class SettleStage extends BaseStage {
         const asset_result = await BalanceService.changeBalance(
           {
             user_id,
-            asset_code: AssetCode.POINTS,
+            asset_code: entryAsset.asset_code,
             delta_amount: -draw_cost,
+            // event_points 为按活动分桶资产，必须携带 EVENT_<code> 桶键
+            lottery_campaign_id: entryAsset.lottery_campaign_id,
             idempotency_key: consume_idempotency_key,
             lottery_session_id,
             business_type: 'lottery_consume',
@@ -212,7 +228,7 @@ class SettleStage extends BaseStage {
             meta: {
               source_type: 'system',
               title: '回馈消耗',
-              description: `回馈消耗 ${draw_cost} 积分`,
+              description: `回馈消耗 ${draw_cost} ${entryAssetLabel}`,
               draw_count,
               discount_applied: pricing_data.saved_points || 0
             }
@@ -277,10 +293,29 @@ class SettleStage extends BaseStage {
       const reward_index = context.current_draw_index || 0
       const reward_idempotency_key = `${idempotency_key}:reward_${reward_index}`
 
+      /*
+       * ========== 🆕 水晶奖品倍率：发放前计算倍率（水晶奖品倍率活动设计方案 §4/§18.3） ==========
+       * 只作用于"抽中水晶类材料的发放数量放大"这一层；非水晶/兜底奖返回 ×1 不影响原逻辑。
+       * 兜底/降级奖不翻倍（拍板 §11-7）；全程在本结算事务内，成本刹车行锁累加。
+       */
+      const crystal_multiplier = await CrystalMultiplierService.resolveMultiplier({
+        user_id,
+        prize: settle_prize,
+        lottery_campaign_id,
+        is_fallback: prize_downgraded || settle_prize.is_fallback === true,
+        now: new Date(),
+        transaction
+      })
+
       await this._distributePrize(user_id, settle_prize, {
         idempotency_key: reward_idempotency_key,
         lottery_session_id,
         lottery_draw_id,
+        // 水晶倍率生效时按最终数量入账（非水晶/未翻倍时等于原 material_amount）
+        material_amount_override: crystal_multiplier.crystal
+          ? crystal_multiplier.final_quantity
+          : null,
+        crystal_multiplier,
         transaction
       })
 
@@ -312,6 +347,7 @@ class SettleStage extends BaseStage {
         draw_index: reward_index,
         prize_downgraded, // 🔒 资源不足降级标记（true=因配额/预算耗尽降级为兜底奖）
         downgrade_reason, // 🔒 降级原因（star_stone_quota_exhausted / budget_points_exhausted）
+        crystal_multiplier, // 🆕 水晶倍率快照（写入 result_metadata.crystal_multiplier）
         transaction
       })
 
@@ -449,8 +485,24 @@ class SettleStage extends BaseStage {
            * budget_cost: 本次中奖实际消耗的 BUDGET_POINTS（小程序端可展示"消耗 xx 预算积分"）
            */
           material_asset_code: settle_prize.material_asset_code || null,
-          material_amount: settle_prize.material_amount || null,
-          budget_cost: settle_prize.budget_cost || 0
+          // 水晶倍率生效时返回最终发放数量（含翻倍）；未翻倍/非水晶时为原 material_amount
+          material_amount: crystal_multiplier.crystal
+            ? crystal_multiplier.final_quantity
+            : settle_prize.material_amount || null,
+          budget_cost: settle_prize.budget_cost || 0,
+          /*
+           * 水晶倍率摘要（命中翻倍时非空，供小程序展示"基础×倍率=最终"，§16.4）
+           * 未翻倍/非水晶时为 null，前端不展示倍率角标。
+           */
+          crystal_multiplier:
+            crystal_multiplier.applied_multiplier > 1
+              ? {
+                  base_quantity: crystal_multiplier.base_quantity,
+                  applied_multiplier: crystal_multiplier.applied_multiplier,
+                  final_quantity: crystal_multiplier.final_quantity,
+                  reason: crystal_multiplier.reason
+                }
+              : null
         }
       }
 
@@ -640,7 +692,14 @@ class SettleStage extends BaseStage {
    * @private
    */
   async _distributePrize(user_id, prize, options) {
-    const { idempotency_key, lottery_session_id, lottery_draw_id, transaction } = options
+    const {
+      idempotency_key,
+      lottery_session_id,
+      lottery_draw_id,
+      transaction,
+      material_amount_override = null,
+      crystal_multiplier = null
+    } = options
 
     try {
       const mintAccount = await BalanceService.getOrCreateAccount(
@@ -708,26 +767,46 @@ class SettleStage extends BaseStage {
          */
         case 'material':
           if (prize.material_asset_code && prize.material_amount) {
+            /*
+             * 水晶倍率：命中翻倍时按最终数量入账（material_amount_override），
+             * 非水晶/未翻倍时 override 为 null，沿用原 material_amount，行为零变化。
+             * 星石为 currency 形态、天然非水晶，override 恒为 null，配额扣减仍按原量。
+             */
+            const distribute_amount =
+              material_amount_override !== null ? material_amount_override : prize.material_amount
+
+            // 命中翻倍时在资产流水 meta 追加倍率摘要（资产侧可对账追溯，§3.3）
+            const material_meta = {
+              lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
+              prize_name: prize.prize_name
+            }
+            if (crystal_multiplier && crystal_multiplier.applied_multiplier > 1) {
+              material_meta.crystal_multiplier = {
+                base_quantity: crystal_multiplier.base_quantity,
+                applied_multiplier: crystal_multiplier.applied_multiplier,
+                final_quantity: crystal_multiplier.final_quantity,
+                multiplier_campaign_id: crystal_multiplier.multiplier_campaign_id,
+                reason: crystal_multiplier.reason
+              }
+            }
+
             // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
             await BalanceService.changeBalance(
               {
                 user_id,
                 asset_code: prize.material_asset_code,
-                delta_amount: prize.material_amount,
+                delta_amount: distribute_amount,
                 idempotency_key: `${idempotency_key}:material`,
                 business_type: 'lottery_reward_material',
                 counterpart_account_id: mintAccount.account_id,
-                meta: {
-                  lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
-                  prize_name: prize.prize_name
-                }
+                meta: material_meta
               },
               { transaction }
             )
 
             /* 星石奖品扣减星石配额（双池隔离第二轨道） */
             if (prize.material_asset_code === AssetCode.STAR_STONE) {
-              await this._deductStarStoneQuota(user_id, prize.material_amount, {
+              await this._deductStarStoneQuota(user_id, distribute_amount, {
                 idempotency_key: `${idempotency_key}:quota_deduct`,
                 lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
                 transaction
@@ -953,6 +1032,7 @@ class SettleStage extends BaseStage {
       asset_transaction_id = null, // 🆕 关联资产流水ID（用于对账）
       tier_pick_data = {}, // 🔴 2026-02-15 修复：档位选择元数据
       draw_index = 0, // 同一会话内第几次抽奖（用于四段式 business_id）
+      crystal_multiplier = null, // 🆕 水晶倍率快照（写入 result_metadata.crystal_multiplier）
       transaction
     } = params
 
@@ -1033,7 +1113,24 @@ class SettleStage extends BaseStage {
           budget_tier: budget_data?.budget_tier || null,
           pressure_tier: budget_data?.pressure_tier || tier_pick_data?.pressure_tier || null,
           effective_budget: budget_data?.effective_budget || 0,
-          weight_adjustment: tier_pick_data?.weight_adjustment || null
+          weight_adjustment: tier_pick_data?.weight_adjustment || null,
+          /*
+           * 🆕 水晶倍率快照（水晶奖品倍率活动设计方案 §3.3/§16.4）
+           * 仅在命中翻倍（applied_multiplier>1）时写入，供小程序展示"基础×倍率=最终"与客服答疑对账。
+           * 非水晶/未翻倍不写此键（保持 result_metadata 精简）。
+           */
+          ...(crystal_multiplier && crystal_multiplier.applied_multiplier > 1
+            ? {
+                crystal_multiplier: {
+                  base_quantity: crystal_multiplier.base_quantity,
+                  applied_multiplier: crystal_multiplier.applied_multiplier,
+                  final_quantity: crystal_multiplier.final_quantity,
+                  multiplier_campaign_id: crystal_multiplier.multiplier_campaign_id,
+                  reason: crystal_multiplier.reason,
+                  candidates: crystal_multiplier.candidates
+                }
+              }
+            : {})
         },
         created_at: BeijingTimeHelper.createBeijingTime()
       },

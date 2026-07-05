@@ -8,6 +8,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
+import { formatProductCode, formatSeriesNo } from '../../../utils/index.js'
 import { buildURL, request } from '../../../api/base.js'
 import { EXCHANGE_ENDPOINTS } from '../../../api/market/exchange.js'
 import { ExchangeItemAPI } from '../../../api/exchange-item/index.js'
@@ -70,8 +71,22 @@ export function useExchangeItemsState() {
       fulfillment_type: 'physical',
       applicable_scope: 'all',
       scoped_store_ids: [],
-      merchant_id: null
+      merchant_id: null,
+      // 商品编码体系：所属系列（可空；series_seq/item_code 由后端系统生成，前端不传）
+      series_id: null
     },
+    /** @type {string} 扫码/输码快速定位输入框绑定值（客服/对账直达单品用） */
+    quickLocateCode: '',
+    /** @type {string} 编辑中商品的平台展示码 item_code（规范形，后端生成只读） */
+    editingItemCode: '',
+    /** @type {string} 编辑中商品的系列号展示形（如 SLNB-001，未归系列为空） */
+    editingSeriesNo: '',
+    /** @type {Array<Object>} 系列选项（product_series，商品表单选系列用） */
+    seriesOptions: [],
+    /** @type {Array<Object>} 供应商选项（suppliers，多供应商区块选择用） */
+    supplierOptions: [],
+    /** @type {Array<Object>} 商品的供应商关联行（多供应商 + 各自货号 + 主供货商标记） */
+    itemSupplierLinks: [],
     /** @type {Array<Object>} 门店选项（核销范围=指定门店时多选，复用 active 门店列表） */
     storeScopeOptions: [],
     /** @type {Array<Object>} 商家选项（核销范围=商家全门店时单选） */
@@ -380,8 +395,12 @@ export function useExchangeItemsMethods() {
         fulfillment_type: 'physical',
         applicable_scope: 'all',
         scoped_store_ids: [],
-        merchant_id: null
+        merchant_id: null,
+        series_id: null
       }
+      this.editingItemCode = ''
+      this.editingSeriesNo = ''
+      this.itemSupplierLinks = []
       this.itemImagePreviewUrl = null
       this.galleryImages = []
       this.detailImages = []
@@ -390,6 +409,8 @@ export function useExchangeItemsMethods() {
       this.usageRuleInput = ''
       this.loadDictionaries()
       this.loadScopeOptions()
+      this.loadSeriesOptions()
+      this.loadSupplierOptions()
       this.showModal('itemModal')
       this.$nextTick(() => this._initRichEditor(''))
     },
@@ -433,8 +454,15 @@ export function useExchangeItemsMethods() {
         fulfillment_type: item.fulfillment_type || 'physical',
         applicable_scope: item.applicable_scope || 'all',
         scoped_store_ids: Array.isArray(item.scoped_store_ids) ? item.scoped_store_ids : [],
-        merchant_id: item.merchant_id || null
+        merchant_id: item.merchant_id || null,
+        series_id: item.series_id || null
       }
+      // 商品编码体系：编码/系列号只读展示（后端生成，前端不可改）
+      this.editingItemCode = item.item_code || ''
+      this.editingSeriesNo =
+        item.series && item.series_seq != null
+          ? formatSeriesNo(item.series.series_code, item.series_seq, item.series.seq_pad)
+          : ''
       this.attributesStr = item.attributes ? JSON.stringify(item.attributes, null, 2) : '{}'
       this.itemImagePreviewUrl =
         item.primary_image?.thumbnail_url ||
@@ -445,13 +473,163 @@ export function useExchangeItemsMethods() {
       this.usageRuleInput = ''
       this.loadDictionaries()
       this.loadScopeOptions()
+      this.loadSeriesOptions()
+      this.loadSupplierOptions()
       const itemId = item.exchange_item_id
       this.loadDetailImages(itemId)
       this.loadShowcaseImages(itemId)
       this.loadGalleryImages(itemId)
       this.loadItemSkus(itemId)
+      this.loadItemSupplierLinks(itemId)
       this.showModal('itemModal')
-      this.$nextTick(() => this._initRichEditor(item.description || ''))
+      this.$nextTick(() => {
+        this._initRichEditor(item.description || '')
+        this.renderItemCodeQr()
+      })
+    },
+
+    /**
+     * 加载系列选项（product_series 主数据，商品表单「所属系列」下拉用）
+     * 仅取启用中的系列；未归系列的商品保持 series_id=null。
+     */
+    async loadSeriesOptions() {
+      try {
+        const res = await ExchangeItemAPI.listProductSeries({ status: 'active', page_size: 100 })
+        if (res.success) {
+          this.seriesOptions = (res.data?.items || []).map(s => ({
+            series_id: s.series_id,
+            series_code: s.series_code,
+            series_name: s.series_name
+          }))
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 加载系列选项失败:', e)
+        this.seriesOptions = []
+      }
+    },
+
+    /**
+     * 加载供应商选项（suppliers 主数据，多供应商区块选择用）
+     */
+    async loadSupplierOptions() {
+      try {
+        const res = await ExchangeItemAPI.listSuppliers({ status: 'active', page_size: 200 })
+        if (res.success) {
+          this.supplierOptions = (res.data?.items || []).map(s => ({
+            supplier_id: s.supplier_id,
+            supplier_name: s.supplier_name
+          }))
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 加载供应商选项失败:', e)
+        this.supplierOptions = []
+      }
+    },
+
+    /**
+     * 加载商品的供应商关联行（编辑表单回显）
+     * @param {number} itemId - 商品 ID
+     */
+    async loadItemSupplierLinks(itemId) {
+      try {
+        const res = await ExchangeItemAPI.getItemSupplierLinks(itemId)
+        if (res.success) {
+          this.itemSupplierLinks = (res.data?.links || []).map(l => ({
+            supplier_id: l.supplier_id,
+            supplier_item_code: l.supplier_item_code || '',
+            is_primary: !!l.is_primary
+          }))
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 加载商品供应商关联失败:', e)
+        this.itemSupplierLinks = []
+      }
+    },
+
+    /**
+     * 新增一行供应商关联（多供应商：供应商 + 该供应商货号 + 主供货商标记）
+     */
+    addSupplierLink() {
+      this.itemSupplierLinks.push({ supplier_id: '', supplier_item_code: '', is_primary: false })
+    },
+
+    /**
+     * 移除一行供应商关联
+     * @param {number} index - 行下标
+     */
+    removeSupplierLink(index) {
+      this.itemSupplierLinks.splice(index, 1)
+    },
+
+    /**
+     * 标记主供货商（最多一行；点选某行时其余行取消）
+     * @param {number} index - 行下标
+     */
+    setPrimarySupplierLink(index) {
+      this.itemSupplierLinks.forEach((l, i) => {
+        l.is_primary = i === index ? !l.is_primary : false
+      })
+    },
+
+    /**
+     * 保存商品的供应商关联行（全量替换；空数组=解除全部关联/自营）
+     * @param {number} itemId - 商品 ID
+     * @returns {Promise<void>}
+     */
+    async _saveItemSupplierLinks(itemId) {
+      // 过滤掉未选供应商的空行；货号可空可重复（脏数据如实存，仅对账参考）
+      const links = this.itemSupplierLinks
+        .filter(l => l.supplier_id)
+        .map(l => ({
+          supplier_id: Number(l.supplier_id),
+          supplier_item_code: String(l.supplier_item_code || '').trim() || null,
+          is_primary: !!l.is_primary
+        }))
+      const res = await ExchangeItemAPI.setItemSupplierLinks(itemId, links)
+      if (!res.success) {
+        throw new Error(res.message || '保存供应商关联失败')
+      }
+    },
+
+    /**
+     * 商品编码展示形（模态框只读展示用）
+     * @param {string} code - 规范形编码
+     * @returns {string} 展示形 SP-XXXX-XXXX-XXXX
+     */
+    formatItemCodeDisplay(code) {
+      return formatProductCode(code)
+    },
+
+    /**
+     * SKU 编码展示形（SKU 规格表用）
+     * @param {string} code - 规范形 sku_code
+     * @returns {string} 展示形 SK-XXXX-XXXX-XXXX
+     */
+    formatSkuCode(code) {
+      return formatProductCode(code)
+    },
+
+    /**
+     * 渲染商品编码二维码（拍1 方案A：后端出编码 payload，admin 用纯 JS qrcode 库端侧渲染）
+     *
+     * 二维码内容 = item_code 规范形（扫码结果作为搜索输入定位商品，与手册手工输码并存）。
+     * qrcode 库按需懒加载（与 echarts-lazy 同思路），不进其它页面首屏。
+     * @returns {Promise<void>}
+     */
+    async renderItemCodeQr() {
+      if (!this.editingItemCode) return
+      const canvas = document.getElementById('item-code-qr-canvas')
+      if (!canvas) return
+      try {
+        const { default: QRCode } = await import('qrcode')
+        await QRCode.toCanvas(canvas, this.editingItemCode, {
+          width: 96,
+          margin: 1,
+          errorCorrectionLevel: 'M'
+        })
+      } catch (e) {
+        logger.error('[ExchangeItems] 渲染编码二维码失败:', e)
+      }
     },
 
     /**
@@ -464,7 +642,9 @@ export function useExchangeItemsMethods() {
       try {
         const { STORE_ENDPOINTS } = await import('../../../api/store.js')
         const { request } = await import('../../../api/base.js')
-        const res = await request({ url: `${STORE_ENDPOINTS.LIST}?status=active&page=1&page_size=200` })
+        const res = await request({
+          url: `${STORE_ENDPOINTS.LIST}?status=active&page=1&page_size=200`
+        })
         const list = res?.data?.stores || res?.data?.list || res?.data || []
         this.storeScopeOptions = Array.isArray(list)
           ? list.map(s => ({ store_id: s.store_id, store_name: s.store_name }))
@@ -562,9 +742,25 @@ export function useExchangeItemsMethods() {
         if (res.success) {
           // 新建商品：上传时 editingItemId 为空、详情/展示图未 attach，建好后用返回 id 补 attach
           if (!this.editingItemId) {
-            const newItemId = res.data?.exchange_item_id || res.data?.id || res.data?.item?.exchange_item_id
+            const newItemId =
+              res.data?.exchange_item_id || res.data?.id || res.data?.item?.exchange_item_id
             if (newItemId) {
               await this._attachPendingGalleryImages(newItemId)
+            }
+          }
+
+          // 商品编码体系：同步保存供应商关联行（多供应商 + 各自货号；空=自营/未知来源）
+          const savedItemId =
+            this.editingItemId ||
+            res.data?.exchange_item_id ||
+            res.data?.id ||
+            res.data?.item?.exchange_item_id
+          if (savedItemId) {
+            try {
+              await this._saveItemSupplierLinks(savedItemId)
+            } catch (linkErr) {
+              // 商品主体已保存成功，供应商关联失败单独报错（不吞掉，运营可重新编辑保存）
+              this.showError?.(`商品已保存，但供应商关联保存失败：${linkErr.message}`)
             }
           }
 
@@ -1550,13 +1746,291 @@ export function useExchangeItemsMethods() {
     },
 
     /**
-     * 导出兑换商品列表（CSV 下载）
+     * 导出兑换商品列表（后端 exceljs 产出 xlsx，前端 blob 下载）
      *
+     * 后端 /export 返回 xlsx 二进制流（含商品编码 SP 展示形/系列号/展示价/图片URL 等列），
+     * 这里以 blob 接收并触发浏览器下载，文件名带北京时间戳。
      * @param {Object} [params] - 筛选参数
      * @param {string} [params.status] - 按状态筛选（active/inactive）
+     * @returns {Promise<void>}
      */
-    exportItems(params = {}) {
-      ExchangeItemAPI.exportItems(params)
+    async exportItems(params = {}) {
+      try {
+        const blob = await ExchangeItemAPI.exportItems(params)
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        // 文件名与后端一致语义：兑换商品导出_北京时间戳.xlsx（展示北京时间）
+        const stamp = new Date()
+          .toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })
+          .replace(/[/\s:]/g, '')
+        a.download = `兑换商品导出_${stamp}.xlsx`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+        this.$toast?.success('商品清单已导出（xlsx）')
+      } catch (e) {
+        logger.error('[ExchangeItems] 导出商品清单失败:', e)
+        this.$toast?.error(e.message || '导出失败')
+      }
+    },
+
+    /**
+     * 扫码/输码快速定位（§8.3 增强项6：后台输码或扫码直达单品详情，供客服/对账高频使用）
+     *
+     * 与列表搜索框（applyKeywordSearch，作用是过滤列表）区分：本方法做「精确直达」——
+     * 输入/扫码枪录入编码后回车，调用后端编码搜索（归一化在后端），命中唯一商品则直接
+     * 打开其编辑/详情弹窗；命中多条则回退为列表过滤展示；无命中则提示。
+     * 扫码枪以键盘方式录入（零新增依赖），与手工输码共用同一入口。
+     * @param {string} code - 用户输入或扫码枪录入的编码（SP/SK，容错大小写/横线/空格）
+     * @returns {Promise<void>}
+     */
+    async quickLocate(code) {
+      const kw = String(code || '').trim()
+      if (!kw) {
+        this.$toast?.error('请输入或扫描商品编码')
+        return
+      }
+      try {
+        const res = await ExchangeItemAPI.listExchangeItems({ keyword: kw, page: 1, page_size: 10 })
+        const rows = res?.data?.items || res?.data?.list || []
+        if (rows.length === 1) {
+          this.quickLocateCode = ''
+          this.editItem(rows[0])
+          this.$toast?.success(`已定位：${rows[0].item_name || rows[0].item_code}`)
+        } else if (rows.length > 1) {
+          this.$toast?.info?.(`命中 ${rows.length} 条，已在列表按编码筛选，请人工确认`)
+          window.dispatchEvent(new CustomEvent('quick-locate-multi', { detail: { keyword: kw } }))
+        } else {
+          this.$toast?.error(`未找到编码 ${kw} 对应的商品`)
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 快速定位失败:', e)
+        this.$toast?.error(e.message || '快速定位失败')
+      }
+    },
+
+    /**
+     * 拉取「印刷手册」所需的全量商品（按当前筛选，分页汇总）
+     *
+     * 手册导出需要全量而非当前页，故循环翻页拉取；每页复用列表接口 listExchangeItems，
+     * 字段（item_code/series/primary_image/cost_amount）与列表视图同源，零新增后端端点。
+     * @returns {Promise<Array<Object>>} 商品数组（含编码/系列/价格/图片字段）
+     */
+    async _fetchAllItemsForManual() {
+      const all = []
+      let page = 1
+      const pageSize = 100
+      // 最多翻 50 页（5000 条）兜底，防异常情况下的死循环
+      for (let guard = 0; guard < 50; guard++) {
+        const params = { page, page_size: pageSize, ...this.itemFilters }
+        Object.keys(params).forEach(k => !params[k] && delete params[k])
+        const res = await ExchangeItemAPI.listExchangeItems(params)
+        const rows = res?.data?.items || res?.data?.list || []
+        all.push(...rows)
+        const totalPages = res?.data?.total_pages || res?.data?.pagination?.total_pages || 1
+        if (page >= totalPages || rows.length === 0) break
+        page += 1
+      }
+      return all
+    },
+
+    /**
+     * 导出商品印刷手册 PDF（§8.3 必备项3/4：商品名 + SP 码 + 图片 + 价格 + 二维码）
+     *
+     * 方案（贴合现网范式，零新增后端依赖）：
+     * - 二维码：前端 `qrcode` 纯 JS 库把 item_code 规范形渲染成 dataURL（拍1 方案A）；
+     * - 中文渲染：jsPDF 内置字体不支持中文，故用现网已装的 `html2canvas` 把 HTML 手册卡片
+     *   截图为位图，再用 `jspdf` 逐页嵌图（与 lottery 模块 exportReportAsPDF 同范式）；
+     * - 展示形编码统一带连字符（§3.5 落地约束2）。
+     * @returns {Promise<void>}
+     */
+    async exportManualPdf() {
+      try {
+        this.$toast?.info?.('正在生成手册 PDF，请稍候…')
+        const [{ default: html2canvas }, { jsPDF }, { default: QRCode }] = await Promise.all([
+          import('html2canvas'),
+          import('jspdf'),
+          import('qrcode')
+        ])
+        const items = await this._fetchAllItemsForManual()
+        if (!items.length) {
+          this.$toast?.error('没有可导出的商品')
+          return
+        }
+        const container = await this._buildManualHtml(items, QRCode)
+        document.body.appendChild(container)
+        try {
+          await this._renderManualToPdf(container, html2canvas, jsPDF)
+        } finally {
+          document.body.removeChild(container)
+        }
+        this.$toast?.success(`手册 PDF 已导出（${items.length} 款商品）`)
+      } catch (e) {
+        logger.error('[ExchangeItems] 导出手册 PDF 失败:', e)
+        this.$toast?.error(e.message || '导出手册 PDF 失败')
+      }
+    },
+
+    /**
+     * 构建手册的离屏 HTML 容器（每款商品一张卡片：图片 + 名称 + SP码 + 系列号 + 价格 + 二维码）
+     * @param {Array<Object>} items - 商品数组
+     * @param {Object} QRCode - qrcode 库
+     * @returns {Promise<HTMLElement>} 离屏渲染容器
+     */
+    async _buildManualHtml(items, QRCode) {
+      const container = document.createElement('div')
+      // 离屏渲染：固定 A4 宽度像素（794px≈210mm@96dpi），置于视口外避免闪烁
+      container.style.cssText =
+        'position:fixed;left:-9999px;top:0;width:794px;background:#fff;' +
+        'font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;padding:24px;box-sizing:border-box;'
+      const nowStr = new Date().toLocaleString('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        hour12: false
+      })
+      const header = document.createElement('div')
+      header.style.cssText = 'text-align:center;margin-bottom:16px;'
+      header.innerHTML =
+        '<div style="font-size:20px;font-weight:700;color:#111;">商品编码手册</div>' +
+        `<div style="font-size:11px;color:#888;margin-top:4px;">生成时间：${nowStr}（北京时间） · 共 ${items.length} 款</div>`
+      container.appendChild(header)
+
+      const grid = document.createElement('div')
+      grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:12px;'
+      for (const it of items) {
+        grid.appendChild(await this._buildManualCard(it, QRCode))
+      }
+      container.appendChild(grid)
+      return container
+    },
+
+    /**
+     * 构建单款商品的手册卡片
+     * @param {Object} it - 商品对象
+     * @param {Object} QRCode - qrcode 库
+     * @returns {Promise<HTMLElement>} 卡片元素
+     */
+    async _buildManualCard(it, QRCode) {
+      const codeDisplay = it.item_code ? formatProductCode(it.item_code) : '—'
+      const seriesNo =
+        it.series && it.series_seq != null
+          ? formatSeriesNo(it.series.series_code, it.series_seq, it.series.seq_pad)
+          : ''
+      const priceVal = it.cost_amount ?? it.min_cost_amount ?? ''
+      const assetName = this.getAssetTypeName?.(it.cost_asset_code || it.min_cost_asset_code) || ''
+      const imgUrl =
+        it.primary_image?.thumbnail_url ||
+        it.primary_image?.url ||
+        it.primary_image?.public_url ||
+        ''
+
+      // 二维码：把 item_code 规范形渲染为 dataURL（扫码结果=编码，可作搜索输入定位商品）
+      let qrDataUrl = ''
+      if (it.item_code) {
+        try {
+          qrDataUrl = await QRCode.toDataURL(it.item_code, { width: 88, margin: 1 })
+        } catch (e) {
+          logger.warn('[ExchangeItems] 手册二维码生成失败:', it.item_code, e?.message)
+        }
+      }
+      return this._renderManualCardEl({
+        it,
+        codeDisplay,
+        seriesNo,
+        priceVal,
+        assetName,
+        imgUrl,
+        qrDataUrl
+      })
+    },
+
+    /**
+     * 渲染手册卡片 DOM（纯拼装，无异步）
+     * @param {Object} p - 卡片渲染参数
+     * @returns {HTMLElement} 卡片元素
+     */
+    _renderManualCardEl(p) {
+      const { it, codeDisplay, seriesNo, priceVal, assetName, imgUrl, qrDataUrl } = p
+      const card = document.createElement('div')
+      // 每行 2 张卡片：(794-48padding-12gap)/2 ≈ 367px
+      card.style.cssText =
+        'width:355px;border:1px solid #e5e7eb;border-radius:8px;padding:12px;box-sizing:border-box;' +
+        'display:flex;gap:12px;align-items:flex-start;background:#fff;'
+      const imgHtml = imgUrl
+        ? `<img src="${imgUrl}" crossorigin="anonymous" style="width:72px;height:72px;object-fit:cover;border-radius:6px;flex-shrink:0;" />`
+        : '<div style="width:72px;height:72px;border-radius:6px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:11px;flex-shrink:0;">无图</div>'
+      const qrHtml = qrDataUrl
+        ? `<img src="${qrDataUrl}" style="width:72px;height:72px;flex-shrink:0;" />`
+        : '<div style="width:72px;height:72px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:10px;flex-shrink:0;">无码</div>'
+      const seriesHtml = seriesNo
+        ? `<div style="font-size:11px;color:#0d9488;margin-top:2px;">系列号：${seriesNo}</div>`
+        : ''
+      const priceHtml =
+        priceVal !== ''
+          ? `<div style="font-size:12px;color:#dc2626;margin-top:4px;">${priceVal} ${assetName}</div>`
+          : ''
+      const escName = String(it.item_name || '')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+      card.innerHTML =
+        imgHtml +
+        '<div style="flex:1;min-width:0;">' +
+        `<div style="font-size:13px;font-weight:600;color:#111;line-height:1.3;">${escName}</div>` +
+        `<div style="font-size:12px;color:#4f46e5;font-family:monospace;margin-top:4px;">${codeDisplay}</div>` +
+        seriesHtml +
+        priceHtml +
+        '</div>' +
+        qrHtml
+      return card
+    },
+
+    /**
+     * 把离屏 HTML 分页渲染进 PDF（html2canvas 截图 → jsPDF 逐页嵌图）
+     * @param {HTMLElement} container - 离屏容器
+     * @param {Function} html2canvas - html2canvas
+     * @param {Function} jsPDF - jsPDF 构造器
+     * @returns {Promise<void>}
+     */
+    async _renderManualToPdf(container, html2canvas, jsPDF) {
+      // 等待卡片内图片（商品图/二维码）加载完成，避免截图空白
+      const imgs = Array.from(container.querySelectorAll('img'))
+      await Promise.all(
+        imgs.map(
+          img =>
+            new Promise(resolve => {
+              if (img.complete) return resolve()
+              img.onload = () => resolve()
+              img.onerror = () => resolve()
+            })
+        )
+      )
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#fff'
+      })
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pageW = pdf.internal.pageSize.getWidth()
+      const pageH = pdf.internal.pageSize.getHeight()
+      const imgW = pageW
+      const imgH = (canvas.height * imgW) / canvas.width
+      // 超过一页则按页高切片，逐页 addImage（负偏移实现分页裁切）
+      let heightLeft = imgH
+      let position = 0
+      const imgData = canvas.toDataURL('image/jpeg', 0.92)
+      pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH)
+      heightLeft -= pageH
+      while (heightLeft > 0) {
+        position -= pageH
+        pdf.addPage()
+        pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH)
+        heightLeft -= pageH
+      }
+      const stamp = new Date()
+        .toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })
+        .replace(/[/\s:]/g, '')
+      pdf.save(`商品编码手册_${stamp}.pdf`)
     },
 
     /**

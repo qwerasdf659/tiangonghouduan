@@ -36,6 +36,14 @@ const { assertAndGetTransaction } = require('../../../utils/transactionHelpers')
 const { BusinessCacheHelper } = require('../../../utils/BusinessCacheHelper')
 const CampaignCodeGenerator = require('../../../utils/CampaignCodeGenerator')
 const AdminSystemService = require('../../AdminSystemService')
+const { AssetCode } = require('../../../constants/AssetCode')
+
+/**
+ * 抽奖入场资产合法值（双层货币可见层 §12.7）
+ * - points：全局可见积分（默认，常驻活动）
+ * - event_points：活动专属可见代币（限时活动，按 EVENT_<campaign_code> 桶隔离，到期清零）
+ */
+const VALID_ENTRY_ASSET_CODES = [AssetCode.POINTS, AssetCode.EVENT_POINTS]
 
 /**
  * 抽奖活动 CRUD 服务类
@@ -108,6 +116,18 @@ class LotteryCampaignCRUDService {
       throw error
     }
 
+    // 验证入场资产码（双层货币可见层 §12.7；仅允许 points / event_points）
+    if (
+      campaignData.entry_asset_code !== undefined &&
+      !VALID_ENTRY_ASSET_CODES.includes(campaignData.entry_asset_code)
+    ) {
+      throw new BusinessError(
+        `无效的入场资产码：${campaignData.entry_asset_code}（允许值：${VALID_ENTRY_ASSET_CODES.join('/')}）`,
+        'INVALID_ENTRY_ASSET_CODE',
+        400
+      )
+    }
+
     // 后端自动生成活动编码（忽略前端传入的值，格式：CAMP202602230001）
     const campaign_code = await CampaignCodeGenerator.generateWithRetry({ transaction })
 
@@ -129,6 +149,8 @@ class LotteryCampaignCRUDService {
         status: campaignData.status || 'draft',
         rules_text: campaignData.rules_text || '',
         budget_mode: campaignData.budget_mode || 'user',
+        // 入场资产（双层货币可见层 §12.7）：points=全局可见积分(默认)/event_points=活动专属代币
+        entry_asset_code: campaignData.entry_asset_code || 'points',
         max_draws_per_user_daily: campaignData.max_draws_per_user_daily || 3,
         max_draws_per_user_total: campaignData.max_draws_per_user_total || null,
         total_prize_pool: campaignData.total_prize_pool || 0,
@@ -468,6 +490,18 @@ class LotteryCampaignCRUDService {
       operator_user_id
     })
 
+    // 验证入场资产码（双层货币可见层 §12.7；仅允许 points / event_points）
+    if (
+      updateData.entry_asset_code !== undefined &&
+      !VALID_ENTRY_ASSET_CODES.includes(updateData.entry_asset_code)
+    ) {
+      throw new BusinessError(
+        `无效的入场资产码：${updateData.entry_asset_code}（允许值：${VALID_ENTRY_ASSET_CODES.join('/')}）`,
+        'INVALID_ENTRY_ASSET_CODE',
+        400
+      )
+    }
+
     // 查找活动
     const campaign = await LotteryCampaign.findByPk(parseInt(lottery_campaign_id), { transaction })
     if (!campaign) {
@@ -487,6 +521,8 @@ class LotteryCampaignCRUDService {
       'status',
       'rules_text',
       'budget_mode',
+      // 入场资产（双层货币可见层 §12.7）：points/event_points
+      'entry_asset_code',
       'max_draws_per_user_daily',
       'max_draws_per_user_total',
       'total_prize_pool',

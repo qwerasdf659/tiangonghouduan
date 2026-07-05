@@ -22,6 +22,7 @@
 
 const BusinessError = require('../../utils/BusinessError')
 const logger = require('../../utils/logger').logger
+const ProductCodeGenerator = require('../../utils/ProductCodeGenerator')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const displayNameHelper = require('../../utils/displayNameHelper')
 const BeijingTimeHelper = require('../../utils/timeHelper')
@@ -109,6 +110,11 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
    */
   marketItemView: [
     'exchange_item_id',
+    /*
+     * item_code（商品编码体系 §3.5）：C 端「只进不出」——select 下发供搜索回显，
+     * 小程序前端不渲染该字段为商品信息（约束落在前端展示层，不在后端删字段）。
+     */
+    'item_code',
     'item_name',
     'description',
     'sort_order',
@@ -144,6 +150,8 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
    */
   marketItemDetailView: [
     'exchange_item_id',
+    // item_code：与列表视图同口径下发（供搜索回显；小程序不渲染，详见 §3.5 编码只进不出）
+    'item_code',
     'item_name',
     'description',
     'sort_order',
@@ -397,9 +405,27 @@ class QueryService {
         where.space = { [Op.in]: [space, 'both'] }
       }
 
-      // 关键词搜索（匹配 item_name）
+      /*
+       * 关键词搜索（编码 + 名称双入口，商品编码体系 §3.5/§15.7 步骤6）：
+       * 1. 先归一化检测输入是否命中商品编码格式（SP/SK 前缀 + 12 位 Base32，容错大小写/横线/空格）；
+       * 2. 命中 SP 码 → 按 exchange_items.item_code 精确匹配（用户照手册输码定位商品）；
+       * 3. 命中 SK 码 → 反查该 SKU 所属 SPU，按 exchange_item_id 精确匹配；
+       * 4. 未命中编码格式 → 维持 item_name 模糊匹配（原有行为不变）。
+       */
       if (keyword) {
-        where.item_name = { [Op.like]: `%${keyword}%` }
+        const codeHit = ProductCodeGenerator.detect(keyword)
+        if (codeHit.matched && codeHit.prefix === 'SP') {
+          where.item_code = codeHit.normalized
+        } else if (codeHit.matched && codeHit.prefix === 'SK') {
+          const skuRow = await this.ExchangeItemSku.findOne({
+            where: { sku_code: codeHit.normalized },
+            attributes: ['exchange_item_id']
+          })
+          // SKU 码命中则定位其所属 SPU；未命中则给一个不可能的 ID，返回空列表（编码查询语义是精确查找）
+          where.exchange_item_id = skuRow ? skuRow.exchange_item_id : -1
+        } else {
+          where.item_name = { [Op.like]: `%${keyword}%` }
+        }
       }
 
       // 分类筛选（支持两级分类：选择一级分类时自动包含其下所有子分类商品）
@@ -413,7 +439,8 @@ class QueryService {
       }
 
       // 排除指定商品（用于详情页"相关推荐"，排除当前商品自身）
-      if (exclude_id) {
+      if (exclude_id && where.exchange_item_id === undefined) {
+        // SK 编码精确命中时 where.exchange_item_id 已是精确值，排除逻辑不再叠加（编码查询优先）
         where.exchange_item_id = { [Op.ne]: parseInt(exclude_id, 10) }
       }
 
@@ -1517,8 +1544,19 @@ class QueryService {
           replacements.space_values = [space, 'both']
         }
         if (keyword) {
-          parts.push('p.item_name LIKE :keyword')
-          replacements.keyword = `%${keyword}%`
+          /*
+           * 与 getMarketItems 主查询同一套编码搜索语义（商品编码体系 §3.5）：
+           * 命中 SP 编码格式 → item_code 精确匹配；否则 item_name 模糊匹配。
+           * （SK 码属 SKU 层，聚合计数按 SPU 维度统计，此处按名称分支兜底即可）
+           */
+          const codeHit = ProductCodeGenerator.detect(keyword)
+          if (codeHit.matched && codeHit.prefix === 'SP') {
+            parts.push('p.item_code = :item_code_kw')
+            replacements.item_code_kw = codeHit.normalized
+          } else {
+            parts.push('p.item_name LIKE :keyword')
+            replacements.keyword = `%${keyword}%`
+          }
         }
         return { parts, replacements }
       }

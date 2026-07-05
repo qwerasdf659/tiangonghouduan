@@ -254,11 +254,38 @@
             <label class="block text-sm font-medium themed-text-secondary mb-1">预计恢复时间</label>
             <input type="datetime-local" x-model="maintenanceForm.end_time" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500">
           </div>
+
+          <!-- 微信小程序分端维护（§21：仅影响微信小程序，Web 后台与商家端不受影响） -->
+          <div class="border-t pt-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="font-medium text-sm">📱 微信小程序维护模式</p>
+                <p class="text-xs themed-text-muted">仅影响微信小程序，Web 后台与商家端不受影响</p>
+              </div>
+              <label class="inline-flex items-center cursor-pointer">
+                <input type="checkbox" x-model="maintenanceForm.wechat_mp_enabled" class="sr-only peer">
+                <div class="relative w-11 h-6 bg-gray-200 peer-checked:bg-orange-500 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+              </label>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">小程序维护公告</label>
+              <textarea x-model="maintenanceForm.wechat_mp_message" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500" rows="2" placeholder="小程序正在升级维护中，预计30分钟后恢复，敬请谅解。"></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">小程序预计恢复时间（可空）</label>
+              <input type="datetime-local" x-model="maintenanceForm.wechat_mp_end_time" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500">
+            </div>
+            <div class="flex justify-end">
+              <button type="button" @click="saveWechatMpMaintenance()" class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm">
+                保存小程序维护设置
+              </button>
+            </div>
+          </div>
         </div>
         <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
           <button type="button" @click="hideModal('maintenanceModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300">取消</button>
           <button type="submit" class="px-4 py-2 text-white rounded-lg disabled:opacity-50" :class="maintenanceMode ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'" :disabled="submitting">
-            <span x-text="maintenanceMode ? '关闭维护' : '开启维护'"></span>
+            <span x-text="maintenanceMode ? '关闭全站维护' : '开启全站维护'"></span>
           </button>
         </div>
       </form>

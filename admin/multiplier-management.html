@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '水晶倍率活动管理', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+
+  <!-- 页面主体 -->
+  <div x-data="multiplierManagementPage()" x-init="init()">
+
+    <!-- 导航栏 -->
+    <nav class="bg-purple-600 text-white shadow-lg">
+      <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+        <div class="flex items-center space-x-4">
+          <a href="/admin/workspace.html" class="hover:text-purple-200">← 返回工作台</a>
+          <span class="text-lg font-semibold">✨ 水晶倍率活动管理</span>
+        </div>
+        <div class="flex gap-2">
+          <button x-show="active_tab === 'rules'" @click="openCreateRuleForm()" class="bg-white text-purple-600 px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-purple-50">
+            + 新增倍率规则
+          </button>
+          <button x-show="active_tab === 'collection'" @click="openCreateCollectionForm()" class="bg-white text-purple-600 px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-purple-50">
+            + 新增归集规则
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-6">
+
+    <!-- ==================== 页面横幅 ==================== -->
+    <div class="themed-card rounded-lg shadow p-4 mb-6 border-l-4 border-purple-500">
+      <h1 class="text-xl font-bold themed-text mb-1">✨ 水晶奖品倍率活动</h1>
+      <p class="themed-text-muted text-sm">
+        对"特定活动 + 特定人群"配置抽中水晶类奖品发放数量翻倍（×1.5~×3）。倍率按活动隔离、同活动内多规则取最高（不叠加）、
+        成本封顶（extra_cost_limit 达上限自动停翻）。归集规则用于限时翻倍活动的预算重定向 + 活动积分发放（防囤积套利）。
+      </p>
+    </div>
+
+    <!-- ==================== Tab 切换 ==================== -->
+    <div class="flex gap-1 mb-6">
+      <button @click="switchTab('rules')"
+              :class="active_tab === 'rules' ? 'bg-purple-600 text-white' : 'themed-card themed-text hover:bg-purple-50'"
+              class="px-5 py-2 rounded-t-lg text-sm font-medium shadow">
+        倍率规则
+      </button>
+      <button @click="switchTab('collection')"
+              :class="active_tab === 'collection' ? 'bg-purple-600 text-white' : 'themed-card themed-text hover:bg-purple-50'"
+              class="px-5 py-2 rounded-t-lg text-sm font-medium shadow">
+        预算归集规则
+      </button>
+      <button @click="switchTab('monitor')"
+              :class="active_tab === 'monitor' ? 'bg-purple-600 text-white' : 'themed-card themed-text hover:bg-purple-50'"
+              class="px-5 py-2 rounded-t-lg text-sm font-medium shadow">
+        监控看板
+      </button>
+    </div>
+
+    <!-- ==================== Tab 1：倍率规则 ==================== -->
+    <div x-show="active_tab === 'rules'">
+
+      <!-- 筛选区域 -->
+      <div class="themed-card rounded-lg shadow p-4 mb-6">
+        <div class="flex flex-wrap gap-4 items-center">
+          <div>
+            <label class="text-sm themed-text-muted block mb-1">绑定活动</label>
+            <select x-model="filter_campaign_id" @change="onFilterChange()" class="themed-input rounded px-3 py-1.5 text-sm w-56">
+              <option value="">全部活动</option>
+              <template x-for="c in campaigns" :key="c.lottery_campaign_id">
+                <option :value="c.lottery_campaign_id" x-text="c.campaign_name + ' (#' + c.lottery_campaign_id + ')'"></option>
+              </template>
+            </select>
+          </div>
+          <div>
+            <label class="text-sm themed-text-muted block mb-1">状态</label>
+            <select x-model="filter_status" @change="onFilterChange()" class="themed-input rounded px-3 py-1.5 text-sm">
+              <option value="">全部</option>
+              <option value="active">生效中</option>
+              <option value="inactive">已停用</option>
+            </select>
+          </div>
+          <div class="flex-1"></div>
+          <div class="text-sm themed-text-muted">
+            共 <span class="font-bold" x-text="pagination.total"></span> 条规则
+          </div>
+        </div>
+      </div>
+
+      <!-- 规则表格 -->
+      <div class="themed-card rounded-lg shadow overflow-hidden mb-6">
+        <template x-if="rules_loading">
+          <div class="p-8 text-center themed-text-muted">加载中...</div>
+        </template>
+        <template x-if="rules_error && !rules_loading">
+          <div class="p-8 text-center text-red-500" x-text="rules_error"></div>
+        </template>
+
+        <template x-if="!rules_loading && !rules_error">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="themed-bg-muted">
+                <tr>
+                  <th class="px-4 py-3 text-left themed-text font-medium">ID</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">规则 / 展示名</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">绑定活动</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">倍率</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">奖品范围</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">作用人群</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">成本水位</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">时间窗</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">状态</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="rule in rules" :key="rule.multiplier_campaign_id">
+                  <tr class="border-t themed-border hover:themed-bg-muted transition-colors">
+                    <td class="px-4 py-3 themed-text-muted" x-text="rule.multiplier_campaign_id"></td>
+                    <td class="px-4 py-3">
+                      <div class="font-medium themed-text" x-text="rule.campaign_name"></div>
+                      <div class="text-xs themed-text-muted" x-text="'对用户展示：' + rule.display_name"></div>
+                    </td>
+                    <td class="px-4 py-3 themed-text text-xs" x-text="getCampaignName(rule.lottery_campaign_id)"></td>
+                    <td class="px-4 py-3">
+                      <span class="font-mono text-purple-600 font-bold" x-text="'×' + Number(rule.multiplier)"></span>
+                      <div class="text-xs themed-text-muted" x-text="'上限 ×' + Number(rule.max_multiplier_cap) + ' / ' + rule.rounding_mode"></div>
+                    </td>
+                    <td class="px-4 py-3 themed-text text-xs" x-text="getRewardScopeLabel(rule.reward_scope)"></td>
+                    <td class="px-4 py-3">
+                      <div class="themed-text text-xs" x-text="getTargetTypeLabel(rule.target_type)"></div>
+                      <div class="text-xs themed-text-muted" x-show="rule.targets && rule.targets.length"
+                           x-text="(rule.targets || []).map(t => t.target_ref).join(', ')"></div>
+                    </td>
+                    <td class="px-4 py-3 w-32">
+                      <div class="text-xs themed-text-muted mb-1">
+                        <span x-text="Number(rule.extra_cost_used)"></span> / <span x-text="Number(rule.extra_cost_limit)"></span>
+                      </div>
+                      <div class="w-full bg-gray-200 rounded-full h-1.5">
+                        <div class="h-1.5 rounded-full"
+                             :class="getCostPercent(rule) >= 90 ? 'bg-red-500' : (getCostPercent(rule) >= 70 ? 'bg-yellow-500' : 'bg-green-500')"
+                             :style="'width:' + getCostPercent(rule) + '%'"></div>
+                      </div>
+                    </td>
+                    <td class="px-4 py-3 text-xs themed-text-muted">
+                      <div x-text="rule.start_at ? formatDateTime(rule.start_at) : '不限'"></div>
+                      <div x-text="rule.end_at ? formatDateTime(rule.end_at) : '不限'"></div>
+                    </td>
+                    <td class="px-4 py-3">
+                      <span class="px-2 py-0.5 rounded-full text-xs font-medium"
+                            :class="getStatusInfo(rule.status).color"
+                            x-text="getStatusInfo(rule.status).label"></span>
+                    </td>
+                    <td class="px-4 py-3">
+                      <div class="flex gap-2 flex-wrap">
+                        <button @click="openEditRuleForm(rule)" class="text-blue-600 hover:text-blue-800 text-xs">编辑</button>
+                        <button @click="toggleRuleStatus(rule)"
+                                :class="rule.status === 'active' ? 'text-yellow-600 hover:text-yellow-800' : 'text-green-600 hover:text-green-800'"
+                                class="text-xs"
+                                x-text="rule.status === 'active' ? '停用' : '启用'"></button>
+                        <button @click="openCostModal(rule)" class="text-purple-600 hover:text-purple-800 text-xs">成本</button>
+                        <button @click="deleteRule(rule)" class="text-red-600 hover:text-red-800 text-xs">删除</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+                <template x-if="rules.length === 0 && !rules_loading">
+                  <tr><td colspan="10" class="px-4 py-8 text-center themed-text-muted">暂无倍率规则</td></tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </template>
+
+        <!-- 分页 -->
+        <template x-if="pagination.total > pagination.page_size">
+          <div class="px-4 py-3 themed-bg-muted flex justify-between items-center text-sm">
+            <span class="themed-text-muted">第 <span x-text="pagination.page"></span> / <span x-text="total_pages"></span> 页</span>
+            <div class="flex gap-2">
+              <button @click="goToPage(pagination.page - 1)" :disabled="!has_prev_page"
+                      class="px-3 py-1 rounded themed-border border disabled:opacity-50">上一页</button>
+              <button @click="goToPage(pagination.page + 1)" :disabled="!has_next_page"
+                      class="px-3 py-1 rounded themed-border border disabled:opacity-50">下一页</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ==================== Tab 2：预算归集规则 ==================== -->
+    <div x-show="active_tab === 'collection'" x-cloak>
+
+      <div class="themed-card rounded-lg shadow p-4 mb-6 text-sm themed-text-muted">
+        限时翻倍活动期间，命中归集规则的消费预算<b>全额重定向</b>进该活动专属桶（EVENT_&lt;活动code&gt;），并按比率发放活动积分
+        event_points（活动内可见、到期清零）。未命中规则的消费维持全局桶 CONSUMPTION_DEFAULT 不受影响。活动 end_time
+        到期后由每日任务自动清零专属预算 + 活动积分。
+      </div>
+
+      <!-- 归集规则表格 -->
+      <div class="themed-card rounded-lg shadow overflow-hidden mb-6">
+        <template x-if="collection_loading">
+          <div class="p-8 text-center themed-text-muted">加载中...</div>
+        </template>
+        <template x-if="collection_error && !collection_loading">
+          <div class="p-8 text-center text-red-500" x-text="collection_error"></div>
+        </template>
+
+        <template x-if="!collection_loading && !collection_error">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="themed-bg-muted">
+                <tr>
+                  <th class="px-4 py-3 text-left themed-text font-medium">ID</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">规则名</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">归集去向活动</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">门店条件</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">商家条件</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">活动积分比率</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">时间窗</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">状态</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="rule in collection_rules" :key="rule.collection_rule_id">
+                  <tr class="border-t themed-border hover:themed-bg-muted transition-colors">
+                    <td class="px-4 py-3 themed-text-muted" x-text="rule.collection_rule_id"></td>
+                    <td class="px-4 py-3 font-medium themed-text" x-text="rule.rule_name"></td>
+                    <td class="px-4 py-3 themed-text text-xs">
+                      <span x-text="rule.lottery_campaign ? rule.lottery_campaign.campaign_name : getCampaignName(rule.lottery_campaign_id)"></span>
+                      <div class="themed-text-muted" x-text="rule.lottery_campaign ? ('EVENT_' + rule.lottery_campaign.campaign_code) : ''"></div>
+                    </td>
+                    <td class="px-4 py-3 themed-text text-xs" x-text="Array.isArray(rule.store_ids) && rule.store_ids.length ? rule.store_ids.join(',') : '不限'"></td>
+                    <td class="px-4 py-3 themed-text text-xs" x-text="Array.isArray(rule.merchant_ids) && rule.merchant_ids.length ? rule.merchant_ids.join(',') : '不限'"></td>
+                    <td class="px-4 py-3 font-mono text-purple-600" x-text="Number(rule.event_points_ratio)"></td>
+                    <td class="px-4 py-3 text-xs themed-text-muted">
+                      <div x-text="rule.start_at ? formatDateTime(rule.start_at) : '对齐活动开始'"></div>
+                      <div x-text="rule.end_at ? formatDateTime(rule.end_at) : '对齐活动结束'"></div>
+                    </td>
+                    <td class="px-4 py-3">
+                      <span class="px-2 py-0.5 rounded-full text-xs font-medium"
+                            :class="getStatusInfo(rule.status).color"
+                            x-text="getStatusInfo(rule.status).label"></span>
+                    </td>
+                    <td class="px-4 py-3">
+                      <div class="flex gap-2">
+                        <button @click="openEditCollectionForm(rule)" class="text-blue-600 hover:text-blue-800 text-xs">编辑</button>
+                        <button @click="toggleCollectionStatus(rule)"
+                                :class="rule.status === 'active' ? 'text-yellow-600 hover:text-yellow-800' : 'text-green-600 hover:text-green-800'"
+                                class="text-xs"
+                                x-text="rule.status === 'active' ? '停用' : '启用'"></button>
+                        <button @click="deleteCollectionRule(rule)" class="text-red-600 hover:text-red-800 text-xs">删除</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+                <template x-if="collection_rules.length === 0 && !collection_loading">
+                  <tr><td colspan="9" class="px-4 py-8 text-center themed-text-muted">暂无归集规则</td></tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </template>
+
+        <!-- 分页 -->
+        <template x-if="collection_pagination.total > collection_pagination.page_size">
+          <div class="px-4 py-3 themed-bg-muted flex justify-between items-center text-sm">
+            <span class="themed-text-muted">第 <span x-text="collection_pagination.page"></span> / <span x-text="collection_total_pages"></span> 页</span>
+            <div class="flex gap-2">
+              <button @click="goToCollectionPage(collection_pagination.page - 1)" :disabled="!collection_has_prev_page"
+                      class="px-3 py-1 rounded themed-border border disabled:opacity-50">上一页</button>
+              <button @click="goToCollectionPage(collection_pagination.page + 1)" :disabled="!collection_has_next_page"
+                      class="px-3 py-1 rounded themed-border border disabled:opacity-50">下一页</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ==================== Tab 3：监控看板（§13.2/§13.3/§13.4） ==================== -->
+    <div x-show="active_tab === 'monitor'" x-cloak>
+      <!-- 加载/错误提示 -->
+      <div x-show="monitor_loading" class="text-center py-6 themed-text-muted">加载监控数据中...</div>
+      <div x-show="monitor_error" class="text-red-600 text-sm mb-4" x-text="monitor_error"></div>
+
+      <!-- 活动积分概览卡片（§13.2 活动代币看板） -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6" x-show="event_points_overview">
+        <div class="themed-card rounded-lg p-4 shadow">
+          <div class="text-xs themed-text-muted">累计发放</div>
+          <div class="text-xl font-bold text-green-600" x-text="event_points_overview ? event_points_overview.total_issued : 0"></div>
+        </div>
+        <div class="themed-card rounded-lg p-4 shadow">
+          <div class="text-xs themed-text-muted">累计消耗（抽奖）</div>
+          <div class="text-xl font-bold text-red-500" x-text="event_points_overview ? event_points_overview.total_consumed : 0"></div>
+        </div>
+        <div class="themed-card rounded-lg p-4 shadow">
+          <div class="text-xs themed-text-muted">在途余额</div>
+          <div class="text-xl font-bold text-blue-600" x-text="event_points_overview ? event_points_overview.in_flight : 0"></div>
+        </div>
+        <div class="themed-card rounded-lg p-4 shadow">
+          <div class="text-xs themed-text-muted">到期清零量</div>
+          <div class="text-xl font-bold text-orange-500" x-text="event_points_overview ? event_points_overview.expired_cleared : 0"></div>
+        </div>
+        <div class="themed-card rounded-lg p-4 shadow">
+          <div class="text-xs themed-text-muted">持有人数</div>
+          <div class="text-xl font-bold themed-text" x-text="event_points_overview ? event_points_overview.holder_count : 0"></div>
+        </div>
+      </div>
+
+      <!-- 趋势窗口切换 -->
+      <div class="flex gap-2 mb-3">
+        <button @click="changeTrendDays(7)" :class="monitor_trend_days === 7 ? 'bg-purple-600 text-white' : 'themed-card themed-text'" class="px-3 py-1 rounded text-xs">近7天</button>
+        <button @click="changeTrendDays(30)" :class="monitor_trend_days === 30 ? 'bg-purple-600 text-white' : 'themed-card themed-text'" class="px-3 py-1 rounded text-xs">近30天</button>
+        <button @click="changeTrendDays(90)" :class="monitor_trend_days === 90 ? 'bg-purple-600 text-white' : 'themed-card themed-text'" class="px-3 py-1 rounded text-xs">近90天</button>
+      </div>
+
+      <!-- 图表区（空数据时直接暴露空白，不隐藏容器） -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <div class="themed-card rounded-lg p-4 shadow">
+          <div class="text-sm font-medium themed-text mb-2">活动积分发放/消耗趋势</div>
+          <div id="event-points-trend-chart" style="width:100%;height:300px;"></div>
+        </div>
+        <div class="themed-card rounded-lg p-4 shadow">
+          <div class="text-sm font-medium themed-text mb-2">个人活动账户余额分布（防套利监控）</div>
+          <div id="budget-distribution-chart" style="width:100%;height:300px;"></div>
+        </div>
+      </div>
+
+      <!-- 到期清零运维视图（§13.4） -->
+      <div class="themed-card rounded-lg p-4 shadow mb-6" x-show="expiry_history">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-sm font-medium themed-text">到期清零执行历史（运维）</div>
+          <span class="text-xs px-2 py-0.5 rounded"
+                :class="expiry_history && expiry_history.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
+                x-text="expiry_history && expiry_history.enabled ? '清零任务已启用' : '清零任务未启用'"></span>
+        </div>
+        <div class="text-xs themed-text-muted mb-2">
+          近 <span x-text="expiry_history ? expiry_history.range_days : 0"></span> 天累计清零
+          <b x-text="expiry_history ? expiry_history.total_cleared_amount : 0"></b> 单位，
+          共 <b x-text="expiry_history ? expiry_history.total_cleared_count : 0"></b> 笔。
+        </div>
+        <table class="w-full text-sm">
+          <thead><tr class="themed-text-muted text-left"><th class="py-1">日期</th><th>清零笔数</th><th>清零总量</th></tr></thead>
+          <tbody>
+            <template x-for="d in (expiry_history ? expiry_history.daily : [])" :key="d.date">
+              <tr class="themed-border border-t">
+                <td class="py-1" x-text="d.date"></td>
+                <td x-text="d.cleared_count"></td>
+                <td x-text="d.cleared_amount"></td>
+              </tr>
+            </template>
+            <template x-if="expiry_history && expiry_history.daily.length === 0">
+              <tr><td colspan="3" class="py-4 text-center themed-text-muted">近期无到期清零执行记录</td></tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 客服查询：为什么翻/没翻（§13.3） -->
+      <div class="themed-card rounded-lg p-4 shadow">
+        <div class="text-sm font-medium themed-text mb-2">客服查询：用户"为什么翻/没翻"</div>
+        <div class="flex flex-wrap gap-2 items-center mb-3">
+          <input x-model="explain_user_id" type="text" placeholder="用户ID（必填）" class="themed-border border rounded px-3 py-1.5 text-sm" />
+          <input x-model="explain_campaign_id" type="text" placeholder="活动ID（可选）" class="themed-border border rounded px-3 py-1.5 text-sm" />
+          <button @click="queryUserExplain()" :disabled="explain_loading" class="bg-purple-600 text-white px-4 py-1.5 rounded text-sm disabled:opacity-50">查询</button>
+        </div>
+        <div x-show="explain_error" class="text-red-600 text-sm mb-2" x-text="explain_error"></div>
+        <div x-show="explain_result">
+          <div class="text-xs themed-text-muted mb-2">
+            共 <b x-text="explain_result ? explain_result.total : 0"></b> 条近期抽奖记录
+          </div>
+          <table class="w-full text-sm">
+            <thead><tr class="themed-text-muted text-left"><th class="py-1">奖品</th><th>档位</th><th>是否翻倍</th><th>说明</th></tr></thead>
+            <tbody>
+              <template x-for="r in (explain_result ? explain_result.records : [])" :key="r.lottery_draw_id">
+                <tr class="themed-border border-t">
+                  <td class="py-1" x-text="r.prize_name"></td>
+                  <td x-text="r.reward_tier"></td>
+                  <td>
+                    <span class="text-xs px-2 py-0.5 rounded"
+                          :class="r.multiplied ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
+                          x-text="r.multiplied ? '已翻倍' : '×1 未翻倍'"></span>
+                  </td>
+                  <td class="text-xs themed-text-muted"
+                      x-text="r.multiplied && r.crystal_multiplier ? ('基础 ' + r.crystal_multiplier.base_quantity + ' × ' + r.crystal_multiplier.applied_multiplier + ' 倍 = ' + r.crystal_multiplier.final_quantity + '（' + (r.crystal_multiplier.reason || '') + '）') : '非水晶奖/未命中规则/兜底奖，按 ×1 发放'"></td>
+                </tr>
+              </template>
+              <template x-if="explain_result && explain_result.records.length === 0">
+                <tr><td colspan="4" class="py-4 text-center themed-text-muted">该用户近期无抽奖记录</td></tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 倍率规则 新增/编辑弹窗 ==================== -->
+    <template x-if="show_rule_form">
+      <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="closeRuleForm()">
+        <div class="themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+          <div class="p-6">
+            <h3 class="text-lg font-bold themed-text mb-4" x-text="is_editing_rule ? '编辑倍率规则' : '新增倍率规则'"></h3>
+
+            <div class="space-y-4">
+              <!-- 绑定活动（编辑时禁改，活动隔离） -->
+              <div>
+                <label class="block text-sm themed-text-muted mb-1">绑定抽奖活动 *（规则只在此活动内生效，活动间隔离）</label>
+                <select x-model="rule_form.lottery_campaign_id" @change="onFormCampaignChange()"
+                        :disabled="is_editing_rule" class="w-full themed-input rounded px-3 py-2 text-sm">
+                  <option value="">请选择活动</option>
+                  <template x-for="c in campaigns" :key="c.lottery_campaign_id">
+                    <option :value="c.lottery_campaign_id" x-text="c.campaign_name + ' (#' + c.lottery_campaign_id + ')'"></option>
+                  </template>
+                </select>
+              </div>
+
+              <!-- 规则名 / 展示名 -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">规则名（对内） *</label>
+                  <input type="text" x-model="rule_form.campaign_name" maxlength="100"
+                         placeholder="如：新春高等级翻倍" class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">展示名（对用户） *</label>
+                  <input type="text" x-model="rule_form.display_name" maxlength="100"
+                         placeholder="如：新春水晶翻倍" class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+              </div>
+
+              <!-- 倍率 / 硬上限 / 取整 -->
+              <div class="grid grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">倍率 *（支持小数 1.5/1.75/2.5）</label>
+                  <input type="number" x-model.number="rule_form.multiplier" min="1" step="0.05"
+                         class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">倍率硬上限（防误填夹紧）</label>
+                  <input type="number" x-model.number="rule_form.max_multiplier_cap" min="1" step="0.5"
+                         class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">小数取整方式</label>
+                  <select x-model="rule_form.rounding_mode" class="w-full themed-input rounded px-3 py-2 text-sm">
+                    <template x-for="opt in rounding_mode_options" :key="opt.value">
+                      <option :value="opt.value" x-text="opt.label"></option>
+                    </template>
+                  </select>
+                </div>
+              </div>
+
+              <!-- 奖品范围 -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">作用奖品范围</label>
+                  <select x-model="rule_form.reward_scope" class="w-full themed-input rounded px-3 py-2 text-sm">
+                    <option value="crystal_all">全部水晶（碎片+宝石，含全部色系）</option>
+                    <option value="group">指定色系（group_code）</option>
+                    <option value="asset_codes">指定资产码</option>
+                  </select>
+                </div>
+                <div x-show="rule_form.reward_scope !== 'crystal_all'">
+                  <label class="block text-sm themed-text-muted mb-1"
+                         x-text="rule_form.reward_scope === 'group' ? '色系列表（逗号分隔，如 red,blue）' : '资产码列表（逗号分隔，如 red_core_shard）'"></label>
+                  <input type="text" x-model="rule_form.scope_values_text"
+                         class="w-full themed-input rounded px-3 py-2 text-sm" placeholder="逗号分隔">
+                </div>
+              </div>
+
+              <!-- 成本封顶 -->
+              <div>
+                <label class="block text-sm themed-text-muted mb-1">额外成本封顶 extra_cost_limit *（按 budget_value_points 折算累计，达上限自动停翻回落×1）</label>
+                <input type="number" x-model.number="rule_form.extra_cost_limit" min="0"
+                       placeholder="必填，如 1000000" class="w-full themed-input rounded px-3 py-2 text-sm">
+              </div>
+
+              <!-- 作用人群 -->
+              <div>
+                <label class="block text-sm themed-text-muted mb-1">作用人群</label>
+                <select x-model="rule_form.target_type" @change="onTargetTypeChange()" class="w-full themed-input rounded px-3 py-2 text-sm">
+                  <option value="all">全体用户（本活动内所有人）</option>
+                  <option value="segment">分群定向（活动分群引擎 segment_key）</option>
+                  <option value="tag">标签定向（user_ad_tags）</option>
+                  <option value="growth_level">成长等级定向（青铜/白银/黄金/钻石）</option>
+                  <option value="user">指定用户（user_id）</option>
+                </select>
+              </div>
+
+              <!-- 人群选择器（target_type ≠ all 时显示） -->
+              <div x-show="rule_form.target_type !== 'all'" class="themed-bg-muted rounded p-3 space-y-2">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm themed-text font-medium">作用对象（命中任一即生效）</span>
+                  <button @click="addTarget()" class="text-purple-600 hover:text-purple-800 text-xs">+ 添加对象</button>
+                </div>
+
+                <!-- tag 类型且无标签数据时的提示 -->
+                <p x-show="rule_form.target_type === 'tag' && ad_tags.length === 0" class="text-xs text-yellow-600">
+                  ⚠️ 暂无标签数据（user_ad_tags 为空，需先接通标签生产任务）；无标签时该定向安全降级为不命中（×1）。
+                </p>
+                <!-- segment 类型未选活动的提示 -->
+                <p x-show="rule_form.target_type === 'segment' && !rule_form.lottery_campaign_id" class="text-xs text-yellow-600">
+                  请先选择绑定活动，分群选项来自该活动的 resolver_version。
+                </p>
+
+                <template x-for="(target, index) in rule_form.targets" :key="index">
+                  <div class="flex gap-2 items-center">
+                    <!-- segment：下拉选活动分群 -->
+                    <template x-if="rule_form.target_type === 'segment'">
+                      <select x-model="target.target_ref" class="flex-1 themed-input rounded px-2 py-1.5 text-sm">
+                        <option value="">选择分群</option>
+                        <template x-for="opt in segment_options" :key="opt.segment_key">
+                          <option :value="opt.segment_key" x-text="opt.segment_key + (opt.description ? '（' + opt.description + '）' : '')"></option>
+                        </template>
+                      </select>
+                    </template>
+                    <!-- growth_level：下拉选等级 -->
+                    <template x-if="rule_form.target_type === 'growth_level'">
+                      <select x-model="target.target_ref" class="flex-1 themed-input rounded px-2 py-1.5 text-sm">
+                        <option value="">选择等级</option>
+                        <template x-for="lv in growth_levels" :key="lv.level_key">
+                          <option :value="lv.level_key" x-text="lv.level_name + '（' + lv.level_key + '）'"></option>
+                        </template>
+                      </select>
+                    </template>
+                    <!-- tag：下拉选标签 + 可选精确值 -->
+                    <template x-if="rule_form.target_type === 'tag'">
+                      <div class="flex-1 flex gap-2">
+                        <select x-model="target.target_ref" class="flex-1 themed-input rounded px-2 py-1.5 text-sm">
+                          <option value="">选择标签</option>
+                          <template x-for="t in ad_tags" :key="t.tag_key">
+                            <option :value="t.tag_key" x-text="t.tag_key"></option>
+                          </template>
+                        </select>
+                        <input type="text" x-model="target.target_value" placeholder="精确值（可空）"
+                               class="w-28 themed-input rounded px-2 py-1.5 text-sm">
+                      </div>
+                    </template>
+                    <!-- user：输入 user_id -->
+                    <template x-if="rule_form.target_type === 'user'">
+                      <input type="number" x-model="target.target_ref" placeholder="用户ID（user_id）"
+                             class="flex-1 themed-input rounded px-2 py-1.5 text-sm">
+                    </template>
+                    <button @click="removeTarget(index)" class="text-red-500 hover:text-red-700 text-xs shrink-0">移除</button>
+                  </div>
+                </template>
+              </div>
+
+              <!-- per-user 三重护栏 -->
+              <div class="grid grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">每日翻倍次数上限（空=不限）</label>
+                  <input type="number" x-model.number="rule_form.per_user_daily_limit" min="1"
+                         class="w-full themed-input rounded px-3 py-2 text-sm" placeholder="不限">
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">资格时间盒/天（空=不限）</label>
+                  <input type="number" x-model.number="rule_form.eligibility_days" min="1"
+                         class="w-full themed-input rounded px-3 py-2 text-sm" placeholder="如新用户30天">
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">单人累计额外量上限（空=不限）</label>
+                  <input type="number" x-model.number="rule_form.per_user_extra_cap" min="1"
+                         class="w-full themed-input rounded px-3 py-2 text-sm" placeholder="不限">
+                </div>
+              </div>
+
+              <!-- 时间窗 + 优先级 -->
+              <div class="grid grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">生效开始（空=不限）</label>
+                  <input type="datetime-local" x-model="rule_form.start_at" class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">生效结束（空=不限）</label>
+                  <input type="datetime-local" x-model="rule_form.end_at" class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">优先级（并列同倍率决胜）</label>
+                  <input type="number" x-model.number="rule_form.priority" class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+              </div>
+
+              <!-- 状态 + 备注 -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">状态</label>
+                  <select x-model="rule_form.status" class="w-full themed-input rounded px-3 py-2 text-sm">
+                    <option value="inactive">先停用（建好再启用）</option>
+                    <option value="active">立即生效</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">备注（可选）</label>
+                  <input type="text" x-model="rule_form.remark" maxlength="500" class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+              </div>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-6">
+              <button @click="closeRuleForm()" class="px-4 py-2 rounded themed-border border text-sm">取消</button>
+              <button @click="submitRuleForm()" class="px-4 py-2 rounded bg-purple-600 text-white text-sm hover:bg-purple-700">
+                <span x-text="is_editing_rule ? '保存修改' : '创建规则'"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ==================== 成本水位弹窗 ==================== -->
+    <template x-if="show_cost_modal">
+      <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="closeCostModal()">
+        <div class="themed-card rounded-lg shadow-xl w-full max-w-md mx-4">
+          <div class="p-6">
+            <h3 class="text-lg font-bold themed-text mb-4">📊 成本水位</h3>
+            <template x-if="cost_loading">
+              <div class="p-4 text-center themed-text-muted">加载中...</div>
+            </template>
+            <template x-if="!cost_loading && cost_data">
+              <div class="space-y-3 text-sm">
+                <div class="flex justify-between"><span class="themed-text-muted">已用额外成本</span><span class="font-mono themed-text" x-text="cost_data.extra_cost_used"></span></div>
+                <div class="flex justify-between"><span class="themed-text-muted">成本上限</span><span class="font-mono themed-text" x-text="cost_data.extra_cost_limit"></span></div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                  <div class="h-2 rounded-full"
+                       :class="cost_data.usage_ratio >= 0.9 ? 'bg-red-500' : (cost_data.usage_ratio >= 0.7 ? 'bg-yellow-500' : 'bg-green-500')"
+                       :style="'width:' + Math.min(100, Math.round(cost_data.usage_ratio * 100)) + '%'"></div>
+                </div>
+                <div class="flex justify-between"><span class="themed-text-muted">水位</span><span class="font-mono" :class="cost_data.exhausted ? 'text-red-600 font-bold' : 'themed-text'" x-text="Math.round(cost_data.usage_ratio * 100) + '%' + (cost_data.exhausted ? '（已击穿，停翻）' : '')"></span></div>
+                <hr class="themed-border">
+                <div class="flex justify-between"><span class="themed-text-muted">翻倍触发次数</span><span class="font-mono themed-text" x-text="cost_data.trigger_count"></span></div>
+                <div class="flex justify-between"><span class="themed-text-muted">受益人数</span><span class="font-mono themed-text" x-text="cost_data.beneficiary_count"></span></div>
+                <div class="flex justify-between"><span class="themed-text-muted">多发水晶总量</span><span class="font-mono themed-text" x-text="cost_data.extra_units_total"></span></div>
+              </div>
+            </template>
+            <div class="flex justify-end mt-6">
+              <button @click="closeCostModal()" class="px-4 py-2 rounded themed-border border text-sm">关闭</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ==================== 归集规则 新增/编辑弹窗 ==================== -->
+    <template x-if="show_collection_form">
+      <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="closeCollectionForm()">
+        <div class="themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+          <div class="p-6">
+            <h3 class="text-lg font-bold themed-text mb-4" x-text="is_editing_collection ? '编辑归集规则' : '新增归集规则'"></h3>
+
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm themed-text-muted mb-1">归集去向活动 *（消费预算全额进 EVENT_&lt;活动code&gt; 专属桶）</label>
+                <select x-model="collection_form.lottery_campaign_id" :disabled="is_editing_collection"
+                        class="w-full themed-input rounded px-3 py-2 text-sm">
+                  <option value="">请选择活动</option>
+                  <template x-for="c in campaigns" :key="c.lottery_campaign_id">
+                    <option :value="c.lottery_campaign_id" x-text="c.campaign_name + ' (#' + c.lottery_campaign_id + ')'"></option>
+                  </template>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-sm themed-text-muted mb-1">规则名 *</label>
+                <input type="text" x-model="collection_form.rule_name" maxlength="100"
+                       placeholder="如：新春活动预算归集" class="w-full themed-input rounded px-3 py-2 text-sm">
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">命中门店ID（逗号分隔，空=不限）</label>
+                  <input type="text" x-model="collection_form.store_ids_text" placeholder="如 1,2,3"
+                         class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">命中商家ID（逗号分隔，空=不限）</label>
+                  <input type="text" x-model="collection_form.merchant_ids_text" placeholder="如 1,2"
+                         class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm themed-text-muted mb-1">活动积分发放比率（event_points = 消费金额 × 比率；0=只归集预算不发活动积分）</label>
+                <input type="number" x-model.number="collection_form.event_points_ratio" min="0" step="0.1"
+                       class="w-full themed-input rounded px-3 py-2 text-sm">
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">生效开始（空=对齐活动开始）</label>
+                  <input type="datetime-local" x-model="collection_form.start_at" class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">生效结束（空=对齐活动结束）</label>
+                  <input type="datetime-local" x-model="collection_form.end_at" class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+              </div>
+
+              <div class="grid grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">优先级</label>
+                  <input type="number" x-model.number="collection_form.priority" class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">状态</label>
+                  <select x-model="collection_form.status" class="w-full themed-input rounded px-3 py-2 text-sm">
+                    <option value="inactive">先停用</option>
+                    <option value="active">立即生效</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">备注</label>
+                  <input type="text" x-model="collection_form.remark" maxlength="500" class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+              </div>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-6">
+              <button @click="closeCollectionForm()" class="px-4 py-2 rounded themed-border border text-sm">取消</button>
+              <button @click="submitCollectionForm()" class="px-4 py-2 rounded bg-purple-600 text-white text-sm hover:bg-purple-700">
+                <span x-text="is_editing_collection ? '保存修改' : '创建规则'"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    </div><!-- /.container -->
+  </div><!-- /x-data -->
+
+  <!-- JS 模块 -->
+  <script type="module" src="/src/alpine/index.js"></script>
+  <script type="module" src="/src/modules/lottery/pages/multiplier-management.js"></script>
+
+</body>
+</html>

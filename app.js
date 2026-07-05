@@ -1280,6 +1280,16 @@ if (require.main === module) {
           } catch (error) {
             appLogger.error('管理员通知清理定时任务加载失败', { error: error.message })
           }
+
+          // 初始化活动专属预算到期清零任务（ENABLE_EVENT_BUDGET_EXPIRY=true 时启用，水晶奖品倍率活动 §18.5 防囤积套利）
+          try {
+            require('./jobs/daily-event-budget-expiry')
+            appLogger.info('活动专属预算到期清零任务模块已加载', {
+              enabled: process.env.ENABLE_EVENT_BUDGET_EXPIRY === 'true'
+            })
+          } catch (error) {
+            appLogger.error('活动专属预算到期清零任务加载失败', { error: error.message })
+          }
         } else {
           appLogger.info('当前 worker 非定时任务执行节点，跳过全部 cron 注册', {
             node_app_instance: process.env.NODE_APP_INSTANCE

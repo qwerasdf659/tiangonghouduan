@@ -21,7 +21,7 @@
 const express = require('express')
 const router = express.Router()
 const logger = require('../../../utils/logger').logger
-const { optionalAuth } = require('../../../middleware/auth')
+const { optionalAuth, authenticateToken } = require('../../../middleware/auth')
 const dataAccessControl = require('../../../middleware/dataAccessControl')
 const { asyncHandler } = require('../../../middleware/validation')
 const { getRateLimiter } = require('../../../middleware/RateLimiterMiddleware')
@@ -352,6 +352,120 @@ router.get(
 
       return res.apiSuccess(sanitizedConfig, '回馈活动配置获取成功')
     }
+  })
+)
+
+/**
+ * @route GET /api/v4/lottery/campaigns/:code/multiplier
+ * @desc 获取当前登录用户在该活动的"合并后单一水晶倍率"（抽奖前展示，§16.3）
+ * @access Private（需登录 - 倍率按人群命中因人而异）
+ *
+ * @param {string} code - 活动代码（配置实体业务码）
+ *
+ * @returns {Object} data：
+ * - lottery_campaign_id: number - 抽奖活动ID
+ * - applied_multiplier: number - 合并后单一倍率（Max + cap 夹紧；无加成=1）
+ * - display_name: string|null - 对用户展示名（如"新春水晶翻倍"；无加成=null）
+ * - end_at: string|null - 倍率活动结束时间（无时间盒=null）
+ * - active: boolean - 是否有生效加成（false 时前端不展示倍率角标，§5.2）
+ *
+ * 业务规则：
+ * - 只读接口：不累加成本、不落快照、不取整（返回倍率本身）
+ * - 成本已击穿（extra_cost_used >= extra_cost_limit）的规则不展示
+ * - per-user 护栏（每日次数/资格时间盒/累计额外量）已触达的规则不展示
+ */
+router.get(
+  '/:code/multiplier',
+  publicReadRateLimiter,
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const campaign_code = req.params.code
+
+    // 参数校验（配置实体业务码）
+    const validation = validateCampaignCode(campaign_code)
+    if (!validation.valid) {
+      return res.apiError(validation.error.message, validation.error.code, { campaign_code }, 400)
+    }
+
+    // 通过 LotteryQueryService 解析活动（读写分离架构）
+    const LotteryQueryService = req.app.locals.services.getService('lottery_query')
+    const campaign = await LotteryQueryService.getCampaignByCode(campaign_code)
+
+    // 通过 CrystalMultiplierService 计算合并后单一倍率（只读，不写成本）
+    const CrystalMultiplierService = req.app.locals.services.getService('crystal_multiplier')
+    const merged = await CrystalMultiplierService.getMergedMultiplierForUser({
+      user_id: req.user.user_id,
+      lottery_campaign_id: campaign.lottery_campaign_id
+    })
+
+    return res.apiSuccess(
+      {
+        lottery_campaign_id: campaign.lottery_campaign_id,
+        applied_multiplier: merged.applied_multiplier,
+        display_name: merged.display_name,
+        end_at: merged.end_at,
+        active: merged.active
+      },
+      '获取当前水晶倍率成功'
+    )
+  })
+)
+
+/**
+ * @route GET /api/v4/lottery/campaigns/:code/event-points
+ * @desc 获取当前登录用户在该活动的"活动积分"余额（水晶奖品倍率活动 §12.7 双层货币可见层）
+ * @access Private（需登录）
+ *
+ * @param {string} code - 活动代码（配置实体业务码）
+ *
+ * @returns {Object} data：
+ * - lottery_campaign_id: number - 抽奖活动ID
+ * - asset_code: string - 固定 'event_points'（活动积分，小写）
+ * - available_amount: number - 该活动专属桶可用余额（从未获得=0）
+ * - campaign_end_time: string - 活动结束时间（到期清零倒计时依据，防2 直接清零）
+ *
+ * 业务规则（§12.7 拍板）：
+ * - 活动积分"仅在活动场景露出"：主钱包 /assets/balances 不展示（form=quota 过滤），本接口是唯一 C 端查询口
+ * - 按活动专属桶隔离（EVENT_<活动code>），活动间余额互不可见、互不可用
+ * - 活动 end_time 到期后由每日任务清零，前端可据 campaign_end_time 显示到期倒计时
+ */
+router.get(
+  '/:code/event-points',
+  publicReadRateLimiter,
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const campaign_code = req.params.code
+
+    // 参数校验（配置实体业务码）
+    const validation = validateCampaignCode(campaign_code)
+    if (!validation.valid) {
+      return res.apiError(validation.error.message, validation.error.code, { campaign_code }, 400)
+    }
+
+    // 通过 LotteryQueryService 解析活动（读写分离架构）
+    const LotteryQueryService = req.app.locals.services.getService('lottery_query')
+    const campaign = await LotteryQueryService.getCampaignByCode(campaign_code)
+
+    // 专属桶键派生（EVENT_<活动code>，D-5 规范）与余额查询均收口到服务层
+    const EventBudgetService = req.app.locals.services.getService('event_budget')
+    const BalanceService = req.app.locals.services.getService('asset_balance')
+    const bucket_key = EventBudgetService.bucketKey(campaign.campaign_code)
+
+    const balance = await BalanceService.getBalance({
+      user_id: req.user.user_id,
+      asset_code: 'event_points',
+      lottery_campaign_id: bucket_key
+    })
+
+    return res.apiSuccess(
+      {
+        lottery_campaign_id: campaign.lottery_campaign_id,
+        asset_code: 'event_points',
+        available_amount: balance ? Number(balance.available_amount) : 0,
+        campaign_end_time: campaign.end_time
+      },
+      '获取活动积分余额成功'
+    )
   })
 )
 

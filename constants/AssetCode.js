@@ -49,6 +49,9 @@ const AssetCode = Object.freeze({
   /** 预算积分 — 商家预算积分（原 BUDGET_POINTS） */
   BUDGET_POINTS: 'budget_points',
 
+  /** 活动积分 — 活动专属可见代币（按 lottery_campaign_id 分桶，活动结束清零；水晶奖品倍率活动 §12.7 双层货币可见层） */
+  EVENT_POINTS: 'event_points',
+
   // ========== 红色源晶 ==========
 
   /** 红源晶碎片（原 red_shard） */

@@ -599,6 +599,29 @@ router.put(
   })
 )
 
+/**
+ * GET /:lottery_campaign_id/segment-options
+ * 获取该活动可选的 segment_key 列表（水晶倍率规则人群选择器数据源，§16.2/D-12）
+ *
+ * 语义（权威）：活动通过 lottery_strategy_config.segment.resolver_version 绑定单一分群版本，
+ * 该版本 segment_rule_configs.rules[].segment_key 即倍率规则 segment 目标可选项。
+ * 数据源与运行时命中判定同源（DB segment_rule_configs），防止选项与实际命中漂移。
+ *
+ * 返回：{ options: [{ segment_key, description }], total }
+ */
+router.get(
+  '/:lottery_campaign_id/segment-options',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const rewardMultiplierService = req.app.locals.services.getService('reward_multiplier')
+    const options = await rewardMultiplierService.getSegmentOptions(
+      parseInt(req.params.lottery_campaign_id, 10)
+    )
+    return res.apiSuccess({ options, total: options.length }, '获取活动分群选项成功')
+  })
+)
+
 /*
  * ============================================
  * Phase 3：活动展示控制路由

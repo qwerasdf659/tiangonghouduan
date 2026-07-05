@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '供应商管理', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+
+  <!-- 导航栏 -->
+  <nav class="bg-gray-800 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-gray-300 transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">🏭 供应商管理</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-data x-text="$store.auth?.user?.nickname ? `欢迎，${$store.auth.user.nickname}` : '欢迎，管理员'" class="text-sm text-gray-300">欢迎，管理员</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 主内容 -->
+  <div class="container mx-auto px-4 py-6" x-data="supplierManagement()" x-cloak>
+
+    <!-- Tab 切换：供应商列表 / 货号辅助查询 -->
+    <div class="flex items-center gap-1 mb-4 border-b border-gray-200">
+      <button type="button" @click="switchTab('suppliers')"
+              class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+              :class="activeTab === 'suppliers' ? 'border-cyan-500 text-cyan-600' : 'border-transparent themed-text-muted hover:text-cyan-500'">
+        🏭 供应商列表
+      </button>
+      <button type="button" @click="switchTab('code-search')"
+              class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+              :class="activeTab === 'code-search' ? 'border-cyan-500 text-cyan-600' : 'border-transparent themed-text-muted hover:text-cyan-500'">
+        🔎 按货号找货
+      </button>
+    </div>
+
+    <!-- ==================== Tab 1：供应商列表 ==================== -->
+    <div x-show="activeTab === 'suppliers'">
+
+      <!-- 筛选栏 -->
+      <div class="themed-card rounded-xl shadow-sm mb-6 overflow-hidden">
+        <div class="px-5 py-4 bg-gradient-to-r from-slate-50 to-white border-b themed-border">
+          <div class="flex flex-wrap gap-4 items-end">
+            <div class="flex-1 min-w-[180px]">
+              <label class="block text-xs font-medium themed-text-muted mb-1.5">关键词搜索</label>
+              <input type="text" x-model="filters.keyword" @keyup.enter="handleSearch()"
+                placeholder="供应商名称 / 联系人 / 电话" class="w-full px-3 py-2 text-sm border rounded-lg themed-border focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors">
+            </div>
+            <div class="w-32">
+              <label class="block text-xs font-medium themed-text-muted mb-1.5">状态</label>
+              <select x-model="filters.status" @change="handleSearch()" class="w-full px-3 py-2 text-sm border rounded-lg themed-border focus:ring-2 focus:ring-cyan-500 transition-colors">
+                <option value="">全部状态</option>
+                <option value="active">启用</option>
+                <option value="inactive">停用</option>
+              </select>
+            </div>
+            <div class="flex gap-2">
+              <button @click="handleSearch()" class="px-4 py-2 text-sm themed-bg-primary text-white rounded-lg themed-hover-primary shadow-sm transition-all hover:shadow-md">🔍 搜索</button>
+              <button @click="resetFilters()" class="px-4 py-2 text-sm border rounded-lg themed-border hover:bg-gray-50 transition-colors">🔄 重置</button>
+              <button @click="openCreateForm()" class="px-4 py-2 text-sm themed-gradient-primary text-white rounded-lg shadow-sm transition-all hover:shadow-md">➕ 新增供应商</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 列表 -->
+      <div class="themed-card rounded-xl shadow-sm border overflow-hidden">
+        <div class="px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b themed-border flex justify-between items-center">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-semibold themed-text">供应商列表</span>
+            <span class="px-2 py-0.5 text-xs font-medium bg-cyan-100 text-cyan-600 rounded-full" x-text="total + ' 条记录'"></span>
+          </div>
+          <p class="text-xs themed-text-muted">供货商（进货来源）与「商家管理」的核销商家是两套独立主数据</p>
+        </div>
+
+        <div x-show="loading" class="p-12 text-center themed-text-secondary">
+          <div class="animate-spin text-3xl mb-3">⏳</div>
+          <p class="text-sm">加载供应商数据中...</p>
+        </div>
+
+        <div x-show="!loading && suppliers.length === 0" class="p-12 text-center">
+          <div class="text-5xl mb-4">🏭</div>
+          <p class="text-lg font-medium themed-text mb-2">暂无供应商数据</p>
+          <p class="text-sm themed-text-muted mb-4">点击「新增供应商」建档进货来源</p>
+          <button @click="openCreateForm()" class="px-4 py-2 text-sm themed-gradient-primary text-white rounded-lg shadow-sm">➕ 新增供应商</button>
+        </div>
+
+        <table x-show="!loading && suppliers.length > 0" class="w-full text-sm">
+          <thead>
+            <tr class="bg-gradient-to-r from-slate-50 to-gray-50 border-b themed-border">
+              <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">ID</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">供应商名称</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">联系人</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">联系电话</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted uppercase tracking-wider">状态</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">备注</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">创建时间</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted uppercase tracking-wider">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y themed-border">
+            <template x-for="s in suppliers" :key="s.supplier_id">
+              <tr class="hover:bg-cyan-50/30 transition-colors">
+                <td class="px-4 py-3"><span class="text-xs font-mono themed-text-muted" x-text="'#' + s.supplier_id"></span></td>
+                <td class="px-4 py-3"><p class="font-semibold themed-text" x-text="s.supplier_name"></p></td>
+                <td class="px-4 py-3 text-sm themed-text" x-text="s.contact_name || '-'"></td>
+                <td class="px-4 py-3 text-sm themed-text" x-text="s.contact_phone || '-'"></td>
+                <td class="px-4 py-3 text-center">
+                  <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
+                    :class="s.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
+                    x-text="s.status === 'active' ? '启用' : '停用'"></span>
+                </td>
+                <td class="px-4 py-3 text-xs themed-text-muted max-w-[200px] truncate" x-text="s.notes || '-'" :title="s.notes || ''"></td>
+                <td class="px-4 py-3 text-xs themed-text-muted" x-text="formatDate(s.created_at)"></td>
+                <td class="px-4 py-3">
+                  <div class="flex justify-center gap-1">
+                    <button @click="viewDetail(s.supplier_id)" class="px-2.5 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-md transition-colors" title="查看供货商品">📋 供货</button>
+                    <button @click="openEditForm(s.supplier_id)" class="px-2.5 py-1.5 text-xs font-medium text-green-600 hover:bg-green-50 rounded-md transition-colors" title="编辑供应商">✏️ 编辑</button>
+                    <button @click="handleDelete(s.supplier_id, s.supplier_name)" class="px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors" title="删除供应商">🗑️ 删除</button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+
+        <!-- 分页 -->
+        <div x-show="total > 0" class="px-5 py-3 flex justify-between items-center bg-gradient-to-r from-slate-50 to-gray-50 border-t themed-border">
+          <span class="text-xs themed-text-muted">
+            共 <span class="font-semibold themed-text" x-text="total"></span> 条记录，
+            第 <span class="font-semibold themed-text" x-text="pagination.page"></span>/<span x-text="totalPages"></span> 页
+          </span>
+          <div class="flex gap-1">
+            <button @click="goToPage(pagination.page - 1)" :disabled="!hasPrevPage"
+              class="px-3 py-1.5 border rounded-lg text-xs font-medium themed-border transition-colors"
+              :class="hasPrevPage ? 'hover:bg-white hover:shadow-sm themed-text-secondary' : 'opacity-40 cursor-not-allowed'">← 上一页</button>
+            <button @click="goToPage(pagination.page + 1)" :disabled="!hasNextPage"
+              class="px-3 py-1.5 border rounded-lg text-xs font-medium themed-border transition-colors"
+              :class="hasNextPage ? 'hover:bg-white hover:shadow-sm themed-text-secondary' : 'opacity-40 cursor-not-allowed'">下一页 →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== Tab 2：按货号找货（货号辅助查询） ==================== -->
+    <div x-show="activeTab === 'code-search'" x-cloak>
+      <div class="themed-card rounded-xl shadow-sm mb-6 overflow-hidden">
+        <div class="px-5 py-4 bg-gradient-to-r from-slate-50 to-white border-b themed-border">
+          <div class="flex flex-wrap gap-4 items-end">
+            <div class="flex-1 min-w-[200px]">
+              <label class="block text-xs font-medium themed-text-muted mb-1.5">供应商货号（模糊匹配）</label>
+              <input type="text" x-model="codeSearch.supplier_item_code" @keyup.enter="handleCodeSearch()"
+                placeholder="如 CB4385 / F-090" class="w-full px-3 py-2 text-sm border rounded-lg themed-border font-mono focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors">
+            </div>
+            <div class="w-56">
+              <label class="block text-xs font-medium themed-text-muted mb-1.5">供应商筛选（组合定位）</label>
+              <select x-model="codeSearch.supplier_id" class="w-full px-3 py-2 text-sm border rounded-lg themed-border focus:ring-2 focus:ring-cyan-500 transition-colors">
+                <option value="">全部供应商</option>
+                <template x-for="s in allSupplierOptions" :key="s.supplier_id">
+                  <option :value="s.supplier_id" x-text="s.supplier_name"></option>
+                </template>
+              </select>
+            </div>
+            <button @click="handleCodeSearch()" class="px-4 py-2 text-sm themed-bg-primary text-white rounded-lg themed-hover-primary shadow-sm transition-all hover:shadow-md">🔍 查询</button>
+          </div>
+          <p class="text-xs themed-text-muted mt-2">货号可重复（不同供应商可撞号、同供应商可复用），命中多条如实展示；请以我方 SP 商品编码为准精确定位</p>
+        </div>
+      </div>
+
+      <div class="themed-card rounded-xl shadow-sm border overflow-hidden">
+        <div class="px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b themed-border">
+          <span class="text-sm font-semibold themed-text">命中结果</span>
+          <span x-show="codeSearchDone" class="ml-2 px-2 py-0.5 text-xs font-medium bg-cyan-100 text-cyan-600 rounded-full" x-text="'共 ' + codeSearchTotal + ' 条命中'"></span>
+        </div>
+
+        <div x-show="codeSearchLoading" class="p-12 text-center themed-text-secondary">
+          <div class="animate-spin text-3xl mb-3">⏳</div>
+          <p class="text-sm">查询中...</p>
+        </div>
+
+        <div x-show="!codeSearchLoading && codeSearchDone && codeSearchResults.length === 0" class="p-12 text-center">
+          <div class="text-5xl mb-4">🔎</div>
+          <p class="text-lg font-medium themed-text mb-2">未找到匹配货号</p>
+          <p class="text-sm themed-text-muted">请确认货号关键词或换供应商筛选</p>
+        </div>
+
+        <table x-show="!codeSearchLoading && codeSearchResults.length > 0" class="w-full text-sm">
+          <thead>
+            <tr class="bg-gradient-to-r from-slate-50 to-gray-50 border-b themed-border">
+              <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">供应商</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">供应商货号</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">我方商品编码</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">商品名称</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted uppercase tracking-wider">商品状态</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted uppercase tracking-wider">主供</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y themed-border">
+            <template x-for="r in codeSearchResults" :key="r.id">
+              <tr class="hover:bg-cyan-50/30 transition-colors">
+                <td class="px-4 py-3 font-medium themed-text" x-text="r.supplier?.supplier_name || '-'"></td>
+                <td class="px-4 py-3">
+                  <span class="font-mono text-sm themed-text" x-text="r.supplier_item_code || '-'"></span>
+                  <!-- 冲突提示（非阻断）：同一供应商对多个 SPU 用了相同货号 -->
+                  <span x-show="r.duplicate_in_supplier" class="ml-1 px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-700 rounded" title="该供应商存在重复货号，请人工核对">⚠️ 重复货号</span>
+                </td>
+                <td class="px-4 py-3"><span class="font-mono text-xs text-indigo-600" x-text="formatItemCode(r.exchangeItem?.item_code)"></span></td>
+                <td class="px-4 py-3 themed-text" x-text="r.exchangeItem?.item_name || '-'"></td>
+                <td class="px-4 py-3 text-center">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                    :class="r.exchangeItem?.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
+                    x-text="r.exchangeItem?.status === 'active' ? '上架' : '下架'"></span>
+                </td>
+                <td class="px-4 py-3 text-center"><span x-show="r.is_primary" class="text-cyan-600 font-bold" title="主供货商">★</span></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 创建/编辑弹窗 -->
+    <div x-show="show_form" class="fixed inset-0 z-50 flex items-center justify-center" x-cloak
+      x-transition:enter="transition ease-out duration-300"
+      x-transition:enter-start="opacity-0"
+      x-transition:enter-end="opacity-100"
+      x-transition:leave="transition ease-in duration-200"
+      x-transition:leave-start="opacity-100"
+      x-transition:leave-end="opacity-0">
+      <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="closeForm()"></div>
+      <div class="relative themed-card rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto border themed-border">
+        <div class="px-6 py-4 themed-gradient-primary rounded-t-2xl">
+          <div class="flex justify-between items-center">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+              <span x-text="is_edit ? '✏️' : '➕'"></span>
+              <span x-text="is_edit ? '编辑供应商' : '新增供应商'"></span>
+            </h3>
+            <button @click="closeForm()" class="text-white/80 hover:text-white text-xl transition-colors">&times;</button>
+          </div>
+        </div>
+        <form @submit.prevent="submitForm()" class="px-6 py-5 space-y-4">
+          <div>
+            <label class="block text-xs font-semibold themed-text-secondary mb-1.5">供应商名称 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="form.supplier_name" required
+              class="w-full px-3 py-2.5 text-sm border rounded-lg themed-border focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all" placeholder="如：晶艺水晶厂">
+            <p class="text-xs themed-text-muted mt-1">名称全局唯一（防重复建档同一供应商）</p>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold themed-text-secondary mb-1.5">联系人</label>
+              <input type="text" x-model="form.contact_name" class="w-full px-3 py-2.5 text-sm border rounded-lg themed-border focus:ring-2 focus:ring-cyan-500 transition-all" placeholder="联系人姓名">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold themed-text-secondary mb-1.5">联系电话</label>
+              <input type="text" x-model="form.contact_phone" class="w-full px-3 py-2.5 text-sm border rounded-lg themed-border focus:ring-2 focus:ring-cyan-500 transition-all" placeholder="联系电话">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold themed-text-secondary mb-1.5">状态</label>
+            <select x-model="form.status" class="w-full px-3 py-2.5 text-sm border rounded-lg themed-border focus:ring-2 focus:ring-cyan-500 transition-all">
+              <option value="active">启用</option>
+              <option value="inactive">停用</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold themed-text-secondary mb-1.5">备注</label>
+            <textarea x-model="form.notes" rows="3" class="w-full px-3 py-2.5 text-sm border rounded-lg themed-border focus:ring-2 focus:ring-cyan-500 transition-all resize-none" placeholder="备注信息（可选）"></textarea>
+          </div>
+          <div class="flex justify-end gap-3 pt-3 border-t themed-border">
+            <button type="button" @click="closeForm()" class="px-5 py-2.5 text-sm font-medium border rounded-lg themed-border hover:bg-gray-50 transition-colors">取消</button>
+            <button type="submit" :disabled="saving"
+              class="px-5 py-2.5 text-sm font-medium themed-gradient-primary text-white rounded-lg shadow-sm transition-all disabled:opacity-50">
+              <span x-show="saving" class="inline-block animate-spin mr-1">⏳</span>
+              <span x-text="is_edit ? '💾 保存修改' : '✅ 创建供应商'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 供货商品详情弹窗 -->
+    <div x-show="show_detail" class="fixed inset-0 z-50 flex items-center justify-center" x-cloak
+      x-transition:enter="transition ease-out duration-300"
+      x-transition:enter-start="opacity-0"
+      x-transition:enter-end="opacity-100"
+      x-transition:leave="transition ease-in duration-200"
+      x-transition:leave-start="opacity-100"
+      x-transition:leave-end="opacity-0">
+      <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="show_detail = false"></div>
+      <div class="relative themed-card rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[85vh] overflow-y-auto border themed-border">
+        <div class="px-6 py-4 bg-gradient-to-r from-slate-700 to-slate-800 rounded-t-2xl">
+          <div class="flex justify-between items-center">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">📋 供货商品清单</h3>
+            <button @click="show_detail = false" class="text-white/80 hover:text-white text-xl transition-colors">&times;</button>
+          </div>
+        </div>
+        <div x-show="detail" class="px-6 py-5">
+          <p class="text-lg font-bold themed-text mb-3" x-text="detail?.supplier_name"></p>
+          <template x-if="(detail?.itemLinks || []).length === 0">
+            <p class="text-sm themed-text-muted py-4 text-center">该供应商暂无供货商品关联</p>
+          </template>
+          <template x-if="(detail?.itemLinks || []).length > 0">
+            <table class="w-full text-sm border rounded">
+              <thead>
+                <tr class="bg-gray-50 border-b">
+                  <th class="px-3 py-2 text-left text-xs font-semibold themed-text-muted">我方商品编码</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold themed-text-muted">商品名称</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold themed-text-muted">该供应商货号</th>
+                  <th class="px-3 py-2 text-center text-xs font-semibold themed-text-muted">主供</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="link in detail.itemLinks" :key="link.id">
+                  <tr>
+                    <td class="px-3 py-2"><span class="font-mono text-xs text-indigo-600" x-text="formatItemCode(link.exchangeItem?.item_code)"></span></td>
+                    <td class="px-3 py-2 themed-text" x-text="link.exchangeItem?.item_name || '-'"></td>
+                    <td class="px-3 py-2 font-mono text-xs themed-text" x-text="link.supplier_item_code || '-'"></td>
+                    <td class="px-3 py-2 text-center"><span x-show="link.is_primary" class="text-cyan-600 font-bold">★</span></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </template>
+        </div>
+        <div class="px-6 py-3 border-t themed-border bg-gray-50/50 rounded-b-2xl flex justify-end">
+          <button @click="show_detail = false" class="px-4 py-2 text-sm font-medium border rounded-lg themed-border hover:bg-white transition-colors">关闭</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <%- include('partials/footer') %>
+  <script type="module" src="./src/modules/market/pages/supplier-management.js"></script>
+</body>
+</html>

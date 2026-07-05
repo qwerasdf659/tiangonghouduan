@@ -264,6 +264,14 @@ router.post(
             sort_order: prize.prize?.sort_order,
             rarity_code: prize.prize?.rarity_code || 'common',
             material_asset_code: materialCode,
+            /* 材料发放数量（水晶倍率生效时已是翻倍后的最终数量，展示"获得碎片×N"） */
+            material_amount: prize.prize?.material_amount || null,
+            /*
+             * 水晶倍率摘要（水晶奖品倍率活动 §16.4）：命中翻倍时非空
+             * { base_quantity, applied_multiplier, final_quantity, reason }，
+             * 小程序据此展示"红源晶碎片 ×20（基础 10 × 新春翻倍 2 倍）"；未翻倍/非水晶为 null。
+             */
+            crystal_multiplier: prize.prize?.crystal_multiplier || null,
             image: prizeImage
           }
         }),

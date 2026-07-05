@@ -121,6 +121,41 @@ const SYSTEM_SETTINGS_WHITELIST = {
     auditRequired: true
   },
 
+  // ===== 微信小程序分端维护模式（§21 分端隔离：只维护小程序，Web 后台/商家端不受影响）=====
+  'basic/maintenance_mode_wechat_mp': {
+    type: 'boolean',
+    default: false,
+    readonly: false,
+    description: '微信小程序维护模式开关（开启后仅微信小程序端 API 返回 503，其他端不受影响）',
+    changeRequiresRestart: false,
+    businessImpact: 'CRITICAL',
+    auditRequired: true
+  },
+
+  'basic/maintenance_message_wechat_mp': {
+    type: 'string',
+    minLength: 0,
+    maxLength: 500,
+    default: '小程序正在升级维护中，预计30分钟后恢复，敬请谅解。',
+    readonly: false,
+    description: '微信小程序维护公告内容',
+    changeRequiresRestart: false,
+    businessImpact: 'MEDIUM',
+    auditRequired: true
+  },
+
+  'basic/maintenance_end_time_wechat_mp': {
+    type: 'string',
+    minLength: 0,
+    maxLength: 30,
+    default: '',
+    readonly: false,
+    description: '微信小程序维护预计结束时间（留空表示未确定，格式示例：2026-07-06 12:00）',
+    changeRequiresRestart: false,
+    businessImpact: 'MEDIUM',
+    auditRequired: true
+  },
+
   // ===== 积分设置（运营策略）=====
   'points/points_expire_days': {
     type: 'number',

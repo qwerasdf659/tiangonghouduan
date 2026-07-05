@@ -17,6 +17,10 @@ router.use('/lottery-tier-rules', require('./lottery-tier-rules'))
 router.use('/lottery-simulation', require('./lottery-simulation'))
 router.use('/prize-pool', require('./prize_pool'))
 router.use('/prize-definitions', require('./prize-definitions'))
+// 水晶奖品倍率规则（/multiplier-rules + /ad-tags，D-13 扁平命名，文件内自带完整前缀）
+router.use('/', require('./multiplier-rules'))
+// 活动预算归集规则（限时翻倍活动消费预算重定向 + event_points 发放，§12.10）
+router.use('/event-budget-collection-rules', require('./event-budget-collection-rules'))
 
 // ── 抽奖监控与分析 ──
 router.use('/lottery-realtime', require('./lottery-realtime'))

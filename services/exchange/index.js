@@ -29,6 +29,8 @@ const ExchangeItemService = require('./ExchangeItemService')
 const AttributeService = require('./AttributeService')
 const ExchangeChannelPriceService = require('./ExchangeChannelPriceService')
 const BarterService = require('./BarterService') // 以物易物（B2C 官方合成，2026-06-05 合规整改阶段六）
+const ProductSeriesService = require('./ProductSeriesService') // 产品系列（商品编码体系双轨制之可读系列号轨道）
+const SupplierService = require('./SupplierService') // 供货商主数据 + 商品关联 + 货号辅助查询（商品编码体系 §3.8）
 
 module.exports = {
   CoreService,
@@ -39,5 +41,7 @@ module.exports = {
   ExchangeItemService,
   AttributeService,
   ExchangeChannelPriceService,
-  BarterService
+  BarterService,
+  ProductSeriesService,
+  SupplierService
 }
