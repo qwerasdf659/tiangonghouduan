@@ -1233,6 +1233,7 @@ class DataSanitizer {
       lottery_management: '抽奖管理',
       lottery_budget_deduct: '抽奖预算扣减',
       lottery_budget_rollback: '抽奖预算回退',
+      lottery_quota_deduct: '抽奖额度扣减',
       /* 兑换相关 */
       exchange_debit: '兑换扣款',
       exchange_refund: '兑换退款',
@@ -1273,6 +1274,7 @@ class DataSanitizer {
       merchant_points_reward: '消费奖励',
       consumption_reward: '消费奖励',
       consumption_budget_allocation: '消费预算分配',
+      consumption_quota_allocation: '消费额度分配',
       /* 广告相关 */
       ad_campaign_freeze: '广告冻结',
       ad_campaign_deduct: '广告扣费',
@@ -1297,6 +1299,15 @@ class DataSanitizer {
 
     /* test_ 前缀的业务类型统一显示为"测试操作"（不暴露内部测试分类） */
     if (businessType.startsWith('test_')) return '测试操作'
+
+    /*
+     * 双录记账对手方（_counterpart 后缀）：去掉后缀复用主业务中文名，加"对冲"后缀区分。
+     * 例：exchange_debit_counterpart → "兑换扣款(对冲)"。避免对手方流水统一落到笼统"系统操作"。
+     */
+    if (businessType.endsWith('_counterpart')) {
+      const baseType = businessType.slice(0, -'_counterpart'.length)
+      if (displayMap[baseType]) return `${displayMap[baseType]}(对冲)`
+    }
 
     return '系统操作'
   }

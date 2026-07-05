@@ -729,6 +729,20 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       expect(DataSanitizer.getPublicSource(null)).toBe('系统操作')
     })
 
+    test('getPublicSource 覆盖真实库新增 business_type（连库核对补全）', () => {
+      // 2026-06-29 连真实库核对发现的真实存在却缺映射的键，已补全
+      expect(DataSanitizer.getPublicSource('lottery_quota_deduct')).toBe('抽奖额度扣减')
+      expect(DataSanitizer.getPublicSource('consumption_quota_allocation')).toBe('消费额度分配')
+    })
+
+    test('getPublicSource 双录对手方（_counterpart）复用主业务名加(对冲)后缀', () => {
+      // 对手方流水不再笼统落到"系统操作"，复用主业务中文名 + (对冲)
+      expect(DataSanitizer.getPublicSource('exchange_debit_counterpart')).toBe('兑换扣款(对冲)')
+      expect(DataSanitizer.getPublicSource('lottery_reward_counterpart')).toBe('抽奖奖励(对冲)')
+      // 主业务名都没有的对手方，仍回退系统操作
+      expect(DataSanitizer.getPublicSource('totally_unknown_counterpart')).toBe('系统操作')
+    })
+
     test('maskUserName 脱敏用户名', () => {
       expect(DataSanitizer.maskUserName('张三')).toBe('张三')
       expect(DataSanitizer.maskUserName('张三丰')).toBe('张*丰')

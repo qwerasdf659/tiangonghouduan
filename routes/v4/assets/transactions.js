@@ -25,6 +25,8 @@ const { asyncHandler } = require('../../../middleware/validation')
  * @description 查询当前用户的资产流水记录
  * @query {string} [asset_code] - 资产代码筛选（如 POINTS、star_stone、red_core_shard）
  * @query {string} [business_type] - 业务类型筛选（如 lottery_consume、lottery_reward、exchange_debit）
+ * @query {string} [start_date] - 起始时间（UTC ISO8601，如 2026-06-28T16:00:00.000Z；前端把"今天/本周/本月"按北京时区换算成 UTC 传入）
+ * @query {string} [end_date] - 结束时间（UTC ISO8601）；与 start_date 一起在数据库层按 created_at 范围 + 分页筛选，杜绝"前端只对当前页本地过滤导致跨页数据对不上"
  * @query {number} [page=1] - 页码（默认1）
  * @query {number} [page_size=20] - 每页数量（默认20，最大100）
  * @access Private（需要 JWT 认证）
@@ -48,14 +50,30 @@ router.get(
   authenticateToken,
   asyncHandler(async (req, res) => {
     const user_id = req.user.user_id
-    const { asset_code, business_type, page = 1, page_size = 20 } = req.query
+    const { asset_code, business_type, start_date, end_date, page = 1, page_size = 20 } = req.query
+
+    /*
+     * 日期范围校验（今天/本周/本月筛选）：前端传 UTC ISO8601 字符串。
+     * 非法日期串直接忽略（不下传无效值，避免底层 new Date('xxx') → Invalid Date 污染查询）。
+     * 时间筛选在数据库层按 created_at 执行 + 分页，确保跨页数据范围一致（修复前端本地过滤当前页对不上）。
+     */
+    const isValidDateStr = v => typeof v === 'string' && v !== '' && !Number.isNaN(Date.parse(v))
+    const startDate = isValidDateStr(start_date) ? start_date : undefined
+    const endDate = isValidDateStr(end_date) ? end_date : undefined
 
     const QueryService = req.app.locals.services.getService('asset_query')
     const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
 
     const result = await QueryService.getTransactions(
       { user_id },
-      { asset_code, business_type, page: parseInt(page), page_size: parseInt(page_size) }
+      {
+        asset_code,
+        business_type,
+        start_date: startDate,
+        end_date: endDate,
+        page: parseInt(page),
+        page_size: parseInt(page_size)
+      }
     )
 
     /*

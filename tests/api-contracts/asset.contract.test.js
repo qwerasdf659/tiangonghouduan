@@ -394,6 +394,51 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
         expect(tx).not.toHaveProperty('idempotency_key')
         expect(tx).not.toHaveProperty('meta')
       })
+
+      /**
+       * Case 7: 日期范围筛选（今天/本周/本月）在数据库层执行
+       *
+       * 业务背景：资产明细页"今天/本周/本月"筛选。修复前路由不接收 start_date/end_date，
+       * 前端只能对当前页本地过滤，跨页数据对不上；修复后按 created_at 在 DB 层筛选 + 分页。
+       * 验证：传一个"未来起点"的 start_date 应筛掉全部历史记录（total=0），证明日期参数确实下传并生效。
+       */
+      test('start_date 日期筛选在数据库层生效（未来起点应返回 0 条）', async () => {
+        // 未来时间点（明显晚于任何历史流水）
+        const futureStart = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString()
+        const response = await request(app)
+          .get('/api/v4/assets/transactions')
+          .set('Authorization', `Bearer ${access_token}`)
+          .query({ asset_code: 'points', start_date: futureStart, page_size: 20 })
+
+        expect(response.status).toBe(200)
+        validateApiContract(response.body)
+        // 未来起点之后无任何流水 → DB 层按 created_at>=start_date 过滤后 total 必为 0
+        expect(response.body.data.pagination.total).toBe(0)
+        expect(response.body.data.transactions.length).toBe(0)
+      })
+
+      /**
+       * Case 8: 非法日期串被安全忽略（不污染查询）
+       *
+       * 路由对非法 start_date/end_date 直接忽略（不下传 Invalid Date），等价于"全部"。
+       */
+      test('非法 start_date 被忽略，等价于不筛选（返回全部）', async () => {
+        const [withBad, without] = await Promise.all([
+          request(app)
+            .get('/api/v4/assets/transactions')
+            .set('Authorization', `Bearer ${access_token}`)
+            .query({ asset_code: 'points', start_date: 'not-a-date', page_size: 1 }),
+          request(app)
+            .get('/api/v4/assets/transactions')
+            .set('Authorization', `Bearer ${access_token}`)
+            .query({ asset_code: 'points', page_size: 1 })
+        ])
+
+        expect(withBad.status).toBe(200)
+        expect(without.status).toBe(200)
+        // 非法日期被忽略 → 与完全不传日期返回同样的 total
+        expect(withBad.body.data.pagination.total).toBe(without.body.data.pagination.total)
+      })
     })
 
     // -------------------- 资产转换接口 --------------------
