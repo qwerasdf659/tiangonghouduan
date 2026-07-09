@@ -234,10 +234,10 @@ GET /api/v4/diy/works/:id/shared     （无需登录）
 
 | 步骤 | 内容 | 项目 |
 | --- | --- | --- |
-| 1 | 迁移新增 9 字段 + shape 枚举扩展 + 修 'round' Bug + 模型/服务白名单（第 3 节） | 后端 |
+| 1 | 迁移新增 9 字段 + shape 按拍板⑤定稿改造 + 修 'round' Bug + 模型/服务白名单（第 3 节） | 后端 |
 | 2 | 分享只读接口 + beads 分页 + 用户端序列化白名单/库存掩码（第 4 节） | 后端 |
 | 3 | `design_data`/`sizing_rules` schema 定稿写入模型注释（4.2/4.3） | 后端 |
-| 4 | 素材表单加 9 字段控件；模板表单加 schema 提示；（可选）批量填充工具 | 管理后台 |
+| 4 | 素材表单加 9 字段控件；模板表单加 schema 提示；批量填充工具 + 完整度提示列 | 管理后台 |
 | 5 | 重传素材图、批量录入/启用素材、发布手链模板、清模板 65 脏数据 | 数据运营 |
 | 6 | 小程序按 5.3 清单改造对接，联调 | 小程序 |
 | 7 | QRCode 对接微信（不阻塞上线） | 后端 |
@@ -315,12 +315,12 @@ GET /api/v4/diy/works/:id/shared     （无需登录）
 
 ## 8. 对原文档"问题清单"的逐条批复
 
-1. **能否补 5 个展示字段？** 能，做实体列（第 3 节），录入维度见拍板②。
+1. **能否补 5 个展示字段？** 能，做实体列（第 3 节）；录入维度已定稿逐颗录入 + 管理后台批量填充（拍板②）。
 2. **能否补 `five_elements`？** 能，JSON 数组（非逗号字符串），枚举 `metal/wood/water/fire/earth`。
 3. **异形珠几何？** 补 `size_length_mm/size_width_mm/bore_orientation` 三列；`image_bbox_ratio` 不做，用 `image_media.width/height`。
 4. **图片规范与 CDN？** 上传管道已裁透明边、`public_url` 走 Sealos（即 CDN 通道）；存量 3 条启用素材缺图需重传（数据问题非架构问题）。
 5. **容量公式？** 以 `sizing_rules` JSON 扩展下发（4.3），公式 `手围cm×10×圈数系数−margin_mm`，异形珠按 `bore_orientation` 取边。
-6. **库存口径？** 推荐掩码三态（拍板④）。
+6. **库存口径？** 已定稿掩码三态 + 序列化白名单（拍板④）。
 7. **商业机密字段？** 表中无成本/供应商列；掩码后无泄露面。
 8. **草稿/还原/分享？** 直接用现有 `POST /works` + `GET /works/:id`，分享用新增 `/works/:id/shared`；`design_data` schema 见 4.2；预览图上传通道 `POST /api/v4/user/images/upload` 已存在。
 
