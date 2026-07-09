@@ -48,6 +48,24 @@
           <span x-show="diagnosing">诊断中...</span>
         </button>
       </div>
+
+      <div class="themed-card rounded-lg shadow p-6">
+        <div class="text-4xl text-red-400 mb-4">🔧</div>
+        <h3 class="text-lg font-semibold mb-2">维护模式</h3>
+        <p class="themed-text-muted text-sm mb-4">全站 / 微信小程序维护开关与公告</p>
+        <button @click="showMaintenanceModal()" class="w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+          管理维护模式
+        </button>
+      </div>
+
+      <div class="themed-card rounded-lg shadow p-6">
+        <div class="text-4xl text-blue-400 mb-4">🚩</div>
+        <h3 class="text-lg font-semibold mb-2">功能开关</h3>
+        <p class="themed-text-muted text-sm mb-4">开启 / 关闭安全类布尔功能项</p>
+        <button @click="showFeatureFlagsModal()" class="w-full px-4 py-2 themed-btn-primary rounded">
+          管理功能开关
+        </button>
+      </div>
     </div>
 
     <!-- 数据字典管理 -->
@@ -190,9 +208,8 @@
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- ==================== Modal 组件区域 ==================== -->
+  <!-- ==================== Modal 组件区域（保持在 x-data="configToolsPage()" 作用域内，否则 showModal/isModalOpen 不生效）==================== -->
 
   <!-- 注意：缓存管理 Modal 已移除，后端不支持 /api/v4/console/config/cache/clear -->
 
@@ -378,6 +395,7 @@
       </form>
     </div>
   </div>
+  </div><!-- /x-data="configToolsPage()" 作用域结束（包裹全部 Modal）-->
 
   <%- include('partials/footer') %>
 

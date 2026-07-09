@@ -42,9 +42,21 @@ const getRewardMultiplierService = req => {
 }
 
 /**
- * 中间件：认证 + 管理员权限（全部端点）
+ * 中间件：认证 + 管理员权限
+ *
+ * ⚠️ 本路由挂载于 lottery/index.js 根 '/'（D-13 现网扁平短横线风格），
+ * 而 lottery 域在 console/index.js 中最先挂载。若此处使用无路径的
+ * router.use(authenticateToken, ...)，会对"流经本 router 的所有请求"生效，
+ * 从而把 admin(100) 认证网关泄漏到整个 /api/v4/console/*（含公开的
+ * /auth/login、/auth/send-code），导致登录/发码被误拦为 401 MISSING_TOKEN。
+ *
+ * 因此认证必须按本路由自身的路径前缀作用域挂载，避免拦截兄弟路由。
  */
-router.use(authenticateToken, requireRoleLevel(100))
+const consoleAdminGuard = [authenticateToken, requireRoleLevel(100)]
+router.use('/multiplier-rules', consoleAdminGuard)
+router.use('/multiplier-user-explain', consoleAdminGuard)
+router.use('/multiplier-analytics', consoleAdminGuard)
+router.use('/ad-tags', consoleAdminGuard)
 
 /**
  * GET /multiplier-rules - 倍率规则列表（分页）
