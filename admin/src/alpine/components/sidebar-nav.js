@@ -201,6 +201,31 @@ export function sidebarNav() {
             id: 'product-series-mgmt',
             name: '📚 产品系列管理',
             url: '/admin/product-series-management.html'
+          },
+          {
+            id: 'purchase-order-mgmt',
+            name: '📦 采购单管理',
+            url: '/admin/purchase-order-management.html'
+          },
+          {
+            id: 'product-batch-mgmt',
+            name: '🏷️ 产品批次管理',
+            url: '/admin/product-batch-management.html'
+          },
+          {
+            id: 'product-bundle-mgmt',
+            name: '🎁 组合商品管理',
+            url: '/admin/product-bundle-management.html'
+          },
+          {
+            id: 'channel-mapping-mgmt',
+            name: '🔗 渠道映射管理',
+            url: '/admin/channel-mapping-management.html'
+          },
+          {
+            id: 'consignment-mgmt',
+            name: '♻️ 寄卖管理',
+            url: '/admin/consignment-management.html'
           }
         ]
       },
@@ -211,6 +236,7 @@ export function sidebarNav() {
         name: 'DIY饰品',
         icon: '💎',
         items: [
+          { id: 'diy-dashboard', name: '数据看板', url: '/admin/diy-dashboard.html' },
           { id: 'diy-templates', name: '款式模板管理', url: '/admin/diy-template-management.html' },
           { id: 'diy-materials', name: '珠子素材管理', url: '/admin/diy-material-management.html' },
           { id: 'diy-works', name: '用户作品管理', url: '/admin/diy-work-management.html' }
@@ -262,6 +288,7 @@ export function sidebarNav() {
         items: [
           { id: 'stats', name: '统计报表', url: '/admin/statistics.html' },
           { id: 'analytics', name: '运营分析', url: '/admin/analytics.html' },
+          { id: 'growth-level-dashboard', name: '成长等级看板', url: '/admin/growth-level-dashboard.html' },
           { id: 'user-data-query', name: '用户数据查询', url: '/admin/user-data-query.html' }
         ]
       },

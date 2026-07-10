@@ -41,17 +41,23 @@ router.get(
   })
 )
 
-/** 获取模板详情 */
+/** 获取模板详情（用户端安全序列化：媒体字段数据最小化，拍板决议 11.5-D） */
 router.get(
   '/templates/:id',
   asyncHandler(async (req, res) => {
     const DIYService = req.app.locals.services.getService('diy')
-    const template = await DIYService.getTemplateDetail(Number(req.params.id))
+    const template = await DIYService.getUserTemplateDetail(Number(req.params.id))
     return res.apiSuccess(template, '获取模板详情成功')
   })
 )
 
-/** 获取模板可用的实物珠子/宝石素材（查 diy_materials 表） */
+/**
+ * 获取模板可用的实物珠子/宝石素材（查 diy_materials 表）
+ *
+ * 查询参数：group_code / diameter / keyword / slot_id / item_type
+ * item_type 素材大类过滤（beads珠子/accessories配饰/pendants吊坠），支撑前端素材 Tab
+ * 输出：数组、无分页、上限 200 条；库存掩码 -1/0/1（拍板决议 11.8-③）
+ */
 router.get(
   '/templates/:id/beads',
   asyncHandler(async (req, res) => {

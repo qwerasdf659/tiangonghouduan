@@ -131,7 +131,7 @@ function registerLotteryManagementComponents() {
         { id: 'lottery-strategy', title: '策略配置', icon: '⚙️' },
         { id: 'activity-strategy-switch', title: '活动策略开关', icon: '🔧' },
         { id: 'segment-rules', title: '分群策略', icon: '👥' },
-        { id: 'level-probability', title: '成长等级概率', icon: '📶' },
+        { id: 'level-probability', title: '成长等级管理', icon: '👑' },
         { id: 'lottery-quota', title: '配额管理', icon: '📊' },
         { id: 'lottery-pricing', title: '定价配置', icon: '💵' },
         { id: 'strategy-effectiveness', title: '策略效果', icon: '📈' },

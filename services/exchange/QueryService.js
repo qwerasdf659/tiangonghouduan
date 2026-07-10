@@ -352,7 +352,9 @@ class QueryService {
       page_size = 20,
       sort_by = 'sort_order',
       sort_order = 'ASC',
-      refresh = false
+      refresh = false,
+      // 当前用户ID（可空）：仅用于 level_requirement.satisfied 实时计算，不参与缓存 key
+      user_id = null
     } = options
 
     // 排序参数白名单化（防 SQL 注入：避免用户原始输入进入 ORDER BY）
@@ -384,6 +386,11 @@ class QueryService {
         const cached = await BusinessCacheHelper.getExchangeItems(cacheParams)
         if (cached) {
           logger.debug('[兑换市场] 缓存命中', cacheParams)
+          /*
+           * 等级门槛摘要在缓存之外附加（拍板⑪扩展2）：satisfied 是"当前用户"的实时状态，
+           * 不能进共享缓存；门槛表 1 次 IN 查询 + 等级表进程内缓存，附加成本极低。
+           */
+          await this.attachLevelRequirements(cached.items, user_id)
           return cached
         }
       }
@@ -589,8 +596,11 @@ class QueryService {
         })
       }
 
-      // 写入 Redis 缓存
+      // 写入 Redis 缓存（level_requirement 不入缓存——satisfied 为用户级实时数据）
       await BusinessCacheHelper.setExchangeItems(cacheParams, result)
+
+      // 等级门槛摘要（拍板⑪扩展2"锁住但可见"，缓存后按当前用户附加）
+      await this.attachLevelRequirements(result.items, user_id)
 
       return result
     } catch (error) {
@@ -603,9 +613,11 @@ class QueryService {
    * 获取单个商品详情
    *
    * @param {number} item_id - 商品ID
+   * @param {Object} [options={}] - 选项
+   * @param {number|null} [options.user_id] - 当前用户ID（用于 level_requirement.satisfied 实时计算）
    * @returns {Promise<Object>} 商品详情
    */
-  async getItemDetail(item_id) {
+  async getItemDetail(item_id, options = {}) {
     try {
       const item = await this.ExchangeItem.findOne({
         where: { exchange_item_id: item_id },
@@ -724,6 +736,12 @@ class QueryService {
        * 不下发任何商业敏感数值；无门槛配置时为 null。
        */
       itemWithDisplayNames.redeem_requirement = await this._buildRedeemRequirementView(item_id)
+
+      /*
+       * 等级门槛脱敏摘要（拍板⑪扩展2）：与列表接口同款 level_requirement
+       * { min_level_name, max_level_name, satisfied }，前端渲染专享角标 + 置灰按钮。
+       */
+      await this.attachLevelRequirements(itemWithDisplayNames, options.user_id || null)
 
       /*
        * SPU 计价契约对齐（议题1·拍板项②，2026-06-12 落地）：
@@ -1125,8 +1143,94 @@ class QueryService {
 
     return {
       min_growth_level_key: requirement.min_growth_level_key || null,
+      max_growth_level_key: requirement.max_growth_level_key || null,
       extra_cost_assets: requirement.extra_cost_assets || [],
       required_consume_items: requirement.required_consume_items || []
+    }
+  }
+
+  /**
+   * 批量附加等级门槛脱敏摘要 level_requirement（拍板⑪扩展2"锁住但可见"，2026-07-10）
+   *
+   * 业务场景（橱窗效应）：
+   * - 有等级门槛的商品在列表/详情下发 { min_level_name, max_level_name, satisfied }，
+   *   前端渲染专享角标 + 置灰按钮——低等级用户看得见高等级专享商品，拉动消费升级。
+   *
+   * 安全口径：
+   * - 只下发等级展示名 + satisfied 布尔（后端按当前用户实时计算）；
+   *   倍数/权重/门槛积分数值一律不下发（守脱敏红线）。
+   *
+   * 性能（工程加固 §9-5 防 N+1）：
+   * - 门槛表按 exchange_item_id IN (...) 一次查全；
+   * - 用户等级只 resolve 一次复用于全列表；
+   * - 等级表走模型 60s 进程内缓存。
+   *
+   * @param {Array<Object>} items - 商品列表（已 toJSON，含 exchange_item_id；原地附加 level_requirement）
+   * @param {number|null} user_id - 当前用户ID（未登录为 null，存在门槛时 satisfied=false）
+   * @returns {Promise<void>} 直接修改传入对象
+   */
+  async attachLevelRequirements(items, user_id = null) {
+    const list = Array.isArray(items) ? items : [items]
+    if (list.length === 0) return
+    const ExchangeRedeemRequirement = this.models.ExchangeRedeemRequirement
+    const UserGrowthLevel = this.models.UserGrowthLevel
+    if (!ExchangeRedeemRequirement || !UserGrowthLevel) {
+      list.forEach(item => {
+        item.level_requirement = null
+      })
+      return
+    }
+
+    const itemIds = [...new Set(list.map(i => i.exchange_item_id).filter(Boolean))]
+    if (itemIds.length === 0) return
+
+    // 一次 IN 查询取全部生效中的商品级门槛（sku_id=NULL；SKU 级门槛不在列表层展示）
+    const now = new Date()
+    const rows = await ExchangeRedeemRequirement.findAll({
+      where: {
+        exchange_item_id: itemIds,
+        sku_id: null,
+        is_enabled: true,
+        [Op.and]: [
+          { [Op.or]: [{ publish_at: null }, { publish_at: { [Op.lte]: now } }] },
+          { [Op.or]: [{ unpublish_at: null }, { unpublish_at: { [Op.gt]: now } }] }
+        ]
+      },
+      attributes: ['exchange_item_id', 'min_growth_level_key', 'max_growth_level_key'],
+      raw: true
+    })
+    const requirementByItemId = new Map(rows.map(r => [Number(r.exchange_item_id), r]))
+
+    // 等级表（60s 进程内缓存）+ 用户等级只 resolve 一次
+    const levels = await UserGrowthLevel.getActiveLevels()
+    const levelByKey = new Map(levels.map(l => [l.level_key, l]))
+    let userSortOrder = -1
+    if (user_id) {
+      const user = await this.models.User.findByPk(user_id, {
+        attributes: ['user_id', 'history_total_points']
+      })
+      const userLevel = user ? await UserGrowthLevel.resolveLevel(user.history_total_points) : null
+      userSortOrder = userLevel ? Number(userLevel.sort_order) : -1
+    }
+
+    for (const item of list) {
+      const req = requirementByItemId.get(Number(item.exchange_item_id))
+      if (!req || (!req.min_growth_level_key && !req.max_growth_level_key)) {
+        item.level_requirement = null
+        continue
+      }
+      const minLevel = req.min_growth_level_key ? levelByKey.get(req.min_growth_level_key) : null
+      const maxLevel = req.max_growth_level_key ? levelByKey.get(req.max_growth_level_key) : null
+      // 未登录访客视为不满足（登录后按真实等级区间实时计算）
+      const satisfied = user_id
+        ? (!minLevel || userSortOrder >= Number(minLevel.sort_order)) &&
+          (!maxLevel || userSortOrder <= Number(maxLevel.sort_order))
+        : false
+      item.level_requirement = {
+        min_level_name: minLevel ? minLevel.level_name : null,
+        max_level_name: maxLevel ? maxLevel.level_name : null,
+        satisfied
+      }
     }
   }
 
@@ -1178,8 +1282,10 @@ class QueryService {
 
     list.forEach(order => {
       const isProp = propItemIdSet.has(order.exchange_item_id)
+      // 以物易物单不可退款/取消（旧物已核销销毁、pay_amount=0 无货币可退，见 CoreService._assertNotBarterOrder）
+      const isBarter = order.source === 'barter'
       order.is_prop = isProp
-      order.refundable = isProp ? false : REFUNDABLE_STATUSES.includes(order.status)
+      order.refundable = isProp || isBarter ? false : REFUNDABLE_STATUSES.includes(order.status)
     })
   }
 

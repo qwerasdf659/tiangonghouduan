@@ -72,6 +72,18 @@ module.exports = sequelize => {
         defaultValue: 'pending',
         comment: '同步状态'
       },
+      channel_price: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+        comment: '渠道独立售价(人民币元,NULL=默认取我方价,拍板#26)',
+        /** @returns {number|null} DECIMAL 转数值（不使用 raw:true 时生效） */
+        get() {
+          const raw = this.getDataValue('channel_price')
+          if (raw === null || raw === undefined) return null
+          const n = parseFloat(raw)
+          return Number.isNaN(n) ? null : n
+        }
+      },
       last_synced_at: {
         type: DataTypes.DATE,
         allowNull: true,

@@ -31,9 +31,11 @@ const { logger } = require('../../utils/logger')
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
 const AssetProductGuard = require('../shared/AssetProductGuard')
 const ItemService = require('../asset/ItemService')
+const UserAddressService = require('../UserAddressService')
 const OrderNoGenerator = require('../../utils/OrderNoGenerator')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const crypto = require('crypto')
+const { Op, literal, where: sequelizeWhere } = require('sequelize')
 
 /** system_settings 配方配置位置 */
 const RECIPE_CATEGORY = 'exchange'
@@ -71,7 +73,9 @@ class BarterService {
    *   required_item_template_id: 16,            // 旧物模板ID（核销标的，按模板匹配用户持有的可用实例）
    *   required_quantity: 1,                     // 需消耗的旧物数量
    *   output_exchange_item_id: 20,             // 产出标的（官方库存 exchange_items）
-   *   is_enabled: true
+   *   is_enabled: true,
+   *   per_user_limit: 1,                        // 每人限换次数（可选，缺省/0=不限，拍板⑬-(c)）
+   *   total_limit: 100                          // 配方总量（可选，缺省/0=不限，拍板⑬-(c)）
    * }]
    *
    * @param {Object} [options] - 选项
@@ -99,13 +103,19 @@ class BarterService {
    * 执行以物易物（核心写操作，事务由路由层传入）
    *
    * 流程：
-   * ① 校验配方存在且启用
+   * ① 校验配方存在且启用（含 per_user_limit / total_limit 限量校验，拍板⑬-(c)）
    * ② 校验旧物归属当前用户且状态可用（available）、数量足够
    * ③ 产出侧守卫：产出标的禁为货币型资产、方向等价或向下
+   * ③.5 履约分流（拍板⑩ / §1.4）：产出为实物（模板 item_type='product'）→ 必须携带
+   *     address_id、订单 status='pending' 走现有发货链、不 mint 进背包（防双重履约）；
+   *     产出为券/道具 → 维持 completed 即时到账 + mint 进背包（现状不变）
    * ④ 旧物 ItemService.consumeItem 真销毁（status='used'，双录写入 SYSTEM_BURN）
-   * ⑤ 从官方库存 mintItem 发产出物（is_tradable=0 由模板控制；产出实例不可交易）
+   * ⑤ 券/道具产出从官方库存 mintItem 发放（is_tradable=0 由模板控制）
    * ⑥ 写 ExchangeRecord(source='barter')
    * 全程用户↔官方，无 transferItem、无用户间转移。
+   *
+   * 并发防超（工程加固 §9-3）：total_limit 的"计数+落单"段由路由层按 recipe_code
+   * 加 Redis 分布式锁串行化（锁防不同用户并发超卖，幂等键防同一请求重放，二者互补）。
    *
    * @param {number} userId - 用户ID
    * @param {string} recipeCode - 配方码
@@ -113,7 +123,8 @@ class BarterService {
    * @param {string} idempotencyKey - 幂等键
    * @param {Object} options - 选项
    * @param {Object} options.transaction - 事务对象（强制，路由层管理事务边界）
-   * @returns {Promise<Object>} 兑换结果 { order_no, consumed_item_ids, minted_item }
+   * @param {number} [options.address_id] - 收货地址主键（产出为实物时必填，校验归属本人）
+   * @returns {Promise<Object>} 兑换结果 { order_no, order_status, recipe_code, consumed_item_ids, minted_item }
    */
   async executeBarter(userId, recipeCode, oldItemIds, idempotencyKey, options = {}) {
     const transaction = assertAndGetTransaction(options, 'BarterService.executeBarter')
@@ -147,6 +158,9 @@ class BarterService {
       )
     }
 
+    // ①.5 限量防薅校验（拍板⑬-(c)：per_user_limit 每人限换 / total_limit 配方总量，缺省=不限）
+    await this._assertRecipeLimits(userId, recipe, transaction)
+
     // ② 校验旧物归属 + 状态可用 + 模板匹配
     const oldItems = await this._loadAndValidateOldItems(userId, oldItemIds, recipe, transaction)
 
@@ -168,9 +182,46 @@ class BarterService {
         404
       )
     }
+    /*
+     * 产出模板硬校验（2026-07-11 根因修复）：产出商品必须关联 item_template_id——
+     * 模板同时承担三个职责：①方向守卫的价值锚（reference_price_points，无模板=按 0 比较形同虚设）、
+     * ②履约分流判定（item_type='product' 才走发货链，无模板时实物会被误当券 mint 进背包）、
+     * ③mint 实例的模板血统（无模板产出会持续制造 item_template_id=NULL 的缺陷物品）。
+     * 历史缺陷：测试期产出商品未挂模板，实物被当券 mint，产生 15 件无模板物品（已作废清理）。
+     */
+    if (!outputItem.itemTemplate) {
+      throw new BusinessError(
+        `产出商品未关联物品模板（exchange_item_id=${recipe.output_exchange_item_id}），无法换物——请先在商品管理中关联 item_template_id`,
+        'BARTER_OUTPUT_TEMPLATE_MISSING',
+        400
+      )
+    }
     // 产出标的为实物/道具实例（非货币型资产），传 null 走"实物放行"分支；显式断言以防误配
     await AssetProductGuard.assertPayoutNotCurrency(null, this.models, { transaction })
     await this._assertDirectionNotUpward(oldItems, outputItem)
+
+    /*
+     * ③.5 履约分流（拍板⑩ / §1.4 产出快递到家改造）：
+     * - 实物产出（模板 item_type='product'）：走 pending→approved→shipped→received 发货链，
+     *   必须携带 address_id（复用 UserAddressService.buildSnapshot 校验归属并生成快照），
+     *   且【不 mint 进背包】——mint 与发货链二选一，防"背包能核销 + 快递又寄一件"双重履约；
+     * - 券/道具产出：维持 completed 即时到账 + mint 进背包（现状不变）。
+     */
+    const outTpl = outputItem.itemTemplate
+    const isPhysicalOutput = outTpl?.item_type === 'product'
+    let addressSnapshot = null
+    if (isPhysicalOutput) {
+      if (!options.address_id) {
+        throw new BusinessError(
+          '实物产出的以物易物需选择收货地址（address_id 必填）',
+          'BARTER_ADDRESS_REQUIRED',
+          400
+        )
+      }
+      addressSnapshot = await UserAddressService.buildSnapshot(userId, options.address_id, {
+        transaction
+      })
+    }
 
     // ④ 旧物真销毁（核销）
     const consumedIds = []
@@ -189,27 +240,30 @@ class BarterService {
       consumedIds.push(item.item_id)
     }
 
-    // ⑤ 从官方库存铸造产出物（item_type 透传模板，产出实例 is_tradable 由模板/背包侧控制）
-    const outTpl = outputItem.itemTemplate
-    const mintResult = await ItemService.mintItem(
-      {
-        user_id: userId,
-        item_type: outTpl?.item_type || 'product',
-        source: 'barter',
-        source_ref_id: String(recipe.output_exchange_item_id),
-        item_name: outputItem.item_name,
-        item_description: outputItem.description || '',
-        item_value: 0,
-        item_template_id: outTpl?.item_template_id || null,
-        business_type: 'barter_mint',
-        idempotency_key: `barter_mint_${idempotencyKey}`,
-        meta: { recipe_code: recipeCode, consumed_item_ids: consumedIds }
-      },
-      { transaction }
-    )
-    const mintedItem = mintResult.item
+    // ⑤ 券/道具产出：从官方库存铸造进背包（实物产出不 mint，走发货链）
+    let mintedItem = null
+    if (!isPhysicalOutput) {
+      const mintResult = await ItemService.mintItem(
+        {
+          user_id: userId,
+          item_type: outTpl?.item_type || 'voucher',
+          source: 'barter',
+          source_ref_id: String(recipe.output_exchange_item_id),
+          item_name: outputItem.item_name,
+          item_description: outputItem.description || '',
+          item_value: 0,
+          item_template_id: outTpl?.item_template_id || null,
+          business_type: 'barter_mint',
+          idempotency_key: `barter_mint_${idempotencyKey}`,
+          meta: { recipe_code: recipeCode, consumed_item_ids: consumedIds }
+        },
+        { transaction }
+      )
+      mintedItem = mintResult.item
+    }
 
-    // ⑥ 写 ExchangeRecord(source='barter')
+    // ⑥ 写 ExchangeRecord(source='barter')：实物走发货链 pending，券/道具即时 completed
+    const orderStatus = isPhysicalOutput ? 'pending' : 'completed'
     const placeholderOrder = `PH${crypto.randomBytes(12).toString('hex').toUpperCase()}`
     const businessId = `barter_${userId}_${recipeCode}_${Date.now()}`
     const record = await this.ExchangeRecord.create(
@@ -222,13 +276,19 @@ class BarterService {
         pay_asset_code: BARTER_PAY_ASSET,
         pay_amount: 0,
         source: 'barter',
-        status: 'completed',
-        item_id: mintedItem.item_id,
+        status: orderStatus,
+        item_id: mintedItem ? mintedItem.item_id : null,
+        address_snapshot: addressSnapshot,
+        /*
+         * 订单快照契约：item_name 为全链路通用字段（admin 订单表格与 C 端订单列表
+         * 均读 item_snapshot.item_name 展示商品名），换物单同样遵守，不造同义别名字段。
+         */
         item_snapshot: {
+          item_name: outputItem.item_name,
           recipe_code: recipeCode,
           recipe_name: recipe.name,
           consumed_item_ids: consumedIds,
-          output_item_name: outputItem.item_name
+          fulfillment: isPhysicalOutput ? 'shipping' : 'instant'
         },
         exchange_time: BeijingTimeHelper.createDatabaseTime()
       },
@@ -246,18 +306,91 @@ class BarterService {
       user_id: userId,
       recipe_code: recipeCode,
       consumed_item_ids: consumedIds,
-      minted_item_id: mintedItem.item_id,
+      minted_item_id: mintedItem ? mintedItem.item_id : null,
+      order_status: orderStatus,
       order_no: record.order_no
     })
 
     return {
       order_no: record.order_no,
+      // 订单状态：pending=实物待发货（走快递履约链），completed=券/道具即时到账
+      order_status: orderStatus,
       recipe_code: recipeCode,
       consumed_item_ids: consumedIds,
-      minted_item: {
-        item_id: mintedItem.item_id,
-        item_name: mintedItem.item_name,
-        tracking_code: mintedItem.tracking_code
+      minted_item: mintedItem
+        ? {
+            item_id: mintedItem.item_id,
+            item_name: mintedItem.item_name,
+            tracking_code: mintedItem.tracking_code
+          }
+        : null
+    }
+  }
+
+  /**
+   * 配方限量校验（拍板⑬-(c) 防"无限循环刷换物"）
+   *
+   * 计数口径：exchange_records 中 source='barter' 且 item_snapshot.recipe_code 匹配、
+   * 状态非取消/拒绝/退款的订单数（取消类订单不占限额）。
+   * per_user_limit=每人限换次数、total_limit=配方总量，缺省/0/负值=不限。
+   *
+   * @param {number} userId - 用户ID
+   * @param {Object} recipe - 配方对象
+   * @param {Object} transaction - 事务对象
+   * @returns {Promise<void>} 校验通过无返回，超限抛 BusinessError
+   * @private
+   */
+  async _assertRecipeLimits(userId, recipe, transaction) {
+    const perUserLimit = Number(recipe.per_user_limit) || 0
+    const totalLimit = Number(recipe.total_limit) || 0
+    if (perUserLimit <= 0 && totalLimit <= 0) return
+
+    /*
+     * item_snapshot 为 JSON 列，按 $.recipe_code 提取匹配（MySQL 8 JSON_EXTRACT）。
+     * 注意：JSON 路径用 literal 表达（Sequelize fn 的字符串参数会把 $ 转义为 $$，
+     * 导致 "Invalid JSON path expression"）；路径是常量、配方码走参数绑定，无注入面。
+     */
+    const recipeCodeCondition = sequelizeWhere(
+      literal("JSON_UNQUOTE(JSON_EXTRACT(`item_snapshot`, '$.recipe_code'))"),
+      recipe.recipe_code
+    )
+    // 取消/拒绝/退款订单不占限额（业务语义：未成交）
+    const occupyingStatuses = ['pending', 'approved', 'shipped', 'received', 'rated', 'completed']
+
+    if (totalLimit > 0) {
+      const totalCount = await this.ExchangeRecord.count({
+        where: {
+          source: 'barter',
+          status: occupyingStatuses,
+          [Op.and]: [recipeCodeCondition]
+        },
+        transaction
+      })
+      if (totalCount >= totalLimit) {
+        throw new BusinessError(
+          `该配方总量已换完（限 ${totalLimit} 次）`,
+          'BARTER_TOTAL_LIMIT_EXCEEDED',
+          400
+        )
+      }
+    }
+
+    if (perUserLimit > 0) {
+      const userCount = await this.ExchangeRecord.count({
+        where: {
+          user_id: userId,
+          source: 'barter',
+          status: occupyingStatuses,
+          [Op.and]: [recipeCodeCondition]
+        },
+        transaction
+      })
+      if (userCount >= perUserLimit) {
+        throw new BusinessError(
+          `您已达该配方每人限换次数（限 ${perUserLimit} 次）`,
+          'BARTER_PER_USER_LIMIT_EXCEEDED',
+          400
+        )
       }
     }
   }
@@ -311,6 +444,52 @@ class BarterService {
           400
         )
       }
+      // 限量字段校验（拍板⑬-(c)）：可选，提供时必须为非负整数（0=不限）
+      for (const limitField of ['per_user_limit', 'total_limit']) {
+        if (r[limitField] !== undefined && r[limitField] !== null) {
+          const limitValue = Number(r[limitField])
+          if (!Number.isInteger(limitValue) || limitValue < 0) {
+            throw new BusinessError(
+              `配方 ${r.recipe_code} 的 ${limitField} 必须为非负整数（0=不限），收到：${r[limitField]}`,
+              'BARTER_INVALID_RECIPES',
+              400
+            )
+          }
+        }
+      }
+    }
+
+    /*
+     * 产出标的写入口校验（2026-07-11 根因修复，与 executeBarter 执行侧校验同口径）：
+     * 配方保存时即拦截"产出商品不存在/未挂模板"，防呆前置到配置动作——
+     * 运营在管理后台配错标的当场报错，而不是等 C 端用户换物时才失败。
+     */
+    const outputIds = [...new Set(recipes.map(r => Number(r.output_exchange_item_id)))]
+    if (outputIds.length > 0) {
+      const outputItems = await this.ExchangeItem.findAll({
+        where: { exchange_item_id: outputIds },
+        attributes: ['exchange_item_id', 'item_name', 'item_template_id'],
+        transaction,
+        raw: true
+      })
+      const outputMap = new Map(outputItems.map(i => [Number(i.exchange_item_id), i]))
+      for (const r of recipes) {
+        const output = outputMap.get(Number(r.output_exchange_item_id))
+        if (!output) {
+          throw new BusinessError(
+            `配方 ${r.recipe_code} 的产出商品不存在：exchange_item_id=${r.output_exchange_item_id}`,
+            'BARTER_OUTPUT_NOT_FOUND',
+            400
+          )
+        }
+        if (!output.item_template_id) {
+          throw new BusinessError(
+            `配方 ${r.recipe_code} 的产出商品「${output.item_name}」未关联物品模板——模板是方向守卫价值锚与履约分流依据，请先在商品管理中关联 item_template_id`,
+            'BARTER_OUTPUT_TEMPLATE_MISSING',
+            400
+          )
+        }
+      }
     }
 
     const value = JSON.stringify(recipes)
@@ -339,6 +518,77 @@ class BarterService {
 
     logger.info('[以物易物] 配方已保存', { count: recipes.length, operator_id: operatorId })
     return recipes
+  }
+
+  /**
+   * 换物运营看板数据（管理端 P2-5，拍板⑫）
+   *
+   * 统计口径（读 exchange_records source='barter' 现有数据，无新表）：
+   * - 订单量趋势：按日计数（DB 会话时区 +08:00，DATE() 即北京日期）；
+   * - 按配方统计：流水快照 item_snapshot.recipe_code 分组；
+   * - 旧物销毁量：item_snapshot.consumed_item_ids 数组长度合计；
+   * - 发货状态分布：订单 status 分组（实物产出走 pending→shipped→received 发货链）。
+   *
+   * @param {Object} [options={}] - 选项
+   * @param {number} [options.days=30] - 统计天数
+   * @returns {Promise<Object>} { period_days, daily, by_recipe, status_distribution, summary }
+   */
+  async getBarterStats(options = {}) {
+    const days = Math.min(Math.max(parseInt(options.days, 10) || 30, 1), 365)
+
+    const [dailyRows] = await this.sequelize.query(
+      `SELECT DATE(created_at) AS stat_date, COUNT(*) AS order_count
+       FROM exchange_records
+       WHERE source = 'barter' AND created_at >= DATE_SUB(CURDATE(), INTERVAL :days DAY)
+       GROUP BY DATE(created_at)
+       ORDER BY stat_date ASC`,
+      { replacements: { days } }
+    )
+
+    const [byRecipeRows] = await this.sequelize.query(
+      `SELECT JSON_UNQUOTE(JSON_EXTRACT(item_snapshot, '$.recipe_code')) AS recipe_code,
+              JSON_UNQUOTE(JSON_EXTRACT(item_snapshot, '$.recipe_name')) AS recipe_name,
+              COUNT(*) AS order_count,
+              SUM(JSON_LENGTH(JSON_EXTRACT(item_snapshot, '$.consumed_item_ids'))) AS consumed_item_count
+       FROM exchange_records
+       WHERE source = 'barter' AND created_at >= DATE_SUB(CURDATE(), INTERVAL :days DAY)
+       GROUP BY recipe_code, recipe_name
+       ORDER BY order_count DESC`,
+      { replacements: { days } }
+    )
+
+    const [statusRows] = await this.sequelize.query(
+      `SELECT status, COUNT(*) AS order_count
+       FROM exchange_records
+       WHERE source = 'barter' AND created_at >= DATE_SUB(CURDATE(), INTERVAL :days DAY)
+       GROUP BY status`,
+      { replacements: { days } }
+    )
+
+    const totalOrders = dailyRows.reduce((sum, r) => sum + Number(r.order_count), 0)
+    const totalConsumed = byRecipeRows.reduce(
+      (sum, r) => sum + Number(r.consumed_item_count || 0),
+      0
+    )
+
+    return {
+      period_days: days,
+      daily: dailyRows.map(r => ({ stat_date: r.stat_date, order_count: Number(r.order_count) })),
+      by_recipe: byRecipeRows.map(r => ({
+        recipe_code: r.recipe_code || null,
+        recipe_name: r.recipe_name || null,
+        order_count: Number(r.order_count),
+        consumed_item_count: Number(r.consumed_item_count || 0)
+      })),
+      status_distribution: statusRows.map(r => ({
+        status: r.status,
+        order_count: Number(r.order_count)
+      })),
+      summary: {
+        total_orders: totalOrders,
+        total_consumed_items: totalConsumed
+      }
+    }
   }
 
   /**

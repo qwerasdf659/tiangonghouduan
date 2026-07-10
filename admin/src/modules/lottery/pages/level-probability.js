@@ -1,13 +1,16 @@
 /**
- * 成长等级公示分级概率管理面板（B 线，2026-06 合规改造）
+ * 成长等级管理面板（P0-1，拍板⑫改造：定位从"B线概率倍数"改为"成长等级管理"）
  *
  * @file admin/src/modules/lottery/pages/level-probability.js
- * @description per-user 暗箱干预下线后，「让某类人更易中」改为「按成长等级的公示分级概率」。
- *              本面板：选择活动 → 读取成长等级阶梯（growth-levels）+ 各等级当前中奖率倍数
- *              （level-probability）→ 编辑各等级 multiplier → 保存（PUT level-probability）。
- *              作为抽奖管理「策略管理」分类下的一个子 Tab，挂载为嵌套 Alpine 组件
- *              x-data="levelProbabilityPanel()"。
- * @version 1.0.0
+ * @description 会员成长等级九档体系的运营管理面板（2026-07-10 发放线九档阶梯上线）：
+ *              1. 成长等级管理（主区块）：九档阈值 / 展示名 / 发放倍数 earn_multiplier / 状态编辑
+ *                 （对接 GET/PUT /console/lottery-management/growth-levels）；
+ *                 发放倍数 = 消费审核发分时可用积分与预算积分的放大倍数（拍板②发放线阶梯），
+ *                 应急回滚 = 九档全部改回 1.00（拍板⑬-(b)，无需发版）。
+ *              2. B线概率倍数（退役区块）：机制保留在代码中但按拍板②-(c) 不配置（默认 1.0），
+ *                 区块默认收起并标注"已退役"。
+ *              作为抽奖管理「策略管理」分类下的子 Tab，挂载 x-data="levelProbabilityPanel()"。
+ * @version 2.0.0
  * @module lottery/pages/level-probability
  */
 
@@ -18,7 +21,7 @@ import { LOTTERY_CORE_ENDPOINTS } from '../../../api/lottery/core.js'
 import { LotteryAdvancedAPI } from '../../../api/lottery/advanced.js'
 
 /**
- * 成长等级公示分级概率管理组件
+ * 成长等级管理组件
  *
  * @returns {Object} Alpine.js 组件配置对象
  */
@@ -26,36 +29,178 @@ function levelProbabilityPanel() {
   return {
     ...createPageMixin(),
 
-    /** @type {Array} 活动列表（供选择配置目标活动） */
+    /*
+     * ===== 成长等级管理（主区块，P0-1） =====
+     */
+    /**
+     * 成长等级九档列表（含编辑态字段）
+     * @type {Array<{user_growth_level_id:number, level_key:string, level_name:string, min_history_points:number, earn_multiplier:number, sort_order:number, status:string, description:string}>}
+     */
+    levels: [],
+    /** @type {boolean} 等级列表加载中 */
+    loadingLevels: false,
+    /** @type {Object|null} 正在编辑的等级（弹窗表单数据副本，snake_case 与后端一致） */
+    editingLevel: null,
+    /** @type {boolean} 等级保存中 */
+    savingLevel: false,
+
+    /*
+     * ===== B线概率倍数（退役区块，拍板②-(c) 保持 1.0） =====
+     */
+    /** @type {boolean} 是否展开已退役的 B线概率区块 */
+    showRetiredBLine: false,
+    /** @type {Array} 活动列表（B线配置目标活动） */
     campaigns: [],
     /** @type {number|string} 当前选中的活动 ID */
     selectedCampaignId: '',
     /**
-     * 各成长等级倍数编辑项
+     * B线各成长等级倍数编辑项
      * @type {Array<{level_key:string, level_name:string, min_history_points:number, multiplier:number}>}
      */
     items: [],
     /** @type {boolean} 活动列表加载中 */
     loadingCampaigns: false,
-    /** @type {boolean} 倍数配置加载中 */
+    /** @type {boolean} B线倍数配置加载中 */
     loadingItems: false,
-    /** @type {boolean} 保存中 */
+    /** @type {boolean} B线保存中 */
     saving: false,
-    /** @type {boolean} 是否已选择活动并加载过配置 */
+    /** @type {boolean} B线是否已选择活动并加载过配置 */
     loaded: false,
 
     /**
-     * 初始化：认证检查 + 加载活动列表
+     * 初始化：认证检查 + 加载成长等级阶梯（主区块）
+     * B线活动列表延迟到用户展开退役区块时再加载（减少无效请求）
      * @async
      * @returns {Promise<void>}
      */
     async init() {
-      logger.info('[LevelProbability] 成长等级公示分级概率面板初始化')
+      logger.info('[GrowthLevelAdmin] 成长等级管理面板初始化')
       if (!this.checkAuth()) {
-        logger.warn('[LevelProbability] 认证检查未通过，跳过初始化')
+        logger.warn('[GrowthLevelAdmin] 认证检查未通过，跳过初始化')
         return
       }
-      await this.loadCampaigns()
+      await this.loadGrowthLevels()
+    },
+
+    /*
+     * ==================== 成长等级管理（主区块） ====================
+     */
+
+    /**
+     * 加载成长等级阶梯（含停用档，运营可复核历史档位）
+     * @async
+     * @returns {Promise<void>}
+     */
+    async loadGrowthLevels() {
+      this.loadingLevels = true
+      try {
+        const response = await LotteryAdvancedAPI.getGrowthLevels({ include_inactive: true })
+        this.levels = response?.data?.levels || []
+        logger.debug('[GrowthLevelAdmin] 成长等级加载完成', { count: this.levels.length })
+      } catch (error) {
+        logger.error('[GrowthLevelAdmin] 加载成长等级失败:', error)
+        this.showError('加载成长等级失败: ' + (error.message || '未知错误'))
+        this.levels = []
+      } finally {
+        this.loadingLevels = false
+      }
+    },
+
+    /**
+     * 打开等级编辑弹窗（复制一份编辑态，避免直接改列表数据）
+     * @param {Object} level - 等级行数据
+     * @returns {void}
+     */
+    openLevelEditor(level) {
+      this.editingLevel = {
+        user_growth_level_id: level.user_growth_level_id,
+        level_key: level.level_key,
+        level_name: level.level_name,
+        min_history_points: level.min_history_points,
+        earn_multiplier: level.earn_multiplier ?? 1.0,
+        sort_order: level.sort_order,
+        status: level.status,
+        description: level.description || ''
+      }
+    },
+
+    /**
+     * 关闭等级编辑弹窗
+     * @returns {void}
+     */
+    closeLevelEditor() {
+      this.editingLevel = null
+    },
+
+    /**
+     * 保存等级定义（阈值/展示名/发放倍数/状态/说明）
+     * 前端防呆与后端同口径：earn_multiplier 1.00~3.00、阈值非负整数；
+     * 阈值倒挂由后端权威校验（GROWTH_LEVEL_THRESHOLD_INVERSION）。
+     * @async
+     * @returns {Promise<void>}
+     */
+    async saveLevel() {
+      if (!this.editingLevel) return
+      const editing = this.editingLevel
+
+      const points = Number(editing.min_history_points)
+      if (!Number.isInteger(points) || points < 0) {
+        this.showError('等级门槛必须为非负整数')
+        return
+      }
+      const multiplier = Number(editing.earn_multiplier)
+      if (!Number.isFinite(multiplier) || multiplier < 1.0 || multiplier > 3.0) {
+        this.showError('发放倍数必须在 1.00 ~ 3.00 之间（与后端硬封顶同值）')
+        return
+      }
+      if (!editing.level_name || !editing.level_name.trim()) {
+        this.showError('等级展示名不能为空')
+        return
+      }
+
+      this.savingLevel = true
+      try {
+        const response = await LotteryAdvancedAPI.updateGrowthLevel(
+          editing.user_growth_level_id,
+          {
+            level_name: editing.level_name.trim(),
+            min_history_points: points,
+            earn_multiplier: multiplier,
+            status: editing.status,
+            description: editing.description
+          }
+        )
+        if (response?.success) {
+          this.showSuccess(`等级「${editing.level_name}」保存成功（60 秒内全端生效）`)
+          this.closeLevelEditor()
+          await this.loadGrowthLevels()
+        } else {
+          throw new Error(response?.message || '保存失败')
+        }
+      } catch (error) {
+        logger.error('[GrowthLevelAdmin] 保存等级定义失败:', error)
+        this.showError('保存失败: ' + (error.message || '未知错误'))
+      } finally {
+        this.savingLevel = false
+      }
+    },
+
+    /*
+     * ==================== B线概率倍数（退役区块） ====================
+     * 拍板②-(c)：概率倍数常被预算闸门抵消且用户无感知，保持 0 配置（默认 1.0）。
+     * 机制保留供未来活动级概率活动复用，故界面保留但默认收起并标注退役。
+     */
+
+    /**
+     * 展开退役区块时才加载活动列表（惰性）
+     * @async
+     * @returns {Promise<void>}
+     */
+    async toggleRetiredBLine() {
+      this.showRetiredBLine = !this.showRetiredBLine
+      if (this.showRetiredBLine && this.campaigns.length === 0) {
+        await this.loadCampaigns()
+      }
     },
 
     /**
@@ -75,9 +220,9 @@ function levelProbabilityPanel() {
             : Array.isArray(data)
               ? data
               : []
-        logger.debug('[LevelProbability] 活动列表加载完成', { count: this.campaigns.length })
+        logger.debug('[GrowthLevelAdmin] 活动列表加载完成', { count: this.campaigns.length })
       } catch (error) {
-        logger.error('[LevelProbability] 加载活动列表失败:', error)
+        logger.error('[GrowthLevelAdmin] 加载活动列表失败:', error)
         this.showError('加载活动列表失败: ' + (error.message || '未知错误'))
         this.campaigns = []
       } finally {
@@ -95,7 +240,7 @@ function levelProbabilityPanel() {
     },
 
     /**
-     * 选择活动后：加载成长等级阶梯 + 各等级当前倍数，合并为可编辑项
+     * 选择活动后：加载成长等级阶梯 + 各等级当前 B线倍数，合并为可编辑项
      * @async
      * @returns {Promise<void>}
      */
@@ -130,13 +275,13 @@ function levelProbabilityPanel() {
           }
         })
         this.loaded = true
-        logger.debug('[LevelProbability] 倍数配置加载完成', {
+        logger.debug('[GrowthLevelAdmin] B线倍数配置加载完成', {
           campaignId,
           count: this.items.length
         })
       } catch (error) {
-        logger.error('[LevelProbability] 加载成长等级倍数失败:', error)
-        this.showError('加载成长等级倍数失败: ' + (error.message || '未知错误'))
+        logger.error('[GrowthLevelAdmin] 加载B线倍数失败:', error)
+        this.showError('加载B线倍数失败: ' + (error.message || '未知错误'))
         this.items = []
         this.loaded = false
       } finally {
@@ -145,7 +290,7 @@ function levelProbabilityPanel() {
     },
 
     /**
-     * 保存各成长等级中奖率倍数
+     * 保存各成长等级 B线中奖率倍数（退役机制，仅特殊活动需要时使用）
      * @async
      * @returns {Promise<void>}
      */
@@ -177,13 +322,13 @@ function levelProbabilityPanel() {
         }))
         const response = await LotteryAdvancedAPI.updateLevelProbability(campaignId, payload)
         if (response?.success) {
-          this.showSuccess('成长等级公示分级概率配置成功')
+          this.showSuccess('B线概率倍数配置成功（注意：该机制已按拍板②-(c) 退役，常规运营请保持 1.0）')
           await this.loadLevelProbability()
         } else {
           throw new Error(response?.message || '保存失败')
         }
       } catch (error) {
-        logger.error('[LevelProbability] 保存成长等级倍数失败:', error)
+        logger.error('[GrowthLevelAdmin] 保存B线倍数失败:', error)
         this.showError('保存失败: ' + (error.message || '未知错误'))
       } finally {
         this.saving = false
@@ -195,7 +340,7 @@ function levelProbabilityPanel() {
 // Alpine.js 组件注册（嵌套于抽奖管理「策略管理」分类的子 Tab）
 document.addEventListener('alpine:init', () => {
   Alpine.data('levelProbabilityPanel', levelProbabilityPanel)
-  logger.info('[LevelProbabilityPanel] Alpine 组件已注册')
+  logger.info('[GrowthLevelAdminPanel] Alpine 组件已注册')
 })
 
 export { levelProbabilityPanel }

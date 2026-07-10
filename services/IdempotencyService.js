@@ -399,6 +399,27 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/exchange/product-series': 'ADMIN_PRODUCT_SERIES_CREATE', // 创建产品系列（POST）
   '/api/v4/console/exchange/product-series/:id': 'ADMIN_PRODUCT_SERIES_UPDATE', // 更新/删除产品系列（PUT/DELETE，:series_id → :id）
   '/api/v4/console/exchange/items/:id/supplier-links': 'ADMIN_EXCHANGE_ITEM_SUPPLIER_LINKS_SET', // 全量替换商品供应商关联行（PUT）
+
+  // ===== S1–S5 商品体系业务逻辑（2026-07-10 商品编码体系 §17 落地）=====
+  '/api/v4/console/exchange/purchase-orders': 'ADMIN_PURCHASE_ORDER_CREATE',
+  '/api/v4/console/exchange/purchase-orders/:id': 'ADMIN_PURCHASE_ORDER_UPDATE',
+  '/api/v4/console/exchange/purchase-orders/:id/submit': 'ADMIN_PURCHASE_ORDER_SUBMIT',
+  '/api/v4/console/exchange/purchase-orders/:id/receive': 'ADMIN_PURCHASE_ORDER_RECEIVE',
+  '/api/v4/console/exchange/purchase-orders/:id/cancel': 'ADMIN_PURCHASE_ORDER_CANCEL',
+  '/api/v4/console/exchange/product-batches': 'ADMIN_PRODUCT_BATCH_CREATE',
+  '/api/v4/console/exchange/product-batches/:id': 'ADMIN_PRODUCT_BATCH_UPDATE',
+  '/api/v4/console/exchange/product-batches/:id/recall': 'ADMIN_PRODUCT_BATCH_RECALL',
+  '/api/v4/console/exchange/product-bundles': 'ADMIN_PRODUCT_BUNDLE_CREATE',
+  '/api/v4/console/exchange/product-bundles/:id': 'ADMIN_PRODUCT_BUNDLE_UPDATE',
+  '/api/v4/console/exchange/channel-mappings': 'ADMIN_CHANNEL_MAPPING_CREATE',
+  '/api/v4/console/exchange/channel-mappings/:id': 'ADMIN_CHANNEL_MAPPING_UPDATE',
+  '/api/v4/console/exchange/consignments': 'ADMIN_CONSIGNMENT_CREATE',
+  '/api/v4/console/exchange/consignments/:id/list': 'ADMIN_CONSIGNMENT_LIST',
+  '/api/v4/console/exchange/consignments/:id/sold': 'ADMIN_CONSIGNMENT_SOLD',
+  '/api/v4/console/exchange/consignments/:id/withdraw': 'ADMIN_CONSIGNMENT_WITHDRAW',
+  '/api/v4/console/exchange/consignments/:id/reject': 'ADMIN_CONSIGNMENT_REJECT',
+  '/api/v4/backpack/items/:id/transfer': 'USER_ITEM_GIFT_TRANSFER', // 用户转赠（S3 拍板 #35，每日限额）
+
   // 注：C2C 二级市场管理写操作（/console/marketplace/listings/*）已随 C2C 下线移除（2026-06-05 阶段五）
 
   // ===== 用户层级 =====

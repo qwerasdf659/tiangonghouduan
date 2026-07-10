@@ -28,6 +28,7 @@ const router = express.Router()
 const { authenticateToken, optionalAuth, getUserRoles } = require('../../../middleware/auth')
 const { handleServiceError, asyncHandler } = require('../../../middleware/validation')
 const TransactionManager = require('../../../utils/TransactionManager')
+const UnifiedDistributedLock = require('../../../utils/UnifiedDistributedLock')
 const logger = require('../../../utils/logger').logger
 
 /**
@@ -159,7 +160,9 @@ router.get(
       page_size: finalPageSize,
       sort_by,
       sort_order: upperSortOrder,
-      refresh: refresh === 'true'
+      refresh: refresh === 'true',
+      // 当前用户（可空）：用于等级门槛摘要 level_requirement.satisfied 实时计算（拍板⑪）
+      user_id: req.user?.user_id || null
     })
 
     // 获取用户权限（未登录用户默认 public 级别，role_level >= 100 为管理员）
@@ -223,8 +226,8 @@ router.get(
       return res.apiError('无效的商品ID', 'BAD_REQUEST', null, 400)
     }
 
-    // 调用服务层
-    const result = await ExchangeQueryService.getItemDetail(itemId)
+    // 调用服务层（user_id 用于等级门槛摘要 level_requirement.satisfied 实时计算，拍板⑪）
+    const result = await ExchangeQueryService.getItemDetail(itemId, { user_id })
 
     // 获取用户权限（未登录用户默认 public 级别）
     let dataLevel = 'public'
@@ -1000,13 +1003,15 @@ router.get(
  *
  * @description 执行以物易物（B2C 官方合成）：用户旧物核销 → 官方库存产出新物。
  *              全程用户↔官方，无用户间转移；旧物真销毁、产出非货币型资产且方向等价/向下。
+ *              履约分流（拍板⑩）：实物产出走 pending→发货链（address_id 必填），券/道具即时 completed。
  * @access Private（登录用户）
  *
  * @header {string} Idempotency-Key - 幂等键（必填）
  * @body {string} recipe_code - 配方码（必填）
  * @body {number[]} old_item_ids - 投入的旧物实例ID列表（必填，归属本人且 available）
+ * @body {number} [address_id] - 收货地址主键（实物产出必填，校验归属本人，写入 address_snapshot）
  *
- * @returns {Object} { order_no, consumed_item_ids, minted_item }
+ * @returns {Object} { order_no, order_status, consumed_item_ids, minted_item }
  */
 router.post(
   '/barter',
@@ -1023,7 +1028,7 @@ router.post(
     }
 
     const user_id = req.user.user_id
-    const { recipe_code, old_item_ids } = req.body
+    const { recipe_code, old_item_ids, address_id } = req.body
 
     if (!recipe_code) {
       return res.apiError('recipe_code 不能为空', 'BAD_REQUEST', null, 400)
@@ -1036,7 +1041,7 @@ router.post(
     const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
       api_path: '/api/v4/exchange/barter',
       http_method: 'POST',
-      request_params: { recipe_code, old_item_ids },
+      request_params: { recipe_code, old_item_ids, address_id: address_id || null },
       user_id
     })
     if (!idempotencyResult.should_process) {
@@ -1045,12 +1050,28 @@ router.post(
 
     try {
       const BarterService = req.app.locals.services.getService('exchange_barter')
-      // 事务边界由路由层管理（写操作收口到 Service + options.transaction）
-      const result = await TransactionManager.execute(async transaction => {
-        return BarterService.executeBarter(user_id, recipe_code, old_item_ids, idempotency_key, {
-          transaction
-        })
-      })
+      /*
+       * 并发防超（工程加固 §9-3）：按 recipe_code 加 Redis 分布式锁，
+       * 串行化"限量计数 + 落单"临界区——total_limit=1 时 N 并发恰好成功 1 笔。
+       * 锁与幂等键互补：幂等键防同一请求重放，锁防不同用户并发超卖。
+       */
+      const distributedLock = new UnifiedDistributedLock()
+      const result = await distributedLock.withLock(
+        `barter_recipe:${recipe_code}`,
+        async () => {
+          // 事务边界由路由层管理（写操作收口到 Service + options.transaction）
+          return TransactionManager.execute(async transaction => {
+            return BarterService.executeBarter(
+              user_id,
+              recipe_code,
+              old_item_ids,
+              idempotency_key,
+              { transaction, address_id: address_id || null }
+            )
+          })
+        },
+        { ttl: 15000 }
+      )
 
       await IdempotencyService.markAsCompleted(idempotency_key, result.order_no, result)
       return res.apiSuccess(result, '以物易物兑换成功')

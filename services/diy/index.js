@@ -56,6 +56,10 @@ class DiyServiceFacade {
     return DiyTemplateService.getUserTemplates(...args)
   }
 
+  static getUserTemplateDetail(...args) {
+    return DiyTemplateService.getUserTemplateDetail(...args)
+  }
+
   // ── 作品域（委托 WorkService）──
   static getWorkList(...args) {
     return DiyWorkService.getWorkList(...args)

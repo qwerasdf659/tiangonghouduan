@@ -22,6 +22,9 @@ import { useExchangeStatsState, useExchangeStatsMethods } from './exchange-stats
 // 以物易物配方管理模块（合规整改阶段六）
 import { useBarterRecipesState, useBarterRecipesMethods } from './barter-recipes.js'
 
+// 兑换等级门槛配置模块（拍板⑪，P0-2）
+import { useRedeemRequirementsState, useRedeemRequirementsMethods } from './redeem-requirements.js'
+
 // ⚠️ 汇率管理 composable 已合并到 conversion-rule-management 页面（2026-04-05）
 
 // 命名导出
@@ -35,5 +38,7 @@ export {
   useExchangeStatsState,
   useExchangeStatsMethods,
   useBarterRecipesState,
-  useBarterRecipesMethods
+  useBarterRecipesMethods,
+  useRedeemRequirementsState,
+  useRedeemRequirementsMethods
 }

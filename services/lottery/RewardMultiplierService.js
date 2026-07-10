@@ -126,8 +126,9 @@ class RewardMultiplierService {
       data.lottery_campaign_id = parseInt(payload.lottery_campaign_id, 10)
     }
 
-    if (payload.campaign_name !== undefined)
+    if (payload.campaign_name !== undefined) {
       data.campaign_name = String(payload.campaign_name).trim()
+    }
     if (payload.display_name !== undefined) data.display_name = String(payload.display_name).trim()
 
     if (payload.multiplier !== undefined) {
@@ -138,8 +139,9 @@ class RewardMultiplierService {
 
     if (payload.max_multiplier_cap !== undefined) {
       const cap = Number(payload.max_multiplier_cap)
-      if (!(cap >= 1))
+      if (!(cap >= 1)) {
         throw new BusinessError('max_multiplier_cap 必须 >= 1', 'INVALID_PARAMS', 400)
+      }
       data.max_multiplier_cap = cap
     }
 
@@ -189,8 +191,9 @@ class RewardMultiplierService {
         }
       } else {
         const limit = Number(payload.extra_cost_limit)
-        if (!(limit >= 0))
+        if (!(limit >= 0)) {
           throw new BusinessError('extra_cost_limit 必须 >= 0', 'INVALID_PARAMS', 400)
+        }
         data.extra_cost_limit = limit
       }
     }
@@ -308,8 +311,9 @@ class RewardMultiplierService {
     // 必填项兜底校验
     if (!data.campaign_name) throw new BusinessError('campaign_name 必填', 'INVALID_PARAMS', 400)
     if (!data.display_name) throw new BusinessError('display_name 必填', 'INVALID_PARAMS', 400)
-    if (data.multiplier === undefined)
+    if (data.multiplier === undefined) {
       throw new BusinessError('multiplier 必填', 'INVALID_PARAMS', 400)
+    }
 
     // 活动必须存在
     const campaign = await LotteryCampaign.findByPk(data.lottery_campaign_id, { transaction })

@@ -66,17 +66,15 @@
         <!-- 类型筛选 -->
         <div class="flex items-center gap-2">
           <span class="text-sm text-gray-500">类型:</span>
+          <!-- 类型取值以后端 ReminderRule.RULE_TYPES 枚举为权威（与 JS ruleTypes 同步，2026-07-11 修正旧假值） -->
           <select 
             x-model="filter.rule_type"
             class="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
           >
             <option value="">全部类型</option>
-            <option value="budget">预算提醒</option>
-            <option value="inventory">库存提醒</option>
-            <option value="performance">性能提醒</option>
-            <option value="security">安全提醒</option>
-            <option value="business">业务提醒</option>
-            <option value="system">系统提醒</option>
+            <template x-for="type in ruleTypes" :key="type.value">
+              <option :value="type.value" x-text="type.label"></option>
+            </template>
           </select>
         </div>
         

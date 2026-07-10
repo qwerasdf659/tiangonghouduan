@@ -54,6 +54,10 @@ export const ANALYTICS_ENDPOINTS = {
   LOTTERY_TRENDS: `${API_PREFIX}/console/analytics/lottery/trends`,
   DASHBOARD_TRENDS: `${API_PREFIX}/console/analytics/decisions/analytics`,
 
+  // 成长等级看板（拍板⑫，P0-3 分布 / P1-4 成本）
+  GROWTH_LEVEL_DISTRIBUTION: `${API_PREFIX}/console/analytics/growth-level/distribution`,
+  GROWTH_LEVEL_COST: `${API_PREFIX}/console/analytics/growth-level/cost`,
+
   // 图表数据
   CHARTS: `${API_PREFIX}/system/statistics/charts`,
 
@@ -171,6 +175,28 @@ export const AnalyticsAPI = {
    */
   async getDashboardTrends(params = {}) {
     const url = ANALYTICS_ENDPOINTS.DASHBOARD_TRENDS + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  // ===== 成长等级看板（拍板⑫） =====
+
+  /**
+   * 获取成长等级分布（P0-3）
+   * @async
+   * @returns {Promise<Object>} { levels: [{level_key, level_name, min_history_points, earn_multiplier, user_count, history_points_sum, upgraded_this_month}], total_users }
+   */
+  async getGrowthLevelDistribution() {
+    return await request({ url: ANALYTICS_ENDPOINTS.GROWTH_LEVEL_DISTRIBUTION, method: 'GET' })
+  },
+
+  /**
+   * 获取成长等级成本（P1-4）
+   * @async
+   * @param {Object} [params={}] - 查询参数（days 统计天数，默认 30）
+   * @returns {Promise<Object>} { period_days, daily, by_level, summary }
+   */
+  async getGrowthLevelCost(params = {}) {
+    const url = ANALYTICS_ENDPOINTS.GROWTH_LEVEL_COST + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 

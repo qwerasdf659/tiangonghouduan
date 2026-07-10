@@ -260,6 +260,15 @@ class ExchangeItemService {
 
     const payload = ExchangeItemService._pickExchangeItemPayload(data)
 
+    /*
+     * 铸造模板守卫（2026-07-11，方案文档 §十二-C.2 落地）：mint_instance=true（兑换后铸造
+     * 物品实例进背包，模型默认值即 true）的商品必须关联 item_template_id——无模板铸造会产生
+     * "模板血统缺失"的缺陷物品（无参考价、无法投入换物、方向守卫按 0 比较形同虚设）。
+     * 创建时按最终落库值判定：payload 未传 mint_instance 时取模型默认 true。
+     */
+    const willMintOnCreate = payload.mint_instance === undefined ? true : !!payload.mint_instance
+    ExchangeItemService._assertMintInstanceHasTemplate(willMintOnCreate, payload.item_template_id)
+
     // 生成 SPU 平台展示码 item_code（无意义随机码 SP+12 位，唯一索引兜底，撞码重试）
     payload.item_code = await ProductCodeGenerator.generateUnique('SP', async code => {
       const existing = await ExchangeItem.findOne({ where: { item_code: code }, transaction })
@@ -305,6 +314,17 @@ class ExchangeItemService {
     }
 
     const payload = ExchangeItemService._pickExchangeItemPayload(data)
+
+    /*
+     * 铸造模板守卫（与 createExchangeItem 同口径）：按"更新后的最终状态"判定——
+     * payload 未传的字段沿用现有行值，防止只改 mint_instance 或只清空模板时绕过校验。
+     */
+    const willMintAfterUpdate =
+      payload.mint_instance === undefined ? !!row.mint_instance : !!payload.mint_instance
+    const templateAfterUpdate =
+      payload.item_template_id === undefined ? row.item_template_id : payload.item_template_id
+    ExchangeItemService._assertMintInstanceHasTemplate(willMintAfterUpdate, templateAfterUpdate)
+
     await row.update(payload, { transaction })
     logger.info('ExchangeItemService.updateExchangeItem 成功', {
       exchange_item_id: pid,
@@ -798,6 +818,27 @@ class ExchangeItemService {
       },
       { where: { exchange_item_id: exchangeItemId }, transaction }
     )
+  }
+
+  /**
+   * 铸造模板守卫断言：需铸造实例（mint_instance=true）的商品必须关联物品模板
+   *
+   * 业务背景（2026-07-11 根因修复）：模板是物品实例的"血统"——承载参考价（换物方向守卫价值锚）、
+   * 物品类型（履约分流判定）与权益定义；无模板铸造出的物品无法投入换物、无法定价，属缺陷数据。
+   *
+   * @private
+   * @param {boolean} willMint - 最终落库的 mint_instance 值
+   * @param {number|null|undefined} templateId - 最终落库的 item_template_id 值
+   * @returns {void} 校验通过无返回，违规抛 BusinessError(400)
+   */
+  static _assertMintInstanceHasTemplate(willMint, templateId) {
+    if (willMint && !templateId) {
+      throw new BusinessError(
+        '需铸造实例的商品（mint_instance=true）必须关联物品模板（item_template_id）——模板承载参考价与物品类型，无模板铸造会产生缺陷物品',
+        'PRODUCT_CENTER_TEMPLATE_REQUIRED',
+        400
+      )
+    }
   }
 
   /**

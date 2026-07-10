@@ -53,10 +53,11 @@ router.get(
 )
 
 /**
- * PUT /growth-levels/:user_growth_level_id - 更新成长等级定义（运营自助调阈值）
+ * PUT /growth-levels/:user_growth_level_id - 更新成长等级定义（运营自助调阈值/发放倍数）
  *
- * 请求体：{ level_name?, min_history_points?, sort_order?, status?, description? }
- * 阈值倒挂、负值、非法状态由 Service 校验并拒绝。
+ * 请求体：{ level_name?, min_history_points?, earn_multiplier?, sort_order?, status?, description? }
+ * 阈值倒挂、负值、非法状态、earn_multiplier 越界（1.00~3.00）由 Service 校验并拒绝。
+ * 应急回滚（拍板⑬-(b)）：九档 earn_multiplier 全部改回 1.00 = 发放行为完全回到基准。
  *
  * @route PUT /api/v4/console/lottery-management/growth-levels/:user_growth_level_id
  * @access Private (管理员)
@@ -70,8 +71,16 @@ router.put(
       return res.apiError('无效的成长等级ID', 'INVALID_GROWTH_LEVEL_ID', null, 400)
     }
 
-    const { level_name, min_history_points, sort_order, status, description } = req.body
-    const updates = { level_name, min_history_points, sort_order, status, description }
+    const { level_name, min_history_points, earn_multiplier, sort_order, status, description } =
+      req.body
+    const updates = {
+      level_name,
+      min_history_points,
+      earn_multiplier,
+      sort_order,
+      status,
+      description
+    }
 
     const growthLevelService = getGrowthLevelService(req)
     const result = await TransactionManager.execute(

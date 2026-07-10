@@ -161,8 +161,13 @@ class ConsumptionRecord extends Model {
   }
 
   /**
-   * 计算预计奖励积分（1元=1分，四舍五入）
-   * @returns {number} 预计奖励积分
+   * 计算预计奖励基础积分的兜底值（按默认比例 1元=1分，四舍五入）
+   *
+   * 注意：真实比例来自 system_settings 的 points_award_ratio（提交时由服务层锁定写入
+   * points_to_award），本方法仅作为 beforeCreate 钩子在未显式指定积分时的兜底计算，
+   * 不能作为审核发放的依据。
+   *
+   * @returns {number} 按默认比例计算的基础积分
    */
   calculateRewardPoints() {
     return Math.round(parseFloat(this.consumption_amount || 0))
@@ -253,10 +258,12 @@ class ConsumptionRecord extends Model {
       warnings.push('商家ID为空，可能影响数据追溯')
     }
 
-    // 检查积分计算
+    // 检查积分计算（按默认比例 1.0 对照；比例非 1 或有个人覆盖时偏差属正常，仅提示）
     const expectedPoints = this.calculateRewardPoints()
     if (this.points_to_award !== expectedPoints) {
-      warnings.push(`积分计算可能不正确：记录${this.points_to_award}分，计算${expectedPoints}分`)
+      warnings.push(
+        `积分与默认比例(1.0)不一致：记录${this.points_to_award}分，默认比例计算${expectedPoints}分（若配置了 points_award_ratio≠1 或个人覆盖则属正常）`
+      )
     }
 
     return {
@@ -492,9 +499,51 @@ module.exports = sequelize => {
         type: DataTypes.INTEGER,
         allowNull: false,
         comment:
-          '预计奖励积分数（单位：分），计算规则：Math.round(consumption_amount)，即1元=1分，四舍五入',
+          '预计奖励基础积分（单位：分），提交时锁定：Math.round(consumption_amount × points_award_ratio)；等级加成笔不含在内',
         validate: {
           min: 1
+        }
+      },
+
+      /*
+       * ========================================
+       * 等级发放线提交时锁定（拍板⑬-(a) / §2.4-5，2026-07-10）
+       * 小票提交时点派生成长等级并锁定倍数，审核快慢不影响到账金额。
+       * NULL = 存量记录 / 无启用等级，审核发分按 1.00 处理。
+       * ========================================
+       */
+      level_key_locked: {
+        type: DataTypes.STRING(32),
+        allowNull: true,
+        comment: '提交时点锁定的成长等级码（关联 user_growth_levels.level_key，NULL=存量记录按1.0）'
+      },
+
+      earn_multiplier_locked: {
+        type: DataTypes.DECIMAL(4, 2),
+        allowNull: true,
+        comment: '提交时点锁定的等级发放倍数（审核发分按此值执行，NULL=存量记录按1.00）',
+        /**
+         * DECIMAL 返回字符串问题：字段级 getter 转数字（项目统一做法）
+         * @returns {number|null} 锁定倍数数值（NULL 保持 NULL，由发放侧按 1.0 处理）
+         */
+        get() {
+          const raw = this.getDataValue('earn_multiplier_locked')
+          return raw === null || raw === undefined ? null : Number(raw)
+        }
+      },
+
+      activity_bonus_rate_locked: {
+        type: DataTypes.DECIMAL(4, 2),
+        allowNull: true,
+        comment:
+          '提交时点锁定的活动加成率（拍板⑮-(b) 加法叠加，独立成 activity_bonus_reward 笔；NULL=无活动加成）',
+        /**
+         * DECIMAL 返回字符串问题：字段级 getter 转数字（项目统一做法）
+         * @returns {number|null} 锁定活动加成率（NULL 保持 NULL，由发放侧按 0 处理）
+         */
+        get() {
+          const raw = this.getDataValue('activity_bonus_rate_locked')
+          return raw === null || raw === undefined ? null : Number(raw)
         }
       },
 
@@ -992,16 +1041,29 @@ module.exports = sequelize => {
       // 模型级验证
       validate: {
         /**
-         * 验证积分计算是否正确
-         * 业务规则：消费金额（元）四舍五入 = 奖励积分（分）
+         * 验证积分数值的合理性边界
+         *
+         * 业务规则（2026-07-10 与可配比例对齐修正）：
+         * - points_to_award 由服务层按 points_award_ratio（system_settings 白名单范围 0.1~5.0）
+         *   在提交时锁定，模型无法重算精确期望值，不再做"恒等于 round(金额)"的硬校验
+         *   （旧校验隐含比例恒为 1，与可配比例功能冲突）。
+         * - 改为边界防护：必须为正整数，且不超过 消费金额 × 比例上限(5.0) 的四舍五入值。
+         *
          * @returns {void}
-         * @throws {Error} 当积分计算不正确时抛出错误
+         * @throws {Error} 当积分数值越界时抛出错误
          */
         validatePointsCalculation() {
-          const expected = Math.round(parseFloat(this.consumption_amount || 0))
-          if (this.points_to_award !== expected) {
+          const amount = parseFloat(this.consumption_amount || 0)
+          // 上限 = 金额 × points_award_ratio 白名单最大值 5.0（config/system-settings-whitelist.js）
+          const upperBound = Math.round(amount * 5.0)
+          if (!Number.isInteger(this.points_to_award) || this.points_to_award < 1) {
             throw new Error(
-              `积分计算不正确：消费${this.consumption_amount}元，应奖励${expected}分，但记录为${this.points_to_award}分`
+              `积分数值不正确：points_to_award 必须为正整数（当前：${this.points_to_award}）`
+            )
+          }
+          if (this.points_to_award > upperBound) {
+            throw new Error(
+              `积分数值越界：消费${this.consumption_amount}元按比例上限5.0最多${upperBound}分，但记录为${this.points_to_award}分`
             )
           }
         },

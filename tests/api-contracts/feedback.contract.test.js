@@ -131,12 +131,18 @@ describe('API契约测试 - 反馈模块 (/api/v4/system)', () => {
     })
 
     /**
-     * Case 2: 统一内容投放接口需要登录
+     * Case 2: 统一内容投放接口为公开可选登录（optionalAuth）——
+     * 未登录返回 operational/system 公开内容，登录后额外含 commercial（计费/定向）。
+     * 与路由契约一致（routes/v4/system/ad-delivery.js @access Public）。
      */
-    test('无 Authorization 应该返回 401', async () => {
+    test('无 Authorization 应返回 200（匿名可见公开内容，commercial 由服务端过滤）', async () => {
       const response = await request(app).get('/api/v4/system/ad-delivery?slot_type=announcement')
 
-      expect(response.status).toBe(401)
+      expect(response.status).toBe(200)
+      validateApiContract(response.body)
+      if (response.body.data?.items) {
+        expect(Array.isArray(response.body.data.items)).toBe(true)
+      }
     })
   })
 

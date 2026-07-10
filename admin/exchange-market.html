@@ -21,6 +21,7 @@
   <!-- 页面主体 -->
   <div class="container mx-auto px-4 py-6" x-data="exchangeMarket()" x-init="init()"
        @edit-item="editItem($event.detail)"
+       @edit-redeem-requirement="openRedeemRequirementModal($event.detail)"
        @delete-item="deleteItem($event.detail)"
        @toggle-item-status="toggleItemStatus($event.detail)"
        @view-item-dashboard="viewItemDashboard($event.detail)"
@@ -238,6 +239,7 @@
                     <td class="px-4 py-3">
                       <div class="flex space-x-2">
                         <button @click="$dispatch('edit-item', row)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                        <button @click="$dispatch('edit-redeem-requirement', row)" class="text-purple-500 hover:text-purple-700 text-sm">等级门槛</button>
                         <button @click="$dispatch('view-item-dashboard', row)" class="text-indigo-500 hover:text-indigo-700 text-sm">看板</button>
                         <button @click="$dispatch('toggle-pin', row)" class="text-sm" :class="row.is_pinned ? 'text-orange-500 hover:text-orange-700' : 'text-gray-400 hover:text-orange-500'" x-text="row.is_pinned ? '取消置顶' : '置顶'"></button>
                         <button @click="$dispatch('toggle-recommend', row)" class="text-sm" :class="row.is_recommended ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 hover:text-blue-500'" x-text="row.is_recommended ? '取消推荐' : '推荐'"></button>
@@ -301,6 +303,7 @@
                 <option value="exchange">普通兑换</option>
                 <option value="bid">竞价中标</option>
                 <option value="diy">DIY 设计</option>
+                <option value="barter">以物易物</option>
               </select>
               <button @click="search()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
               <button @click="handleFilterReset()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">🔄 重置</button>
@@ -563,6 +566,8 @@
                 <th class="px-3 py-2 border-b">旧物模板ID <span class="text-red-500">*</span></th>
                 <th class="px-3 py-2 border-b">需投入数量</th>
                 <th class="px-3 py-2 border-b">产出商品ID <span class="text-red-500">*</span></th>
+                <th class="px-3 py-2 border-b" title="每人限换次数（拍板⑬-(c) 防薅），0=不限">每人限换</th>
+                <th class="px-3 py-2 border-b" title="配方总量（拍板⑬-(c) 防薅），0=不限">配方总量</th>
                 <th class="px-3 py-2 border-b">启用</th>
                 <th class="px-3 py-2 border-b">操作</th>
               </tr>
@@ -575,6 +580,8 @@
                   <td class="px-3 py-2"><input type="number" x-model.number="recipe.required_item_template_id" class="w-24 px-2 py-1 border rounded" min="1"></td>
                   <td class="px-3 py-2"><input type="number" x-model.number="recipe.required_quantity" class="w-20 px-2 py-1 border rounded" min="1"></td>
                   <td class="px-3 py-2"><input type="number" x-model.number="recipe.output_exchange_item_id" class="w-24 px-2 py-1 border rounded" min="1"></td>
+                  <td class="px-3 py-2"><input type="number" x-model.number="recipe.per_user_limit" class="w-20 px-2 py-1 border rounded" min="0" placeholder="0=不限"></td>
+                  <td class="px-3 py-2"><input type="number" x-model.number="recipe.total_limit" class="w-20 px-2 py-1 border rounded" min="0" placeholder="0=不限"></td>
                   <td class="px-3 py-2 text-center"><input type="checkbox" x-model="recipe.is_enabled"></td>
                   <td class="px-3 py-2"><button @click="removeBarterRecipe(idx)" class="text-red-600 hover:underline">删除</button></td>
                 </tr>
@@ -1238,6 +1245,107 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- 1.5 兑换等级门槛配置模态框（P0-2，拍板⑪） -->
+  <div x-ref="redeemRequirementModal"
+       x-show="isModalOpen('redeemRequirementModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="closeRedeemRequirementModal()"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
+      <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card z-10">
+        <h5 class="font-semibold">🔒 等级门槛配置 <span class="text-sm themed-text-muted" x-text="redeemRequirementItem?.item_name"></span></h5>
+        <button @click="closeRedeemRequirementModal()" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      <div class="p-4">
+        <p class="text-xs themed-text-muted mb-3">
+          配置本商品的成长等级兑换门槛（区间语义）：仅配「最低等级」=该等级及以上可兑；仅配「最高等级」=该等级及以下可兑（新人专享）；两者相同=仅该等级；都不配=不限。C 端对不满足门槛的用户显示「专享」角标并置灰兑换按钮（橱窗效应）。
+        </p>
+
+        <!-- 现有门槛列表 -->
+        <div x-show="redeemRequirementLoading" class="text-center py-4 themed-text-muted text-sm">加载中…</div>
+        <div x-show="!redeemRequirementLoading">
+          <table class="w-full text-sm border mb-4" x-show="redeemRequirements.length > 0">
+            <thead>
+              <tr class="bg-gray-50 text-left">
+                <th class="px-3 py-2 border-b">最低等级</th>
+                <th class="px-3 py-2 border-b">最高等级</th>
+                <th class="px-3 py-2 border-b">状态</th>
+                <th class="px-3 py-2 border-b">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="req in redeemRequirements" :key="req.exchange_redeem_requirement_id">
+                <tr class="border-b">
+                  <td class="px-3 py-2" x-text="growthLevelName(req.min_growth_level_key)"></td>
+                  <td class="px-3 py-2" x-text="growthLevelName(req.max_growth_level_key)"></td>
+                  <td class="px-3 py-2">
+                    <span class="px-2 py-0.5 rounded text-xs" :class="req.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'" x-text="req.is_enabled ? '启用' : '停用'"></span>
+                  </td>
+                  <td class="px-3 py-2 space-x-2">
+                    <button @click="editRedeemRequirement(req)" class="text-blue-600 hover:underline">编辑</button>
+                    <button @click="deleteRedeemRequirement(req)" class="text-red-600 hover:underline">删除</button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <div x-show="redeemRequirements.length === 0" class="text-center py-3 themed-text-muted text-sm">暂无门槛配置（该商品不限等级兑换）</div>
+
+          <button @click="addRedeemRequirement()" x-show="!redeemRequirementForm" class="action-btn action-btn-secondary mb-2">+ 新增门槛</button>
+
+          <!-- 门槛编辑表单 -->
+          <div x-show="redeemRequirementForm" x-cloak class="border rounded p-4 mt-2 themed-bg-base">
+            <template x-if="redeemRequirementForm">
+              <div class="space-y-3">
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium themed-text-secondary mb-1">最低等级（及以上）</label>
+                    <select x-model="redeemRequirementForm.min_growth_level_key" class="w-full px-3 py-2 border rounded">
+                      <option value="">不限</option>
+                      <template x-for="lv in growthLevelOptions" :key="lv.level_key">
+                        <option :value="lv.level_key" x-text="lv.level_name + '（' + lv.level_key + '）'"></option>
+                      </template>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium themed-text-secondary mb-1">最高等级（及以下）</label>
+                    <select x-model="redeemRequirementForm.max_growth_level_key" class="w-full px-3 py-2 border rounded">
+                      <option value="">不限</option>
+                      <template x-for="lv in growthLevelOptions" :key="lv.level_key">
+                        <option :value="lv.level_key" x-text="lv.level_name + '（' + lv.level_key + '）'"></option>
+                      </template>
+                    </select>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium themed-text-secondary mb-1">生效时间（北京时间，留空=立即）</label>
+                    <input type="datetime-local" x-model="redeemRequirementForm.publish_at" class="w-full px-3 py-2 border rounded">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium themed-text-secondary mb-1">失效时间（北京时间，留空=长期）</label>
+                    <input type="datetime-local" x-model="redeemRequirementForm.unpublish_at" class="w-full px-3 py-2 border rounded">
+                  </div>
+                </div>
+                <label class="flex items-center gap-2 text-sm">
+                  <input type="checkbox" x-model="redeemRequirementForm.is_enabled"> 启用该门槛
+                </label>
+                <div class="flex justify-end gap-2">
+                  <button @click="redeemRequirementForm = null" class="px-3 py-1.5 border rounded text-sm hover:bg-gray-100">取消</button>
+                  <button @click="saveRedeemRequirement()" :disabled="redeemRequirementSaving" class="action-btn action-btn-primary disabled:opacity-50">
+                    <span x-show="!redeemRequirementSaving">保存门槛</span>
+                    <span x-show="redeemRequirementSaving">保存中…</span>
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

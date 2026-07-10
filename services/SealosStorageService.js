@@ -552,6 +552,38 @@ class SealosStorageService {
   }
 
   /**
+   * 🔴 按指定对象 key 上传 Buffer（确定性路径场景，如 DIY 小程序码缓存）
+   *
+   * 与 uploadImage 的区别：
+   * - uploadImage 自动生成随机唯一 key（时间戳+哈希），适合用户上传的素材
+   * - 本方法由调用方指定确定性 key（如 diy-qrcodes/work_65.png），
+   *   同 key 重复上传直接覆盖，实现「生成一次、后续走缓存」的幂等语义
+   *
+   * 复用 _uploadWithFallback 的内网优先 + 公网回退策略。
+   *
+   * @param {Buffer} fileBuffer - 文件缓冲区
+   * @param {string} objectKey - 完整对象 key（含文件夹前缀，如 diy-qrcodes/work_65.png）
+   * @param {string} [contentType='image/png'] - 文件 MIME 类型
+   * @returns {Promise<string>} 对象 key（与传入一致）
+   */
+  async uploadBufferAtKey(fileBuffer, objectKey, contentType = 'image/png') {
+    const uploadParams = {
+      Bucket: this.config.bucket,
+      Key: objectKey,
+      Body: fileBuffer,
+      ContentType: contentType,
+      ContentDisposition: 'inline', // 浏览器/小程序直接显示，而非触发下载
+      ACL: 'public-read', // 展示型素材公共可读
+      CacheControl: 'max-age=31536000' // 缓存1年（确定性路径内容不变）
+    }
+
+    await this._uploadWithFallback(uploadParams, 'buffer_at_key')
+
+    logger.info('✅ 确定性路径上传成功', { objectKey, size: fileBuffer.length })
+    return objectKey
+  }
+
+  /**
    * 🔴 检查文件是否存在
    * @param {string} fileKey - 文件Key
    * @returns {Promise<boolean>} 文件是否存在

@@ -44,6 +44,189 @@ class UserGrowthLevelService {
     this.UserGrowthLevel = models.UserGrowthLevel
     this.User = models.User
     this.LotteryStrategyConfig = models.LotteryStrategyConfig
+    this.sequelize = models.sequelize
+  }
+
+  /**
+   * 等级分布看板数据（管理端 P0-3，拍板⑫）
+   *
+   * 统计口径：
+   * - 各档人数/累计积分贡献：全量用户按 history_total_points 实时分档
+   *   （用户量当前很小，JS 分桶即可；上量后再改 SQL CASE 聚合——工程加固 §9-8 结论）；
+   * - 累计积分 ≈ 累计消费贡献（1 元 = 1 积分的 A 口径代理）；
+   * - 本月升级人数：本月获得的"计入等级"积分（排除加成笔）使其跨过当前档阈值的用户数。
+   *
+   * @returns {Promise<Object>} { levels: [{level_key, level_name, min_history_points, earn_multiplier, user_count, history_points_sum, upgraded_this_month}], total_users }
+   */
+  async getLevelDistribution() {
+    const levels = await this.UserGrowthLevel.getActiveLevels()
+    const sortedLevels = [...levels].sort(
+      (a, b) => Number(a.min_history_points) - Number(b.min_history_points)
+    )
+
+    // 全量用户累计积分（仅取单列；14 行级别，上量后改 SQL 聚合）
+    const users = await this.User.findAll({
+      attributes: ['user_id', 'history_total_points'],
+      raw: true
+    })
+
+    /*
+     * 本月"计入等级"积分增量（北京时间月初起，DB 会话时区 +08:00 故 NOW() 即北京时刻）：
+     * 排除 level_bonus_reward / activity_bonus_reward（加成笔不计等级，与
+     * BalanceService.HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES 同口径）。
+     */
+    const [monthGainedRows] = await this.sequelize.query(
+      `SELECT a.user_id, SUM(t.delta_amount) AS gained
+       FROM asset_transactions t
+       JOIN accounts a ON a.account_id = t.account_id
+       WHERE a.account_type = 'user'
+         AND t.asset_code = 'points'
+         AND t.delta_amount > 0
+         AND t.business_type NOT IN ('level_bonus_reward', 'activity_bonus_reward')
+         AND t.created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')
+       GROUP BY a.user_id`
+    )
+    const gainedByUserId = new Map(monthGainedRows.map(r => [Number(r.user_id), Number(r.gained)]))
+
+    /**
+     * 按累计积分匹配所属档位下标（阈值升序，取满足下限的最高档）
+     * @param {number} points - 累计积分
+     * @returns {number} 档位下标（-1=无匹配档）
+     */
+    const resolveIndex = points => {
+      let idx = -1
+      for (let i = 0; i < sortedLevels.length; i++) {
+        if (points >= Number(sortedLevels[i].min_history_points)) idx = i
+      }
+      return idx
+    }
+
+    const buckets = sortedLevels.map(l => ({
+      level_key: l.level_key,
+      level_name: l.level_name,
+      min_history_points: Number(l.min_history_points),
+      earn_multiplier: Number(l.earn_multiplier) || 1.0,
+      user_count: 0,
+      history_points_sum: 0,
+      upgraded_this_month: 0
+    }))
+
+    for (const user of users) {
+      const points = Number(user.history_total_points) || 0
+      const idx = resolveIndex(points)
+      if (idx < 0) continue
+      buckets[idx].user_count += 1
+      buckets[idx].history_points_sum += points
+
+      // 本月升级判定：月初积分（当前 - 本月增量）低于当前档下限 = 本月跨档
+      const gained = gainedByUserId.get(Number(user.user_id)) || 0
+      const threshold = Number(sortedLevels[idx].min_history_points)
+      if (threshold > 0 && points - gained < threshold) {
+        buckets[idx].upgraded_this_month += 1
+      }
+    }
+
+    return {
+      levels: buckets,
+      total_users: users.length
+    }
+  }
+
+  /**
+   * 等级成本看板数据（管理端 P1-4，拍板⑫）
+   *
+   * 统计口径（发放线"真金白银"的仪表盘）：
+   * - 加成发放量：business_type='level_bonus_reward' 按日/按档聚合（按档取流水 meta.level_key_locked）；
+   * - 预算注入量：business_type='consumption_budget_allocation' 按日聚合；
+   * - 加成成本占营收比：加成积分总量 / 审核通过消费总额（1 积分 ≈ 1 元）；
+   * - 积分负债余额：全体用户 points 可用余额合计（拍板⑰永不过期口径下负债只增不销，
+   *   此监控为唯一财务闸口）。
+   *
+   * @param {Object} [options={}] - 选项
+   * @param {number} [options.days=30] - 统计天数（按日趋势窗口）
+   * @returns {Promise<Object>} { daily, by_level, summary }
+   */
+  async getLevelCostReport(options = {}) {
+    const days = Math.min(Math.max(parseInt(options.days, 10) || 30, 1), 365)
+
+    // 按日：加成发放量 + 预算注入量（DB 会话时区 +08:00，DATE() 即北京日期）
+    const [dailyRows] = await this.sequelize.query(
+      `SELECT DATE(t.created_at) AS stat_date,
+              SUM(CASE WHEN t.business_type = 'level_bonus_reward' THEN t.delta_amount ELSE 0 END) AS level_bonus_points,
+              SUM(CASE WHEN t.business_type = 'consumption_budget_allocation' THEN t.delta_amount ELSE 0 END) AS budget_points_injected
+       FROM asset_transactions t
+       JOIN accounts a ON a.account_id = t.account_id
+       WHERE a.account_type = 'user'
+         AND t.delta_amount > 0
+         AND t.business_type IN ('level_bonus_reward', 'consumption_budget_allocation')
+         AND t.created_at >= DATE_SUB(CURDATE(), INTERVAL :days DAY)
+       GROUP BY DATE(t.created_at)
+       ORDER BY stat_date ASC`,
+      { replacements: { days } }
+    )
+
+    // 按档：加成发放量（流水 meta.level_key_locked 为发放时点锁定档位）
+    const [byLevelRows] = await this.sequelize.query(
+      `SELECT JSON_UNQUOTE(JSON_EXTRACT(t.meta, '$.level_key_locked')) AS level_key,
+              SUM(t.delta_amount) AS level_bonus_points,
+              COUNT(*) AS bonus_count
+       FROM asset_transactions t
+       JOIN accounts a ON a.account_id = t.account_id
+       WHERE a.account_type = 'user'
+         AND t.delta_amount > 0
+         AND t.business_type = 'level_bonus_reward'
+         AND t.created_at >= DATE_SUB(CURDATE(), INTERVAL :days DAY)
+       GROUP BY level_key
+       ORDER BY level_key ASC`,
+      { replacements: { days } }
+    )
+
+    // 营收口径：窗口内审核通过的消费总额（reviewed_at 与发放时点对齐）
+    const [[revenueRow]] = await this.sequelize.query(
+      `SELECT COALESCE(SUM(consumption_amount), 0) AS approved_amount
+       FROM consumption_records
+       WHERE status = 'approved' AND is_deleted = 0
+         AND reviewed_at >= DATE_SUB(CURDATE(), INTERVAL :days DAY)`,
+      { replacements: { days } }
+    )
+
+    // 积分负债余额（全体用户 points 可用余额合计，实时快照）
+    const [[liabilityRow]] = await this.sequelize.query(
+      `SELECT COALESCE(SUM(b.available_amount), 0) AS points_liability
+       FROM account_asset_balances b
+       JOIN accounts a ON a.account_id = b.account_id
+       WHERE a.account_type = 'user' AND b.asset_code = 'points'`
+    )
+
+    const totalLevelBonus = dailyRows.reduce((sum, r) => sum + Number(r.level_bonus_points), 0)
+    const totalBudgetInjected = dailyRows.reduce(
+      (sum, r) => sum + Number(r.budget_points_injected),
+      0
+    )
+    const approvedAmount = Number(revenueRow.approved_amount) || 0
+
+    return {
+      period_days: days,
+      daily: dailyRows.map(r => ({
+        stat_date: r.stat_date,
+        level_bonus_points: Number(r.level_bonus_points),
+        budget_points_injected: Number(r.budget_points_injected)
+      })),
+      by_level: byLevelRows.map(r => ({
+        level_key: r.level_key || null,
+        level_bonus_points: Number(r.level_bonus_points),
+        bonus_count: Number(r.bonus_count)
+      })),
+      summary: {
+        total_level_bonus_points: totalLevelBonus,
+        total_budget_points_injected: totalBudgetInjected,
+        approved_consumption_amount: approvedAmount,
+        // 加成成本占营收比（1 积分 ≈ 1 元；营收为 0 时为 null 避免除零假象）
+        bonus_cost_ratio:
+          approvedAmount > 0 ? Number((totalLevelBonus / approvedAmount).toFixed(4)) : null,
+        points_liability: Number(liabilityRow.points_liability)
+      }
+    }
   }
 
   /**
@@ -62,6 +245,32 @@ class UserGrowthLevelService {
       return null
     }
     return this.UserGrowthLevel.resolveLevelKey(user.history_total_points, options)
+  }
+
+  /**
+   * 派生指定用户的成长等级 + 发放线倍数（提交时锁定用，拍板⑬-(a)/§2.4-5）
+   *
+   * 业务场景：小票提交时点派生用户等级并锁定 earn_multiplier，随消费记录落表
+   * （level_key_locked / earn_multiplier_locked），审核快慢不影响到账金额。
+   *
+   * @param {number} user_id - 用户ID
+   * @param {Object} [options={}] - 查询选项（可含 transaction）
+   * @returns {Promise<Object>} { level_key, level_name, earn_multiplier }（无等级时倍数为 1.0）
+   */
+  async resolveUserLevelWithMultiplier(user_id, options = {}) {
+    const user = await this.User.findByPk(user_id, {
+      attributes: ['user_id', 'history_total_points'],
+      transaction: options.transaction
+    })
+    if (!user) {
+      return { level_key: null, level_name: null, earn_multiplier: 1.0 }
+    }
+    const level = await this.UserGrowthLevel.resolveLevel(user.history_total_points, options)
+    return {
+      level_key: level ? level.level_key : null,
+      level_name: level ? level.level_name : null,
+      earn_multiplier: level ? Number(level.earn_multiplier) || 1.0 : 1.0
+    }
   }
 
   /**
@@ -106,11 +315,32 @@ class UserGrowthLevelService {
     const currentLevelKey = await this.UserGrowthLevel.resolveLevelKey(historyTotalPoints)
     const currentLevel = levels.find(l => l.level_key === currentLevelKey) || null
 
+    /*
+     * "距下一级"体验字段（工程加固 §9-9，2026-07-10 确认必做）：
+     * - 阈值定稿后门槛数字本就公开下发，差值不泄密（倍数/权重仍守脱敏红线）。
+     * - 小程序会员页据此渲染"再消费 X 元升{下一级名}"（1 积分≈1 元消费）。
+     * - 顶档（无更高启用等级）或阈值未定稿时返回 null。
+     */
+    let nextLevel = null
+    if (thresholdsConfirmed && currentLevel) {
+      const currentIndex = levels.findIndex(l => l.level_key === currentLevel.level_key)
+      const higher = currentIndex >= 0 ? levels[currentIndex + 1] : null
+      if (higher) {
+        nextLevel = {
+          level_key: higher.level_key,
+          level_name: higher.level_name,
+          points_needed: Math.max(0, Number(higher.min_history_points) - historyTotalPoints)
+        }
+      }
+    }
+
     return {
       current_level_key: currentLevelKey,
       current_level_name: currentLevel ? currentLevel.level_name : null,
       history_total_points: historyTotalPoints,
       thresholds_confirmed: thresholdsConfirmed,
+      // 下一级差值（顶档/未定稿为 null；小程序渲染"再消费 X 元升级"）
+      next_level: nextLevel,
       levels: levels.map(l => ({
         level_key: l.level_key,
         level_name: l.level_name,
@@ -138,6 +368,8 @@ class UserGrowthLevelService {
       level_key: l.level_key,
       level_name: l.level_name,
       min_history_points: l.min_history_points,
+      // 发放线倍数（拍板②：管理端等级管理页编辑，仅管理端可见，C 端视图绝不下发）
+      earn_multiplier: Number(l.earn_multiplier) || 1.0,
       sort_order: l.sort_order,
       status: l.status,
       description: l.description
@@ -304,6 +536,23 @@ class UserGrowthLevelService {
     const allowed = {}
     if (updates.level_name !== undefined) allowed.level_name = String(updates.level_name).trim()
     if (updates.sort_order !== undefined) allowed.sort_order = parseInt(updates.sort_order, 10)
+    if (updates.earn_multiplier !== undefined) {
+      /*
+       * 发放倍数防呆上限（工程加固 §9-6）：写入口校验 1.00 ≤ earn_multiplier ≤ 3.00
+       * （上限与拍板⑮-(d) 可用积分总倍数硬封顶 3.0 同值）——运营手滑填 15 在写入口就拦住，
+       * 而不是靠发放侧封顶兜底。
+       */
+      const multiplier = Number(updates.earn_multiplier)
+      if (!Number.isFinite(multiplier) || multiplier < 1.0 || multiplier > 3.0) {
+        const err = new Error(
+          `earn_multiplier 必须在 1.00~3.00 之间（收到：${updates.earn_multiplier}）`
+        )
+        err.statusCode = 400
+        err.code = 'INVALID_EARN_MULTIPLIER'
+        throw err
+      }
+      allowed.earn_multiplier = Math.round(multiplier * 100) / 100
+    }
     if (updates.status !== undefined) {
       if (!['active', 'inactive'].includes(updates.status)) {
         const err = new Error('status 只能是 active 或 inactive')
@@ -358,6 +607,9 @@ class UserGrowthLevelService {
 
     await level.update(allowed, { transaction: options.transaction })
 
+    // 写时失效进程内缓存（§9-4）：管理端调档后新配置最迟 60s 内全进程生效
+    this.UserGrowthLevel.invalidateActiveLevelsCache()
+
     logger.info('[UserGrowthLevelService] 成长等级定义已更新', {
       user_growth_level_id,
       operated_by,
@@ -369,6 +621,7 @@ class UserGrowthLevelService {
       level_key: level.level_key,
       level_name: level.level_name,
       min_history_points: level.min_history_points,
+      earn_multiplier: Number(level.earn_multiplier) || 1.0,
       sort_order: level.sort_order,
       status: level.status,
       description: level.description

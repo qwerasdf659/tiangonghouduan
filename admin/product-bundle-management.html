@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { title: '组合商品管理', pageStyle: '[x-cloak] { display: none !important; }' }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  <nav class="bg-gray-800 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-gray-300 transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">🎁 组合商品管理</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-data x-text="$store.auth?.user?.nickname ? `欢迎，${$store.auth.user.nickname}` : '欢迎，管理员'" class="text-sm text-gray-300">欢迎，管理员</span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6" x-data="productBundleManagement()" x-cloak>
+    <div class="themed-card rounded-xl shadow-sm mb-6 overflow-hidden">
+      <div class="px-5 py-4 bg-gradient-to-r from-slate-50 to-white border-b themed-border">
+        <div class="flex flex-wrap gap-4 items-end">
+          <div class="flex-1 min-w-[160px]">
+            <label class="block text-xs font-medium themed-text-muted mb-1.5">关键词</label>
+            <input type="text" x-model="filters.keyword" @keyup.enter="handleSearch()" placeholder="商品名称 / 编码" class="w-full px-3 py-2 text-sm border rounded-lg themed-border focus:ring-2 focus:ring-cyan-500">
+          </div>
+          <div class="w-32">
+            <label class="block text-xs font-medium themed-text-muted mb-1.5">bundle_type</label>
+            <select x-model="filters.bundle_type" @change="handleSearch()" class="w-full px-3 py-2 text-sm border rounded-lg themed-border">
+              <option value="">全部</option>
+              <option value="suit">套装</option>
+              <option value="gift">赠品搭售</option>
+            </select>
+          </div>
+          <div class="w-32">
+            <label class="block text-xs font-medium themed-text-muted mb-1.5">status</label>
+            <select x-model="filters.status" @change="handleSearch()" class="w-full px-3 py-2 text-sm border rounded-lg themed-border">
+              <option value="">全部</option>
+              <option value="active">启用</option>
+              <option value="inactive">停用</option>
+            </select>
+          </div>
+          <div class="flex gap-2">
+            <button @click="handleSearch()" class="px-4 py-2 text-sm themed-bg-primary text-white rounded-lg">🔍 搜索</button>
+            <button @click="resetFilters()" class="px-4 py-2 text-sm border rounded-lg themed-border hover:bg-gray-50">🔄 重置</button>
+            <button @click="openCreateForm()" class="px-4 py-2 text-sm themed-gradient-primary text-white rounded-lg">➕ 新建组合</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="themed-card rounded-xl shadow-sm border overflow-hidden">
+      <div class="px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b themed-border flex items-center gap-2">
+        <span class="text-sm font-semibold themed-text">组合商品列表</span>
+        <span class="px-2 py-0.5 text-xs font-medium bg-cyan-100 text-cyan-600 rounded-full" x-text="total + ' 条'"></span>
+      </div>
+      <div x-show="loading" class="p-12 text-center"><div class="animate-spin text-3xl mb-3">⏳</div><p class="text-sm">加载中...</p></div>
+      <div x-show="!loading && items.length === 0" class="p-12 text-center">
+        <p class="text-lg font-medium themed-text mb-2">暂无组合商品</p>
+        <button @click="openCreateForm()" class="px-4 py-2 text-sm themed-gradient-primary text-white rounded-lg">➕ 新建组合</button>
+      </div>
+      <table x-show="!loading && items.length > 0" class="w-full text-sm">
+        <thead>
+          <tr class="bg-gradient-to-r from-slate-50 to-gray-50 border-b themed-border">
+            <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted">bundle_id</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted">商品名称</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted">bundle_type</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted">status</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted">创建时间</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted">操作</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y themed-border">
+          <template x-for="row in items" :key="row.bundle_id">
+            <tr class="hover:bg-cyan-50/30">
+              <td class="px-4 py-3 font-mono text-xs" x-text="'#' + row.bundle_id"></td>
+              <td class="px-4 py-3 font-medium" x-text="row.exchangeItem?.item_name || '-'"></td>
+              <td class="px-4 py-3 text-center" x-text="bundleTypeLabel(row.bundle_type)"></td>
+              <td class="px-4 py-3 text-center" x-text="statusLabel(row.status)"></td>
+              <td class="px-4 py-3 text-xs themed-text-muted" x-text="formatDate(row.created_at)"></td>
+              <td class="px-4 py-3">
+                <div class="flex justify-center gap-1">
+                  <button @click="viewDetail(row.bundle_id)" class="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded">BOM</button>
+                  <button @click="openEditForm(row.bundle_id)" class="px-2 py-1 text-xs text-green-600 hover:bg-green-50 rounded">编辑</button>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+      <div x-show="total > 0" class="px-5 py-3 flex justify-between items-center bg-gradient-to-r from-slate-50 to-gray-50 border-t themed-border">
+        <span class="text-xs themed-text-muted">共 <span x-text="total"></span> 条，第 <span x-text="pagination.page"></span>/<span x-text="totalPages"></span> 页</span>
+        <div class="flex gap-1">
+          <button @click="goToPage(pagination.page - 1)" :disabled="!hasPrevPage" class="px-3 py-1.5 border rounded-lg text-xs themed-border" :class="hasPrevPage ? '' : 'opacity-40'">← 上一页</button>
+          <button @click="goToPage(pagination.page + 1)" :disabled="!hasNextPage" class="px-3 py-1.5 border rounded-lg text-xs themed-border" :class="hasNextPage ? '' : 'opacity-40'">下一页 →</button>
+        </div>
+      </div>
+    </div>
+
+    <div x-show="show_form" class="fixed inset-0 z-50 flex items-center justify-center" x-cloak>
+      <div class="absolute inset-0 bg-black/50" @click="closeForm()"></div>
+      <div class="relative themed-card rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border themed-border">
+        <div class="px-6 py-4 themed-gradient-primary rounded-t-2xl flex justify-between">
+          <h3 class="text-lg font-bold text-white" x-text="is_edit ? '✏️ 编辑组合商品' : '➕ 新建组合商品'"></h3>
+          <button @click="closeForm()" class="text-white/80 hover:text-white text-xl">&times;</button>
+        </div>
+        <form @submit.prevent="submitForm()" class="px-6 py-5 space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div class="col-span-2"><label class="block text-xs font-semibold mb-1.5">item_name <span class="text-red-500">*</span></label><input type="text" x-model="form.exchange_item.item_name" required class="w-full px-3 py-2 text-sm border rounded-lg themed-border"></div>
+            <div class="col-span-2"><label class="block text-xs font-semibold mb-1.5">description</label><textarea x-model="form.exchange_item.description" rows="2" class="w-full px-3 py-2 text-sm border rounded-lg themed-border resize-none"></textarea></div>
+            <div>
+              <label class="block text-xs font-semibold mb-1.5">bundle_type</label>
+              <select x-model="form.bundle_type" class="w-full px-3 py-2 text-sm border rounded-lg themed-border">
+                <option value="suit">suit</option>
+                <option value="gift">gift</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold mb-1.5">status</label>
+              <select x-model="form.status" class="w-full px-3 py-2 text-sm border rounded-lg themed-border">
+                <option value="active">active</option>
+                <option value="inactive">inactive</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <label class="text-xs font-semibold">BOM 明细 <span class="text-red-500">*</span></label>
+              <button type="button" @click="addBomLine()" class="text-xs text-cyan-600 hover:underline">+ 添加行</button>
+            </div>
+            <template x-for="(line, idx) in form.items" :key="idx">
+              <div class="grid grid-cols-5 gap-2 mb-2 items-end">
+                <div><label class="text-xs themed-text-muted">child_item_id</label><input type="number" x-model="line.child_item_id" class="w-full px-2 py-1.5 text-sm border rounded themed-border"></div>
+                <div><label class="text-xs themed-text-muted">child_sku_id</label><input type="number" x-model="line.child_sku_id" class="w-full px-2 py-1.5 text-sm border rounded themed-border"></div>
+                <div><label class="text-xs themed-text-muted">quantity</label><input type="number" x-model="line.quantity" min="1" class="w-full px-2 py-1.5 text-sm border rounded themed-border"></div>
+                <div class="flex items-center gap-1 pt-4"><input type="checkbox" x-model="line.is_gift" :id="'gift-' + idx"><label :for="'gift-' + idx" class="text-xs">is_gift</label></div>
+                <button type="button" @click="removeBomLine(idx)" class="px-2 py-1.5 text-xs text-red-600 border rounded themed-border" :disabled="form.items.length <= 1">删除</button>
+              </div>
+            </template>
+          </div>
+          <div class="flex justify-end gap-3 pt-3 border-t themed-border">
+            <button type="button" @click="closeForm()" class="px-5 py-2.5 text-sm border rounded-lg themed-border">取消</button>
+            <button type="submit" :disabled="saving" class="px-5 py-2.5 text-sm themed-gradient-primary text-white rounded-lg disabled:opacity-50" x-text="is_edit ? '💾 保存' : '✅ 创建'"></button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div x-show="show_detail" class="fixed inset-0 z-50 flex items-center justify-center" x-cloak>
+      <div class="absolute inset-0 bg-black/50" @click="show_detail = false"></div>
+      <div class="relative themed-card rounded-2xl shadow-2xl w-full max-w-lg mx-4 border themed-border">
+        <div class="px-6 py-4 bg-gradient-to-r from-slate-700 to-slate-800 rounded-t-2xl flex justify-between">
+          <h3 class="text-lg font-bold text-white">📋 BOM 明细</h3>
+          <button @click="show_detail = false" class="text-white/80 hover:text-white text-xl">&times;</button>
+        </div>
+        <div class="px-6 py-5">
+          <p class="font-semibold mb-3" x-text="detail?.exchangeItem?.item_name"></p>
+          <table class="w-full text-sm border rounded">
+            <thead><tr class="bg-gray-50"><th class="px-2 py-1 text-left">子商品</th><th class="px-2 py-1">数量</th><th class="px-2 py-1">赠品</th></tr></thead>
+            <tbody>
+              <template x-for="i in (detail?.items || [])" :key="i.bundle_item_id || i.child_item_id">
+                <tr class="border-t"><td class="px-2 py-1" x-text="i.childItem?.item_name || i.child_item_id"></td><td class="px-2 py-1 text-center" x-text="i.quantity"></td><td class="px-2 py-1 text-center" x-text="i.is_gift ? '是' : '否'"></td></tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <div class="px-6 py-3 border-t themed-border flex justify-end">
+          <button @click="show_detail = false" class="px-4 py-2 text-sm border rounded-lg themed-border">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%- include('partials/footer') %>
+  <script type="module" src="./src/modules/market/pages/product-bundle-management.js"></script>
+</body>
+</html>

@@ -14,10 +14,13 @@
 const { initializeTestServiceManager } = require('../helpers/UnifiedTestManager')
 
 /**
- * 真实数据库快照：14 个 category
+ * 真实数据库快照：17 个 category
  * 任何新增/删除/重命名 category 都必须同步更新此列表
  * 2026-06-02 新增 dispute（方案A 二期：售后申诉自助发起防滥用风控配置）
  * 2026-06-06 移除 marketplace / auction（C2C 用户间交易/拍卖整体下线，残留运营配置随之清除）
+ * 2026-06-25 新增 premium（臻选空间解锁规则配置化，白名单 premium/*）
+ * 2026-07-09 新增 agreement（协议文档配置，白名单 agreement/*）
+ * 2026-07-10 新增 risk（风控异常检测阈值迁入配置中心，拍板⑱，白名单 risk/*）
  */
 const EXPECTED_CATEGORIES = [
   'points',
@@ -33,7 +36,10 @@ const EXPECTED_CATEGORIES = [
   'backpack',
   'ad_system',
   'customer_service',
-  'dispute'
+  'dispute',
+  'premium',
+  'agreement',
+  'risk'
 ].sort()
 
 describe('system_settings category 一致性合约', () => {

@@ -465,7 +465,119 @@ async function executeBusinessRecordReconciliation(cutoffDate = null) {
   }
 }
 
-module.exports = { executeReconciliation, executeBusinessRecordReconciliation, executeSpuSummaryReconciliation }
+/**
+ * 用户累计积分周对账（拍板⑭-(d)，2026-07-11 落地）
+ *
+ * 真相不变量：users.history_total_points ==「用户账户 + points 资产 + 正向入账」流水重算值
+ * （排除防复利名单 level_bonus_reward/activity_bonus_reward——加成笔可花不计等级，
+ *   与 BalanceService.HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES 同一口径；排除 is_invalid 流水）。
+ *
+ * 业务意义：history_total_points 是成长等级派生的单一数据源（发放线九档阶梯的定级依据），
+ * 字段被绕过 BalanceService 收口直改（如历史脚本/手工 SQL）会导致"等级凭空错了"的信任事故，
+ * 本对账每周比对字段值 vs 流水重算值，不一致即向管理员告警（只告警不自动改——
+ * history_total_points 与余额同属互锁数据，修复必须经人工判定走业务接口）。
+ *
+ * @param {Object} [options] - 选项
+ * @param {boolean} [options.standalone=false] - 独立运行模式（结束后关闭连接并 exit）
+ * @returns {Promise<Object>} 对账报告 { status, mismatch_count, mismatches, duration_ms }
+ */
+async function executeHistoryPointsReconciliation(options = {}) {
+  const { standalone = false } = options
+  const { sequelize } = require('../config/database')
+  const logger = require('../utils/logger').logger
+  const NotificationService = require('../services/NotificationService')
+  // 防复利排除名单唯一真相源（与 history_total_points 累加口径同源，杜绝两处名单漂移）
+  const { HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES } = require('../services/asset/BalanceService')
+  const start_time = Date.now()
+
+  try {
+    logger.info('[累计积分对账] 开始 users.history_total_points vs asset_transactions 重算比对')
+
+    const [mismatches] = await sequelize.query(
+      `SELECT u.user_id,
+              CAST(u.history_total_points AS SIGNED) AS field_value,
+              CAST(COALESCE(t.recalc, 0) AS SIGNED) AS recalc_value,
+              CAST(u.history_total_points - COALESCE(t.recalc, 0) AS SIGNED) AS diff
+       FROM users u
+       LEFT JOIN (
+         SELECT a.user_id, SUM(t.delta_amount) AS recalc
+         FROM asset_transactions t
+         JOIN accounts a ON a.account_id = t.account_id AND a.account_type = 'user'
+         WHERE t.asset_code = 'points'
+           AND t.delta_amount > 0
+           AND (t.is_invalid IS NULL OR t.is_invalid = 0)
+           AND t.business_type NOT IN (:excludedTypes)
+         GROUP BY a.user_id
+       ) t ON t.user_id = u.user_id
+       HAVING diff <> 0
+       ORDER BY ABS(diff) DESC
+       LIMIT 50`,
+      { replacements: { excludedTypes: HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES } }
+    )
+
+    const mismatch_count = mismatches.length
+    const report = {
+      status: mismatch_count === 0 ? 'OK' : 'WARNING',
+      mismatch_count,
+      mismatches: mismatches.map(m => ({
+        user_id: Number(m.user_id),
+        field_value: Number(m.field_value),
+        recalc_value: Number(m.recalc_value),
+        diff: Number(m.diff)
+      })),
+      duration_ms: Date.now() - start_time
+    }
+
+    console.log(
+      `\n=== 累计积分对账：${report.status}（${mismatch_count} 个用户不一致）===`
+    )
+    for (const m of report.mismatches.slice(0, 10)) {
+      console.log(
+        `  ⚠️ user_id=${m.user_id}: 字段=${m.field_value} 重算=${m.recalc_value} 差=${m.diff > 0 ? '+' : ''}${m.diff}`
+      )
+    }
+
+    if (mismatch_count > 0) {
+      logger.warn('[累计积分对账] 发现字段值与流水重算值不一致', report)
+      try {
+        await NotificationService.sendToAdmins({
+          type: 'history_points_reconciliation_alert',
+          title: '⚠️ 用户累计积分对账告警',
+          content: `发现 ${mismatch_count} 个用户的 history_total_points 与积分流水重算值不一致（影响成长等级派生），请人工核查处理`,
+          data: {
+            mismatch_count,
+            sample: report.mismatches.slice(0, 10),
+            excluded_business_types: HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES,
+            timestamp: new Date().toISOString()
+          }
+        })
+      } catch (notifyError) {
+        logger.error('[累计积分对账] 发送告警失败', { error: notifyError.message })
+      }
+    } else {
+      logger.info('[累计积分对账] 全部一致', report)
+    }
+
+    if (standalone) {
+      await sequelize.close()
+      process.exit(mismatch_count === 0 ? 0 : 1)
+    }
+    return report
+  } catch (error) {
+    logger.error('[累计积分对账] 执行失败', { error_message: error.message })
+    if (standalone) {
+      process.exit(1)
+    }
+    throw error
+  }
+}
+
+module.exports = {
+  executeReconciliation,
+  executeBusinessRecordReconciliation,
+  executeSpuSummaryReconciliation,
+  executeHistoryPointsReconciliation
+}
 
 // 独立运行模式
 if (require.main === module) {

@@ -746,6 +746,13 @@ class SettleStage extends BaseStage {
               item_description: prize.prize_description || `抽奖获得：${prize.prize_name}`,
               item_value: Math.round(parseFloat(prize.prize_value) || 0),
               prize_definition_id: prize.prize_definition_id,
+              /*
+               * 物品模板关联（拍板⑤修复，2026-07-10）：抽奖发奖曾是全库唯一漏写
+               * item_template_id 的铸造链路（兑换/换物/竞价均已正确写入）。
+               * 模板ID 由 LoadCampaignStage 从 prize_definitions.item_template_id 加载，
+               * 缺配置时为 null（不阻断发奖，由运营在奖品定义补挂模板）。
+               */
+              item_template_id: prize.item_template_id || null,
               rarity_code: prize.rarity_code || 'common',
               business_type: 'lottery_mint',
               idempotency_key: `${idempotency_key}:item`,

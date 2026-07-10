@@ -126,9 +126,17 @@ class DiyWorkService {
 
   /**
    * 获取作品详情
+   *
+   * 权限规则（拍板决议 11.8-②「分享即公开只读快照」）：
+   * - 作者：任意状态可读，返回完整数据
+   * - 非作者：仅 frozen / completed 状态可读（分享还原场景），返回脱敏版
+   *  （去 total_cost.price_snapshot / idempotency_key / account_id，
+   *    保留 design_data / template / preview_media / work_name）；
+   *   草稿（draft）与已取消（cancelled）作品非作者不可读，仍返回 403
+   *
    * @param {number} workId - diy_work_id
    * @param {number} accountId - 用户 account_id（权限校验）
-   * @returns {DiyWork} 作品详情
+   * @returns {DiyWork|Object} 作者返回模型实例；非作者返回脱敏后的普通对象
    */
   static async getWorkDetail(workId, accountId) {
     const work = await DiyWork.findByPk(workId, {
@@ -154,13 +162,53 @@ class DiyWorkService {
       error.statusCode = 404
       throw error
     }
-    if (Number(work.account_id) !== Number(accountId)) {
+
+    const isAuthor = Number(work.account_id) === Number(accountId)
+    if (isAuthor) {
+      return work
+    }
+
+    /* 非作者：仅冻结/已完成的作品可被分享还原（草稿不可读） */
+    const SHAREABLE_STATUSES = ['frozen', 'completed']
+    if (!SHAREABLE_STATUSES.includes(work.status)) {
       const error = new Error('无权访问该作品')
       error.statusCode = 403
       throw error
     }
 
-    return work
+    return DiyWorkService._toSharedWorkJSON(work)
+  }
+
+  /**
+   * 非作者分享还原的脱敏序列化（拍板决议 11.5-E）
+   *
+   * 移除敏感字段：
+   * - account_id（作者账户标识）
+   * - idempotency_key（幂等键，内部技术标识）
+   * - total_cost.price_snapshot（逐颗定价快照，只保留 payments 汇总供费用展示）
+   *
+   * @param {DiyWork} work - 作品模型实例（含 template / preview_media 关联）
+   * @returns {Object} 脱敏后的作品数据
+   * @private
+   */
+  static _toSharedWorkJSON(work) {
+    const plain = work.toJSON()
+    delete plain.account_id
+    delete plain.idempotency_key
+
+    if (plain.total_cost && !Array.isArray(plain.total_cost)) {
+      plain.total_cost = { payments: plain.total_cost.payments || [] }
+    }
+
+    /* 媒体字段收敛为安全输出（隐藏 object_key 等对象存储内部字段） */
+    plain.preview_media = work.preview_media ? work.preview_media.toSafeJSON() : null
+    if (plain.template) {
+      plain.template.base_image_media = work.template?.base_image_media
+        ? work.template.base_image_media.toSafeJSON()
+        : null
+    }
+
+    return plain
   }
 
   /**

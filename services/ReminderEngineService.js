@@ -195,6 +195,57 @@ const RULE_PROCESSORS = {
   },
 
   /**
+   * 日发放量告警检测（以物易物与会员成长等级功能启用方案 拍板⑭-(c)，2026-07-11）
+   *
+   * 业务场景：成长等级发放线上线后，等级加成使伪造小票收益放大（v9 顶档 1 元刷 1.5 分 +
+   * 预算 0.12），需监控"日加成积分发放量 / 日预算注入量"超阈值自动告警，
+   * 配合拍板⑬-(b)"九档倍数归一"应急回滚形成【发现 → 回滚】闭环。
+   *
+   * trigger_condition 结构（snake_case，运营在 reminder-rules 页配置）：
+   * - business_type: 监控的流水业务类型（如 level_bonus_reward / consumption_budget_allocation）
+   * - daily_threshold: 日发放量告警阈值（积分数，>0 才生效）
+   *
+   * 统计口径：今日（北京自然日，DB 会话时区 +08:00 故 CURDATE() 即北京日期）
+   * 用户账户该业务类型的正向流水总量（排除 is_invalid 作废流水）。
+   *
+   * @param {Object} rule - 提醒规则
+   * @returns {Promise<Object>} 检测结果 { matched, count, business_type, issued_today, daily_threshold }
+   */
+  issuance_alert: async rule => {
+    const { trigger_condition } = rule
+    const { business_type, daily_threshold } = trigger_condition || {}
+
+    const threshold = Number(daily_threshold)
+    if (!business_type || !Number.isFinite(threshold) || threshold <= 0) {
+      logger.warn(
+        `[提醒引擎] 发放量告警规则配置不完整（需 business_type + daily_threshold>0）: ${rule.rule_code}`
+      )
+      return { matched: false, count: 0, error: '规则配置不完整' }
+    }
+
+    const [[row]] = await models.sequelize.query(
+      `SELECT COALESCE(SUM(t.delta_amount), 0) AS issued_today
+       FROM asset_transactions t
+       JOIN accounts a ON a.account_id = t.account_id AND a.account_type = 'user'
+       WHERE t.business_type = :business_type
+         AND t.delta_amount > 0
+         AND (t.is_invalid IS NULL OR t.is_invalid = 0)
+         AND t.created_at >= CURDATE()`,
+      { replacements: { business_type } }
+    )
+    const issuedToday = Number(row.issued_today)
+    const matched = issuedToday >= threshold
+
+    return {
+      matched,
+      count: matched ? 1 : 0,
+      business_type,
+      issued_today: issuedToday,
+      daily_threshold: threshold
+    }
+  },
+
+  /**
    * 定时提醒（按时间触发）
    * @param {Object} rule - 提醒规则
    * @returns {Promise<Object>} 检测结果

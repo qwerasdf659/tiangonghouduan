@@ -65,6 +65,19 @@ function assetTransactionNoPlaceholder() {
 const BALANCE_SAFETY_LIMIT = 1_000_000_000
 
 /**
+ * history_total_points 累加排除的业务类型名单（防等级复利，拍板②-(d)/§2.4-3）
+ *
+ * 语义：名单内业务类型的积分入账"可花不计等级"——照常增加可用余额，
+ * 但不累计 users.history_total_points（成长等级派生的单一数据源）。
+ *
+ * - level_bonus_reward：消费审核发放的等级加成笔（发放线九档阶梯）
+ * - activity_bonus_reward：未来活动加成笔（拍板⑮-(b) 加法叠加，预留同名单）
+ *
+ * @constant {string[]}
+ */
+const HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES = ['level_bonus_reward', 'activity_bonus_reward']
+
+/**
  * 按活动分桶的资产码（lottery_campaign_id 隔离规则）
  *
  * - budget_points：预算积分（隐藏层成本，按活动隔离）
@@ -484,8 +497,18 @@ class BalanceService {
        * - 该字段语义为"用户在平台累计获得过多少积分"（单调只增，消费不扣减）。
        * - 与本笔流水在同一事务内原子完成；位于幂等早返回之后，重试不会重复累加。
        * - changeBalance 是积分变动的唯一写收口，故此处维护即可保证账本一致、无同步债。
+       *
+       * 防等级复利排除名单（拍板②-(d)"定级/奖励分离"，§2.4-3，2026-07-10）：
+       * - 等级/活动加成笔"可花不计等级"——加成积分照常入账可消费，但不累计
+       *   history_total_points，杜绝"高等级→加成多→更快升级"的复利循环。
+       * - 等级永远由"基础分≈真实消费"驱动（航空业"定级里程/奖励里程分离"同款）。
        */
-      if (asset_code === AssetCode.POINTS && account.account_type === 'user' && delta_amount > 0) {
+      if (
+        asset_code === AssetCode.POINTS &&
+        account.account_type === 'user' &&
+        delta_amount > 0 &&
+        !HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES.includes(business_type)
+      ) {
         await User.increment('history_total_points', {
           by: delta_amount,
           where: { user_id: account.user_id },
@@ -1433,3 +1456,4 @@ class BalanceService {
 
 module.exports = BalanceService
 module.exports.BALANCE_SAFETY_LIMIT = BALANCE_SAFETY_LIMIT
+module.exports.HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES = HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES

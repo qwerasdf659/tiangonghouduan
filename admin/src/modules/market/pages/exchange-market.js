@@ -31,7 +31,9 @@ import {
   useExchangeStatsState,
   useExchangeStatsMethods,
   useBarterRecipesState,
-  useBarterRecipesMethods
+  useBarterRecipesMethods,
+  useRedeemRequirementsState,
+  useRedeemRequirementsMethods
 } from '../composables/index.js'
 
 /**
@@ -123,6 +125,7 @@ document.addEventListener('alpine:init', () => {
       ...useExchangeOrdersState(),
       ...useExchangeStatsState(),
       ...useBarterRecipesState(),
+      ...useRedeemRequirementsState(),
 
       // ========== 市场统计 ==========
       /** 市场统计数据 - 直接使用后端字段名 */
@@ -407,6 +410,7 @@ document.addEventListener('alpine:init', () => {
       ...useExchangeOrdersMethods(),
       ...useExchangeStatsMethods(),
       ...useBarterRecipesMethods(),
+      ...useRedeemRequirementsMethods(),
 
       /**
        * 编辑 SKU 并同步 spec_values 到 JSON 字符串
@@ -719,6 +723,10 @@ document.addEventListener('alpine:init', () => {
           label: '商品',
           render: (val, row) => {
             if (row.source === 'diy') return '🎨 DIY 设计兑换'
+            // 以物易物订单：加来源标识（与 DIY 同款模式），商品名读 item_snapshot.item_name
+            if (row.source === 'barter') {
+              return `🔄 ${row.item_snapshot?.item_name || val || '以物易物'}`
+            }
             return row.item_snapshot?.item_name || val || '-'
           }
         },

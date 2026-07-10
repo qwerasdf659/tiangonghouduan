@@ -191,14 +191,25 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
         expect(response.body.data).toHaveProperty('balances')
         expect(Array.isArray(response.body.data.balances)).toBe(true)
 
-        // 如果有数据，验证每条记录的结构
+        /*
+         * 如果有数据，验证每条记录的结构。
+         * 口径决策（2026-06-28，routes/v4/assets/balance.js）：
+         * - POINTS：下发「可用 + 待审核消费积分」（pending_consumption_points），不含 frozen_amount
+         *   （待审核口径单一事实源 = consumption_records(status=pending)，不动资产账本冻结）；
+         * - 其他资产：保持 available/frozen 口径（frozen 为兑换/竞价/DIY 的真实锁定）。
+         */
         if (response.body.data.balances.length > 0) {
           response.body.data.balances.forEach(balance => {
             expect(balance).toHaveProperty('asset_code')
             expect(balance).toHaveProperty('available_amount')
-            expect(balance).toHaveProperty('frozen_amount')
             expect(balance).toHaveProperty('total_amount')
             expect(typeof balance.available_amount).toBe('number')
+            if (balance.asset_code === 'points') {
+              expect(balance).toHaveProperty('pending_consumption_points')
+              expect(balance).not.toHaveProperty('frozen_amount')
+            } else {
+              expect(balance).toHaveProperty('frozen_amount')
+            }
           })
         }
       })

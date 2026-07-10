@@ -29,6 +29,7 @@ const BalanceService = require('../asset/BalanceService')
 const ItemService = require('../asset/ItemService')
 const UserAddressService = require('../UserAddressService')
 const ExchangeItemService = require('./ExchangeItemService')
+const ProductBundleService = require('./ProductBundleService')
 const AttributeRuleEngine = require('../item/AttributeRuleEngine')
 const AssetProductGuard = require('../shared/AssetProductGuard')
 const { Op } = require('sequelize')
@@ -91,6 +92,12 @@ class CoreService {
      * 避免小程序列表/详情读到陈旧 SPU 库存。
      */
     this.exchangeItemService = new ExchangeItemService(models)
+    /*
+     * S4 组合商品服务（拍板 #18/#19/#22，2026-07-11 拍板执行）：
+     * 兑换下单命中组合 SPU 时按 BOM 拆解扣子项库存（组合本身不备货）、
+     * 退款按订单快照回补；组合识别与拆解逻辑集中在 ProductBundleService，本服务只做编排。
+     */
+    this.productBundleService = new ProductBundleService(models)
   }
 
   /**
@@ -275,7 +282,19 @@ class CoreService {
     if (!productSku) {
       throw new BusinessError('SKU 不存在或已停售', 'EXCHANGE_SKU_NOT_FOUND', 404)
     }
-    if (productSku.stock < quantity) {
+
+    /*
+     * S4 组合商品分流（拍板 #18：按 BOM 拆解扣子项库存，组合本身不备货）：
+     * 命中组合 SPU 时校验/扣减对象是 BOM 子项 SKU（resolveBundleForOrder 内含
+     * 子项 active 校验 #23 + 库存预检），组合自身 SKU 库存不参与校验与扣减。
+     */
+    const bundleOrder = await this.productBundleService.resolveBundleForOrder(
+      exchange_item_id,
+      quantity,
+      { transaction }
+    )
+
+    if (!bundleOrder && productSku.stock < quantity) {
       throw new BusinessError(
         `库存不足，当前库存：${productSku.stock}`,
         'EXCHANGE_STOCK_INSUFFICIENT',
@@ -488,7 +507,13 @@ class CoreService {
             description: itemDescription,
             cost_asset_code: costAssetCode,
             cost_amount: costAmount,
-            image_url: imageUrl
+            image_url: imageUrl,
+            /*
+             * S4 组合快照（拍板 #18/#22）：记录下单时刻解析出的 BOM 扣减清单，
+             * 供 a) 发货员整单拣货（知道要发哪些子项）；b) 退款按快照回补
+             * （BOM 事后可能被运营改动，回补以下单时刻为准）。非组合为 null。
+             */
+            bundle: bundleOrder
           },
           quantity,
           pay_asset_code: costAssetCode,
@@ -535,14 +560,29 @@ class CoreService {
     await record.reload({ transaction })
     const order_no = record.order_no
 
-    // 6. 扣减库存（ExchangeItem SKU）
-    await productSkuRecord.update(
-      {
-        stock: productSkuRecord.stock - quantity,
-        sold_count: (productSkuRecord.sold_count || 0) + quantity
-      },
-      { transaction }
-    )
+    /*
+     * 6. 扣减库存：
+     * - 普通商品：扣自身 SKU stock + 计销量；
+     * - S4 组合（拍板 #18/#19）：按 BOM 扣子项 SKU（赠品同扣不另计价），
+     *   组合自身 SKU 只计 sold_count（组合不备货，stock 不动）。
+     */
+    if (bundleOrder) {
+      await this.productBundleService.deductBundleStockForOrder(bundleOrder.items, quantity, {
+        transaction
+      })
+      await productSkuRecord.update(
+        { sold_count: (productSkuRecord.sold_count || 0) + quantity },
+        { transaction }
+      )
+    } else {
+      await productSkuRecord.update(
+        {
+          stock: productSkuRecord.stock - quantity,
+          sold_count: (productSkuRecord.sold_count || 0) + quantity
+        },
+        { transaction }
+      )
+    }
 
     /*
      * 回填 SPU 物化汇总列：库存权威在 exchange_item_skus，扣减 SKU 后必须同步
@@ -559,6 +599,8 @@ class CoreService {
     await record.save({ transaction })
 
     try {
+      // 组合单自身 SKU stock 不动（子项扣减日志由各 SKU 变动自身体现），delta 记 0
+      const ownStockDelta = bundleOrder ? 0 : -quantity
       await this.models.AdminOperationLog.create(
         {
           operator_id: null,
@@ -567,15 +609,24 @@ class CoreService {
           target_id: productSkuRecord.sku_id,
           action: 'purchase',
           before_data: { stock: productSkuRecord.stock, item_name: itemName },
-          after_data: { stock: productSkuRecord.stock - quantity, item_name: itemName },
+          after_data: { stock: productSkuRecord.stock + ownStockDelta, item_name: itemName },
           changed_fields: {
             stock: {
               from: productSkuRecord.stock,
-              to: productSkuRecord.stock - quantity,
-              delta: -quantity
-            }
+              to: productSkuRecord.stock + ownStockDelta,
+              delta: ownStockDelta
+            },
+            ...(bundleOrder
+              ? {
+                  bundle_children: bundleOrder.items.map(
+                    i => `sku:${i.resolved_sku_id}x${i.quantity * quantity}`
+                  )
+                }
+              : {})
           },
-          reason: `用户兑换扣减库存（数量：${quantity}）`,
+          reason: bundleOrder
+            ? `用户兑换组合商品（数量：${quantity}，BOM 拆解扣子项库存）`
+            : `用户兑换扣减库存（数量：${quantity}）`,
           risk_level: 'low',
           requires_approval: false,
           approval_status: 'not_required',
@@ -1366,6 +1417,31 @@ class CoreService {
   }
 
   /**
+   * 校验订单不是以物易物单（拍板⑩边界：换物成交即不可逆）
+   *
+   * 业务约束（换物快递履约改造后 barter 实物单进入 pending 发货链新增的守卫）：
+   * - 换物投入的旧物已通过 ItemService.consumeItem 真销毁（status='used' 不可复活）；
+   * - 换物订单 pay_amount=0（无货币支付），取消/拒绝/退款的"退还材料资产"语义不成立；
+   * - 故 barter 单成交后不可取消/拒绝/退款，只能沿发货链走完（pending→shipped→received）。
+   *   异常场景（如缺货）由运营线下与用户协商补偿，不走资金退还链路。
+   *
+   * @param {Object} order - ExchangeRecord 订单实例
+   * @param {string} action_name - 被拦截的动作名（用于错误提示，如"取消"/"拒绝"/"退款"）
+   * @throws {BusinessError} BARTER_ORDER_IRREVERSIBLE - 换物订单不可逆
+   * @returns {void} 校验通过无返回，违规抛 BusinessError(400)
+   * @private
+   */
+  _assertNotBarterOrder(order, action_name) {
+    if (order && order.source === 'barter') {
+      throw new BusinessError(
+        `以物易物订单不可${action_name}：投入旧物已核销销毁且无货币可退，请沿发货流程完成履约（异常请联系运营处理）`,
+        'BARTER_ORDER_IRREVERSIBLE',
+        400
+      )
+    }
+  }
+
+  /**
    * 用户取消订单（仅 pending 状态可取消，退还材料资产）
    *
    * 业务规则：
@@ -1404,6 +1480,9 @@ class CoreService {
       throw error
     }
 
+    // 以物易物订单禁取消（旧物已核销销毁不可复活、无货币可退，成交即必须履约）
+    this._assertNotBarterOrder(order, '取消')
+
     // F1 选 A：虚拟道具单买入即消耗、禁止退款（防止变相"官方回收"撞星石货币属性红线）
     await this._assertNotPropOrder(order, transaction)
 
@@ -1429,6 +1508,12 @@ class CoreService {
       },
       { transaction }
     )
+
+    /*
+     * 回补库存（2026-07-11 修复）：与下单扣减对称。
+     * 修复前取消只退材料资产不回补库存，pending 单取消后库存永久丢失。
+     */
+    await this._restoreOrderStock(order, 'cancel', { transaction })
 
     await order.update(
       {
@@ -1515,6 +1600,9 @@ class CoreService {
       throw error
     }
 
+    // 以物易物订单禁拒绝（旧物已核销销毁不可复活、无货币可退，须沿发货链履约）
+    this._assertNotBarterOrder(order, '拒绝')
+
     // F1 选 A：虚拟道具单买入即消耗、禁止退款
     await this._assertNotPropOrder(order, transaction)
 
@@ -1542,6 +1630,12 @@ class CoreService {
       },
       { transaction }
     )
+
+    /*
+     * 回补库存（2026-07-11 修复）：与下单扣减对称。
+     * 修复前拒绝只退材料资产不回补库存，pending 单被拒后库存永久丢失。
+     */
+    await this._restoreOrderStock(order, 'reject', { transaction })
 
     await order.update(
       {
@@ -1632,6 +1726,9 @@ class CoreService {
 
     const old_status = order.status
 
+    // 以物易物订单禁退款（pay_amount=0 无货币可退、旧物已销毁不可复活；异常由运营线下处理）
+    this._assertNotBarterOrder(order, '退款')
+
     // F1 选 A：虚拟道具单买入即消耗、禁止退款
     await this._assertNotPropOrder(order, transaction)
 
@@ -1664,75 +1761,8 @@ class CoreService {
       { transaction }
     )
 
-    // 恢复商品库存（退款回补）
-    const restoreItemId = order.exchange_item_id
-    if (restoreItemId) {
-      const quantity = order.quantity || 1
-      /*
-       * 库存权威在 exchange_item_skus：退款回补必须改对应 SKU 的 stock/sold_count，
-       * 再调 syncSpuSummary 回填 SPU 物化汇总列（exchange_items.stock/sold_count）。
-       * 修复前此处直接改 SPU exchange_items.stock、且未回补 SKU，会导致 SKU 与 SPU 库存对不上账。
-       */
-      const refundSku = order.sku_id
-        ? await this.ExchangeItemSku.findOne({
-            where: { sku_id: order.sku_id, exchange_item_id: restoreItemId },
-            lock: transaction.LOCK.UPDATE,
-            transaction
-          })
-        : null
-
-      if (refundSku) {
-        const beforeStock = refundSku.stock
-        await refundSku.update(
-          {
-            stock: refundSku.stock + quantity,
-            sold_count: Math.max(0, (refundSku.sold_count || 0) - quantity)
-          },
-          { transaction }
-        )
-
-        // 回填 SPU 物化汇总列（与兑换扣库存对称，同口径）
-        await this.exchangeItemService.syncSpuSummary(restoreItemId, transaction)
-
-        try {
-          await this.models.AdminOperationLog.create(
-            {
-              operator_id: null,
-              operation_type: 'stock_change',
-              target_type: 'product_sku',
-              target_id: refundSku.sku_id,
-              action: 'refund',
-              before_data: { stock: beforeStock, item_name: order.item_snapshot?.item_name },
-              after_data: {
-                stock: beforeStock + quantity,
-                item_name: order.item_snapshot?.item_name
-              },
-              changed_fields: {
-                stock: {
-                  from: beforeStock,
-                  to: beforeStock + quantity,
-                  delta: quantity
-                }
-              },
-              reason: `退款回补库存（订单：${order.exchange_record_id}，SKU：${refundSku.sku_id}，数量：${quantity}）`,
-              risk_level: 'low',
-              requires_approval: false,
-              approval_status: 'not_required',
-              affected_amount: quantity
-            },
-            { transaction }
-          )
-        } catch (logErr) {
-          logger.warn('[兑换市场] 库存变动日志记录失败', { error: logErr.message })
-        }
-      } else {
-        logger.warn('[兑换市场] 退款回补库存跳过：订单无可定位的 SKU', {
-          order_no,
-          exchange_item_id: restoreItemId,
-          sku_id: order.sku_id || null
-        })
-      }
-    }
+    // 恢复商品库存（退款回补，与取消/拒绝共用同一份回补逻辑）
+    await this._restoreOrderStock(order, 'refund', { transaction })
 
     await order.update(
       {
@@ -1821,19 +1851,42 @@ class CoreService {
     }
     const targetIsValuable = AssetProductGuard.isValuable(targetTemplate)
 
-    // ① 成长等级门槛
-    if (req.min_growth_level_key && this.UserGrowthLevel) {
+    /*
+     * ① 成长等级区间门槛（拍板⑪，2026-07-10 扩展为 min/max 区间）
+     * 组合语义：min 单配=及以上（高价值门槛）、max 单配=及以下（新人专享）、
+     * min=max=仅某等级（专属纪念品）、双 NULL=不限。
+     * 比较口径：按 user_growth_levels.sort_order 区间比较（等级高低的唯一权威排序）。
+     */
+    if ((req.min_growth_level_key || req.max_growth_level_key) && this.UserGrowthLevel) {
       const user = await this.models.User.findByPk(user_id, {
         attributes: ['user_id', 'history_total_points'],
         transaction
       })
       const levels = await this.UserGrowthLevel.getActiveLevels({ transaction })
-      const required = levels.find(l => l.level_key === req.min_growth_level_key)
-      const userPoints = Number(user?.history_total_points || 0)
-      if (required && userPoints < Number(required.min_history_points)) {
+      const userLevel = await this.UserGrowthLevel.resolveLevel(
+        Number(user?.history_total_points || 0),
+        { transaction }
+      )
+      const userSortOrder = userLevel ? Number(userLevel.sort_order) : -1
+
+      const minLevel = req.min_growth_level_key
+        ? levels.find(l => l.level_key === req.min_growth_level_key)
+        : null
+      if (minLevel && userSortOrder < Number(minLevel.sort_order)) {
         throw new BusinessError(
-          `成长等级不足：需达到「${required.level_name}」（累计积分 ${required.min_history_points}），当前 ${userPoints}`,
+          `成长等级不足：需达到「${minLevel.level_name}」及以上（累计积分 ${minLevel.min_history_points}），当前等级 ${userLevel ? userLevel.level_name : '无'}`,
           'REDEEM_GROWTH_LEVEL_INSUFFICIENT',
+          400
+        )
+      }
+
+      const maxLevel = req.max_growth_level_key
+        ? levels.find(l => l.level_key === req.max_growth_level_key)
+        : null
+      if (maxLevel && userSortOrder > Number(maxLevel.sort_order)) {
+        throw new BusinessError(
+          `超出等级上限：本商品为「${maxLevel.level_name}」及以下会员专享，当前等级 ${userLevel ? userLevel.level_name : '无'}`,
+          'REDEEM_GROWTH_LEVEL_EXCEEDED',
           400
         )
       }
@@ -2011,6 +2064,7 @@ class CoreService {
       exchange_item_id,
       sku_id = null,
       min_growth_level_key = null,
+      max_growth_level_key = null,
       extra_cost_assets = null,
       required_consume_items = null,
       required_badges = null,
@@ -2022,6 +2076,41 @@ class CoreService {
 
     if (!exchange_item_id) {
       throw new BusinessError('exchange_item_id 必填', 'REDEEM_REQ_INVALID_PARAMS', 400)
+    }
+
+    /*
+     * 等级门槛写入校验（拍板⑪ / §2.5-4）：
+     * - min/max 必须为启用中的 level_key（防配错死键）；
+     * - min.sort_order ≤ max.sort_order（防区间倒挂）。
+     */
+    if (min_growth_level_key || max_growth_level_key) {
+      const activeLevels = await this.UserGrowthLevel.getActiveLevels({ transaction })
+      const levelByKey = new Map(activeLevels.map(l => [l.level_key, l]))
+      if (min_growth_level_key && !levelByKey.has(min_growth_level_key)) {
+        throw new BusinessError(
+          `min_growth_level_key 非启用中的成长等级：${min_growth_level_key}`,
+          'REDEEM_REQ_INVALID_PARAMS',
+          400
+        )
+      }
+      if (max_growth_level_key && !levelByKey.has(max_growth_level_key)) {
+        throw new BusinessError(
+          `max_growth_level_key 非启用中的成长等级：${max_growth_level_key}`,
+          'REDEEM_REQ_INVALID_PARAMS',
+          400
+        )
+      }
+      if (min_growth_level_key && max_growth_level_key) {
+        const minSort = Number(levelByKey.get(min_growth_level_key).sort_order)
+        const maxSort = Number(levelByKey.get(max_growth_level_key).sort_order)
+        if (minSort > maxSort) {
+          throw new BusinessError(
+            `等级区间倒挂：min(${min_growth_level_key}) 高于 max(${max_growth_level_key})`,
+            'REDEEM_REQ_INVALID_PARAMS',
+            400
+          )
+        }
+      }
     }
 
     // 校验：目标商品存在；额外资产逐项过守卫（实物侧禁星石）
@@ -2047,6 +2136,7 @@ class CoreService {
       exchange_item_id,
       sku_id,
       min_growth_level_key,
+      max_growth_level_key,
       extra_cost_assets,
       required_consume_items,
       required_badges,
@@ -2093,6 +2183,130 @@ class CoreService {
     await record.destroy({ transaction })
     logger.info('[兑换市场] 门槛配置已删除', { exchange_redeem_requirement_id })
     return { exchange_redeem_requirement_id, deleted: true }
+  }
+
+  /**
+   * 订单逆向库存回补（退款/取消/拒绝共用，2026-07-11 修复）
+   *
+   * 修复背景：修复前仅管理员退款回补库存，用户取消 / 管理员拒绝只退材料资产、
+   * 不回补库存——pending 单取消后库存永久丢失。三条逆向路径统一走本方法。
+   *
+   * 回补规则（与下单扣减完全对称）：
+   * - 普通商品：SKU stock+quantity、sold_count-quantity，再 syncSpuSummary 回填 SPU 汇总；
+   * - S4 组合单（拍板 #18）：按订单快照（item_snapshot.bundle.items）回补子项 SKU
+   *   （BOM 事后可能被运营改动，以下单时刻扣减清单为准），组合自身 SKU 只回退 sold_count。
+   *
+   * @param {Object} order - 兑换订单记录（ExchangeRecord 实例）
+   * @param {string} action - 逆向动作标识（refund/cancel/reject，写操作日志用）
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 事务对象（必填）
+   * @returns {Promise<void>} 回补完成
+   * @private
+   */
+  async _restoreOrderStock(order, action, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'CoreService._restoreOrderStock')
+
+    const restoreItemId = order.exchange_item_id
+    if (!restoreItemId) return
+
+    const quantity = order.quantity || 1
+    const bundleSnapshot = order.item_snapshot?.bundle || null
+
+    if (bundleSnapshot && Array.isArray(bundleSnapshot.items)) {
+      // S4 组合单：按下单快照回补子项，组合自身 SKU 只回退销量（下单时 stock 未扣）
+      await this.productBundleService.restoreBundleStockFromSnapshot(
+        bundleSnapshot.items,
+        quantity,
+        { transaction }
+      )
+      const bundleOwnSku = order.sku_id
+        ? await this.ExchangeItemSku.findOne({
+            where: { sku_id: order.sku_id, exchange_item_id: restoreItemId },
+            lock: transaction.LOCK.UPDATE,
+            transaction
+          })
+        : null
+      if (bundleOwnSku) {
+        await bundleOwnSku.update(
+          { sold_count: Math.max(0, (bundleOwnSku.sold_count || 0) - quantity) },
+          { transaction }
+        )
+        await this.exchangeItemService.syncSpuSummary(restoreItemId, transaction)
+      }
+      logger.info('[兑换市场] 组合单按快照回补子项库存完成', {
+        order_no: order.order_no,
+        action,
+        bundle_id: bundleSnapshot.bundle_id,
+        children: bundleSnapshot.items.length
+      })
+      return
+    }
+
+    /*
+     * 普通商品：库存权威在 exchange_item_skus，回补必须改对应 SKU 的 stock/sold_count，
+     * 再调 syncSpuSummary 回填 SPU 物化汇总列（exchange_items.stock/sold_count）。
+     */
+    const restoreSku = order.sku_id
+      ? await this.ExchangeItemSku.findOne({
+          where: { sku_id: order.sku_id, exchange_item_id: restoreItemId },
+          lock: transaction.LOCK.UPDATE,
+          transaction
+        })
+      : null
+
+    if (!restoreSku) {
+      logger.warn('[兑换市场] 逆向回补库存跳过：订单无可定位的 SKU', {
+        order_no: order.order_no,
+        action,
+        exchange_item_id: restoreItemId,
+        sku_id: order.sku_id || null
+      })
+      return
+    }
+
+    const beforeStock = restoreSku.stock
+    await restoreSku.update(
+      {
+        stock: restoreSku.stock + quantity,
+        sold_count: Math.max(0, (restoreSku.sold_count || 0) - quantity)
+      },
+      { transaction }
+    )
+
+    // 回填 SPU 物化汇总列（与兑换扣库存对称，同口径）
+    await this.exchangeItemService.syncSpuSummary(restoreItemId, transaction)
+
+    try {
+      await this.models.AdminOperationLog.create(
+        {
+          operator_id: null,
+          operation_type: 'stock_change',
+          target_type: 'product_sku',
+          target_id: restoreSku.sku_id,
+          action,
+          before_data: { stock: beforeStock, item_name: order.item_snapshot?.item_name },
+          after_data: {
+            stock: beforeStock + quantity,
+            item_name: order.item_snapshot?.item_name
+          },
+          changed_fields: {
+            stock: {
+              from: beforeStock,
+              to: beforeStock + quantity,
+              delta: quantity
+            }
+          },
+          reason: `订单逆向回补库存（动作：${action}，订单：${order.exchange_record_id}，SKU：${restoreSku.sku_id}，数量：${quantity}）`,
+          risk_level: 'low',
+          requires_approval: false,
+          approval_status: 'not_required',
+          affected_amount: quantity
+        },
+        { transaction }
+      )
+    } catch (logErr) {
+      logger.warn('[兑换市场] 库存变动日志记录失败', { error: logErr.message })
+    }
   }
 
   /**

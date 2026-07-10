@@ -13,21 +13,58 @@ const logger = require('../../utils/logger').logger
 const OrderNoGenerator = require('../../utils/OrderNoGenerator')
 const { DiyTemplate, DiyWork, Category, MediaFile } = require('../../models')
 
+/**
+ * 用户端模板序列化（数据最小化，拍板决议 11.5-D）
+ *
+ * preview_media / base_image_media 用 MediaFile.toSafeJSON() 输出：
+ * 隐藏 object_key / uploaded_by / thumbnail_keys（对象存储 key 非 URL），
+ * 补齐 public_url + thumbnails.w375/w750/w1080 衍生图 URL（前端降级链数据源）。
+ * 其余模板字段（layout/bead_rules/sizing_rules/capacity_rules 等）原样下发。
+ *
+ * @param {DiyTemplate} template - 模板模型实例（含媒体关联）
+ * @returns {Object} 用户端安全的模板数据
+ */
+function toUserTemplateJSON(template) {
+  const plain = template.toJSON()
+  plain.preview_media = template.preview_media ? template.preview_media.toSafeJSON() : null
+  plain.base_image_media = template.base_image_media ? template.base_image_media.toSafeJSON() : null
+  return plain
+}
+
 /** DIY 款式模板管理服务 */
 class DiyTemplateService {
   /**
    * 获取模板列表（分页/筛选）
-   * @param {Object} params - { page, page_size, status, is_enabled, category_id, keyword }
+   *
+   * 完备度快捷筛选（拍板决议 11.6-4 P0，配合完备度卡片做成运营工作清单）：
+   * - missing_preview=true     缺预览图模板（preview_media_id IS NULL）
+   * - missing_base_image=true  缺底图模板（base_image_media_id IS NULL）
+   *
+   * @param {Object} params - { page, page_size, status, is_enabled, category_id, keyword,
+   *   missing_preview, missing_base_image }
    * @returns {{ rows: DiyTemplate[], count: number }} 分页模板列表
    */
   static async getTemplateList(params = {}) {
-    const { page = 1, page_size = 20, status, is_enabled, category_id, keyword } = params
+    const {
+      page = 1,
+      page_size = 20,
+      status,
+      is_enabled,
+      category_id,
+      keyword,
+      missing_preview,
+      missing_base_image
+    } = params
 
     const where = {}
     if (status) where.status = status
     if (is_enabled !== undefined) where.is_enabled = is_enabled
     if (category_id) where.category_id = category_id
     if (keyword) where.display_name = { [Op.like]: `%${keyword}%` }
+    if (missing_preview === 'true' || missing_preview === true) where.preview_media_id = null
+    if (missing_base_image === 'true' || missing_base_image === true) {
+      where.base_image_media_id = null
+    }
 
     return DiyTemplate.findAndCountAll({
       where,
@@ -269,10 +306,13 @@ class DiyTemplateService {
 
   /**
    * 获取用户端模板列表（仅返回已发布+已启用的模板，按分类分组）
-   * @returns {DiyTemplate[]} 用户可见的模板列表
+   *
+   * 输出经 toUserTemplateJSON 收敛（媒体字段数据最小化，拍板决议 11.5-D）
+   *
+   * @returns {Object[]} 用户可见的模板列表（安全序列化后的普通对象）
    */
   static async getUserTemplates() {
-    return DiyTemplate.findAll({
+    const templates = await DiyTemplate.findAll({
       where: { status: 'published', is_enabled: true },
       include: [
         {
@@ -288,6 +328,22 @@ class DiyTemplateService {
         ['diy_template_id', 'ASC']
       ]
     })
+
+    return templates.map(toUserTemplateJSON)
+  }
+
+  /**
+   * 获取用户端模板详情（小程序端专用）
+   *
+   * 与管理端 getTemplateDetail 的区别（拍板决议 11.5-D：管理端接口不变）：
+   * - 媒体字段经 toUserTemplateJSON 收敛（隐藏 object_key，补衍生图 URL）
+   *
+   * @param {number} templateId - diy_template_id
+   * @returns {Object} 用户端安全的模板详情
+   */
+  static async getUserTemplateDetail(templateId) {
+    const template = await DiyTemplateService.getTemplateDetail(templateId)
+    return toUserTemplateJSON(template)
   }
 }
 

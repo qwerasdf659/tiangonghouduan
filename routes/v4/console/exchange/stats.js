@@ -41,4 +41,23 @@ router.get(
   })
 )
 
+/**
+ * GET /barter - 换物运营看板统计（P2-5，拍板⑫）
+ *
+ * @route GET /api/v4/console/exchange/stats/barter?days=30
+ * @description barter 订单量趋势、按配方兑换统计、旧物销毁量、发货状态分布
+ * @security JWT + Admin权限
+ */
+router.get(
+  '/barter',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { days = 30 } = req.query
+    const BarterService = req.app.locals.services.getService('exchange_barter')
+    const stats = await BarterService.getBarterStats({ days })
+    return res.apiSuccess(stats, '换物运营统计数据查询成功')
+  })
+)
+
 module.exports = router

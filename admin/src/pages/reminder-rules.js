@@ -205,7 +205,8 @@ function reminderRulesPage() {
     editMode: false,
     saving: false,
     form: {
-      rule_type: 'budget',
+      // 默认类型取后端枚举合法值（budget_alert，此前 'budget' 为后端不存在的假值）
+      rule_type: 'budget_alert',
       rule_name: '',
       description: '',
       priority: 50,
@@ -215,14 +216,20 @@ function reminderRulesPage() {
       actions: {}
     },
 
-    // 规则类型选项
+    /*
+     * 规则类型选项（以后端为权威：与 models/ReminderRule.js RULE_TYPES 枚举一一对应，
+     * 中文名与字典表 reminder_rule_type 一致。2026-07-11 修正：此前为 budget/inventory
+     * 等一套后端不存在的值，创建/编辑规则时 rule_type 无法匹配后端枚举）
+     */
     ruleTypes: [
-      { value: 'budget', label: '预算提醒' },
-      { value: 'inventory', label: '库存提醒' },
-      { value: 'performance', label: '性能提醒' },
-      { value: 'security', label: '安全提醒' },
-      { value: 'business', label: '业务提醒' },
-      { value: 'system', label: '系统提醒' }
+      { value: 'pending_timeout', label: '待处理超时' },
+      { value: 'stock_low', label: '库存不足' },
+      { value: 'budget_alert', label: '预算告警' },
+      { value: 'activity_status', label: '活动状态变更' },
+      { value: 'anomaly_detect', label: '异常检测' },
+      { value: 'scheduled', label: '定时提醒' },
+      { value: 'custom', label: '自定义规则' },
+      { value: 'issuance_alert', label: '发放量告警' }
     ],
 
     /**
@@ -261,7 +268,8 @@ function reminderRulesPage() {
     openCreateModal() {
       this.editMode = false
       this.form = {
-        rule_type: 'budget',
+        // 默认类型取后端枚举合法值（budget_alert）
+        rule_type: 'budget_alert',
         rule_name: '',
         description: '',
         priority: 50,

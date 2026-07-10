@@ -25,7 +25,8 @@ const RULE_TYPES = {
   ACTIVITY_STATUS: 'activity_status', // 活动状态变更
   ANOMALY_DETECT: 'anomaly_detect', // 异常检测
   SCHEDULED: 'scheduled', // 定时提醒
-  CUSTOM: 'custom' // 自定义规则
+  CUSTOM: 'custom', // 自定义规则
+  ISSUANCE_ALERT: 'issuance_alert' // 日资产发放量告警（等级加成/预算注入超阈值，拍板⑭-(c)）
 }
 
 /**

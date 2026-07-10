@@ -538,4 +538,68 @@ describe('ConsumptionService - 消费记录服务', () => {
       }
     })
   })
+
+  /*
+   * ============================================================
+   * 发放组合器加成规则（拍板②⑮ / §2.4，2026-07-11 活动加成落地）
+   * _buildBonusRules 为纯函数（入参=消费记录锁定值，出参=加成规则列表），
+   * 直接按业务规则断言：加法叠加、独立成笔、总倍数硬封顶 3.0（等级优先、活动让位截断）。
+   * ============================================================
+   */
+  describe('发放组合器加成规则（_buildBonusRules）', () => {
+    /** 被测静态类（与 merchantSubmitConsumption 同一 CoreService） */
+    const CoreService = require('../../services/consumption/CoreService')
+
+    it('等级倍数 1.10：应产出 level_bonus_reward 一笔（基础×0.10）', () => {
+      const rules = CoreService._buildBonusRules({
+        points_to_award: 2000,
+        consumption_amount: 2000,
+        earn_multiplier_locked: 1.1,
+        activity_bonus_rate_locked: null
+      })
+      expect(rules).toHaveLength(1)
+      expect(rules[0].business_type).toBe('level_bonus_reward')
+      expect(rules[0].amount).toBe(200) // round(2000 × 0.10)
+    })
+
+    it('等级 1.50 + 活动 0.20：应加法叠加两笔独立流水', () => {
+      const rules = CoreService._buildBonusRules({
+        points_to_award: 1000,
+        consumption_amount: 1000,
+        earn_multiplier_locked: 1.5,
+        activity_bonus_rate_locked: 0.2
+      })
+      expect(rules).toHaveLength(2)
+      expect(rules[0].business_type).toBe('level_bonus_reward')
+      expect(rules[0].amount).toBe(500) // round(1000 × 0.50)
+      expect(rules[1].business_type).toBe('activity_bonus_reward')
+      expect(rules[1].amount).toBe(200) // round(1000 × 0.20)，各加成独立按基础分计算
+    })
+
+    it('总倍数硬封顶 3.0：等级 1.50 + 活动 1.80 时活动率应被截断到剩余空间 1.50', () => {
+      const rules = CoreService._buildBonusRules({
+        points_to_award: 1000,
+        consumption_amount: 1000,
+        earn_multiplier_locked: 1.5,
+        activity_bonus_rate_locked: 1.8
+      })
+      // 加成率合计封顶 2.0（总倍数 3.0）：等级占 0.5，活动被截为 1.5
+      expect(rules).toHaveLength(2)
+      expect(rules[1].business_type).toBe('activity_bonus_reward')
+      expect(rules[1].rate).toBeCloseTo(1.5)
+      expect(rules[1].amount).toBe(1500)
+      const totalBonus = rules.reduce((sum, r) => sum + r.amount, 0)
+      expect(totalBonus).toBe(2000) // 基础 1000 + 加成 2000 = 总 3000 = 基础 × 3.0
+    })
+
+    it('锁定值为 NULL（存量记录/无活动）：应无任何加成笔，行为与现状一致', () => {
+      const rules = CoreService._buildBonusRules({
+        points_to_award: 1000,
+        consumption_amount: 1000,
+        earn_multiplier_locked: null,
+        activity_bonus_rate_locked: null
+      })
+      expect(rules).toHaveLength(0)
+    })
+  })
 })

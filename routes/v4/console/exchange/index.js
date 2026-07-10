@@ -32,6 +32,21 @@ router.use('/suppliers', require('./suppliers'))
 /** 产品系列管理（商品编码体系 §3.6：可读系列号轨道，系列 CRUD） */
 router.use('/product-series', require('./product-series'))
 
+/** S1 采购单管理（进货管理） */
+router.use('/purchase-orders', require('./purchase-orders'))
+
+/** S2 产品批次管理（一批一码） */
+router.use('/product-batches', require('./product-batches'))
+
+/** S4 组合商品管理（套装/赠品 BOM） */
+router.use('/product-bundles', require('./product-bundles'))
+
+/** S5 外部渠道映射（淘宝/抖音等分销） */
+router.use('/channel-mappings', require('./channel-mappings'))
+
+/** S3 二手寄卖管理（反向资产流，需风控评审） */
+router.use('/consignments', require('./consignments'))
+
 /** 商品运营操作（置顶、推荐、批量操作、缺图、绑图） */
 router.use('/', require('./operations'))
 

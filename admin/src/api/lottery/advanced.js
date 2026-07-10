@@ -37,6 +37,7 @@ export const LOTTERY_ADVANCED_ENDPOINTS = {
 
   // 成长等级公示分级概率（B 线，2026-06-04 合规改造；per-user 暗箱干预已下线）
   GROWTH_LEVELS_LIST: `${API_PREFIX}/console/lottery-management/growth-levels`,
+  GROWTH_LEVEL_UPDATE: `${API_PREFIX}/console/lottery-management/growth-levels/:user_growth_level_id`,
   LEVEL_PROBABILITY_GET: `${API_PREFIX}/console/lottery-management/level-probability/:lottery_campaign_id`,
   LEVEL_PROBABILITY_UPDATE: `${API_PREFIX}/console/lottery-management/level-probability/:lottery_campaign_id`,
 
@@ -193,11 +194,22 @@ export const LotteryAdvancedAPI = {
   /**
    * 获取成长等级阶梯定义（公示）
    * @param {Object} [params={}] - 查询参数（如 include_inactive）
-   * @returns {Promise<Object>} { levels: [{level_key, level_name, min_history_points, sort_order, status, description}] }
+   * @returns {Promise<Object>} { levels: [{level_key, level_name, min_history_points, earn_multiplier, sort_order, status, description}] }
    */
   async getGrowthLevels(params = {}) {
     const url = LOTTERY_ADVANCED_ENDPOINTS.GROWTH_LEVELS_LIST + buildQueryString(params)
     return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 更新成长等级定义（阈值/展示名/发放倍数/状态，拍板①②⑧）
+   * @param {number} user_growth_level_id - 成长等级主键
+   * @param {Object} data - 可更新字段 { level_name?, min_history_points?, earn_multiplier?, sort_order?, status?, description? }
+   * @returns {Promise<Object>} 更新后的等级定义
+   */
+  async updateGrowthLevel(user_growth_level_id, data) {
+    const url = buildURL(LOTTERY_ADVANCED_ENDPOINTS.GROWTH_LEVEL_UPDATE, { user_growth_level_id })
+    return await request({ url, method: 'PUT', data })
   },
 
   /**

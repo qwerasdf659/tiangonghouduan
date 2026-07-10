@@ -81,6 +81,7 @@ const pageConfigs = {
   'diy-material-management': { title: 'DIY珠子素材管理', pageIcon: '🔮', pageTitle: 'DIY珠子素材管理' },
   'diy-work-management': { title: 'DIY用户作品管理', pageIcon: '🎨', pageTitle: 'DIY用户作品管理' },
   'diy-slot-editor': { title: 'DIY槽位标注编辑器', pageIcon: '✏️', pageTitle: 'DIY槽位标注编辑器' },
+  'diy-dashboard': { title: 'DIY数据看板', pageIcon: '📈', pageTitle: 'DIY数据看板' },
 
   // 奖品目录管理（2026-05-26 集中奖品目录方案）
   'prize-definitions': { title: '奖品目录管理', pageIcon: '🏆', pageTitle: '奖品目录管理' },
@@ -94,6 +95,16 @@ const pageConfigs = {
   // 商品编码体系（2026-07-06 供应商/系列管理）
   'supplier-management': { title: '供应商管理', pageIcon: '🏭', pageTitle: '供应商管理' },
   'product-series-management': { title: '产品系列管理', pageIcon: '📚', pageTitle: '产品系列管理' },
+
+  // S1–S5 商品体系（2026-07-10 §17 落地）
+  'purchase-order-management': { title: '采购单管理', pageIcon: '📦', pageTitle: '采购单管理' },
+  'product-batch-management': { title: '产品批次管理', pageIcon: '🏷️', pageTitle: '产品批次管理' },
+  'product-bundle-management': { title: '组合商品管理', pageIcon: '🎁', pageTitle: '组合商品管理' },
+  'channel-mapping-management': { title: '渠道映射管理', pageIcon: '🔗', pageTitle: '渠道映射管理' },
+  'consignment-management': { title: '寄卖管理', pageIcon: '♻️', pageTitle: '寄卖管理' },
+
+  // 成长等级看板（2026-07-10 会员成长等级功能启用 P0-3/P1-4）
+  'growth-level-dashboard': { title: '成长等级看板', pageIcon: '👑', pageTitle: '成长等级看板' },
 
   // 默认配置
   'default': { title: '管理后台', pageIcon: '🏠', pageTitle: '管理后台' }

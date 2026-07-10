@@ -21,9 +21,11 @@
 
 const express = require('express')
 const router = express.Router()
+const { Op } = require('sequelize')
 const { authenticateToken, getUserRoles } = require('../../../middleware/auth')
 const { asyncHandler } = require('../../../middleware/validation')
 const TransactionManager = require('../../../utils/TransactionManager')
+const BeijingTimeHelper = require('../../../utils/timeHelper')
 const logger = require('../../../utils/logger').logger
 
 /**
@@ -420,6 +422,162 @@ router.post(
         instructions
       },
       result.is_duplicate ? '物品已使用（幂等回放）' : '物品使用成功'
+    )
+  })
+)
+
+/**
+ * POST /api/v4/backpack/items/:item_id/transfer
+ *
+ * @description 用户转赠物品给其他用户（S3 拍板 #35：免审核 + 每用户每日限额）
+ * @access Private（仅物品所有者可操作）
+ *
+ * 业务规则（S1-S5 拍板清单 #35，2026-07-09 定稿）：
+ * - 免审核，限额每用户每日 N 次（系统配置 exchange/gift_transfer_daily_limit，默认 5，0=关闭）
+ * - 全程 item_ledger 双录 + 幂等键（复用 ItemService.transferItem，business_type='gift_transfer'）
+ * - 仅 available 状态物品可转赠（held/used/expired/destroyed 均拒绝）
+ * - 接收方通过 target_user_id 或 target_mobile 指定（手机号走盲索引查询，明文不落库）
+ *
+ * Body: { target_user_id? | target_mobile?, remark? }
+ *
+ * @returns {Object} { item_id, tracking_code, to_user_id, is_duplicate, remaining_today }
+ */
+router.post(
+  '/items/:item_id/transfer',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const user_id = req.user.user_id
+    const itemId = parseInt(req.params.item_id, 10)
+    if (isNaN(itemId) || itemId <= 0) {
+      return res.apiError('无效的物品ID', 'BAD_REQUEST', null, 400)
+    }
+
+    const { target_user_id, target_mobile, remark } = req.body || {}
+    if (!target_user_id && !target_mobile) {
+      return res.apiError(
+        '请指定接收人（target_user_id 或 target_mobile）',
+        'BAD_REQUEST',
+        null,
+        400
+      )
+    }
+
+    const models = req.app.locals.models
+    const ItemService = req.app.locals.services.getService('asset_item')
+    const BackpackService = req.app.locals.services.getService('backpack')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
+
+    // 每日限额（拍板 #35：默认 5 次/日，运营可调，0=关闭转赠）
+    const dailyLimit = Number(
+      await AdminSystemService.getSettingValue('exchange', 'gift_transfer_daily_limit', 5)
+    )
+    if (dailyLimit <= 0) {
+      return res.apiError('转赠功能当前未开放', 'GIFT_TRANSFER_DISABLED', null, 403)
+    }
+
+    // 解析接收人（手机号走盲索引，明文不落查询条件）
+    let targetUser = null
+    if (target_user_id) {
+      targetUser = await models.User.findOne({
+        where: { user_id: parseInt(target_user_id, 10), status: 'active' }
+      })
+    } else {
+      targetUser = await models.User.findByMobile(String(target_mobile).trim())
+    }
+    if (!targetUser) {
+      return res.apiError('接收人不存在或已停用', 'GIFT_TRANSFER_TARGET_NOT_FOUND', null, 404)
+    }
+    if (targetUser.user_id === user_id) {
+      return res.apiError('不能转赠给自己', 'GIFT_TRANSFER_SELF_FORBIDDEN', null, 400)
+    }
+
+    const result = await TransactionManager.execute(async transaction => {
+      // 1. 所有权校验（与 /use 同一份逻辑；非本人物品统一按 404 处理，不泄露存在性）
+      let itemDetail = null
+      try {
+        itemDetail = await BackpackService.getItemDetail(itemId, {
+          viewer_user_id: user_id,
+          has_admin_access: false,
+          transaction
+        })
+      } catch (detailErr) {
+        if (detailErr.code === 'FORBIDDEN') {
+          itemDetail = null
+        } else {
+          throw detailErr
+        }
+      }
+      if (!itemDetail) {
+        const notFoundError = new Error('物品不存在或不属于你')
+        notFoundError.statusCode = 404
+        throw notFoundError
+      }
+
+      // 2. 仅 available 可转赠（held 是锁定中，比 transferItem 内部校验更严）
+      if (itemDetail.status !== 'available') {
+        const statusError = new Error(`物品当前状态为"${itemDetail.status}"，无法转赠`)
+        statusError.statusCode = 400
+        throw statusError
+      }
+
+      // 3. 每日限额：按发起人账户当天 gift_transfer 转出流水计数（账本即真相，无独立计数器）
+      const senderAccount = await models.Account.findOne({
+        where: { user_id },
+        transaction
+      })
+      const todayCount = await models.ItemLedger.count({
+        where: {
+          account_id: senderAccount.account_id,
+          event_type: 'transfer',
+          business_type: 'gift_transfer',
+          delta: -1,
+          created_at: { [Op.gte]: BeijingTimeHelper.todayStart() }
+        },
+        transaction
+      })
+      if (todayCount >= dailyLimit) {
+        const limitError = new Error(`今日转赠次数已达上限（${dailyLimit} 次/日）`)
+        limitError.statusCode = 429
+        limitError.errorCode = 'GIFT_TRANSFER_DAILY_LIMIT'
+        throw limitError
+      }
+
+      // 4. 执行转移（item_ledger 双录 + 幂等键，复用现有资产核心服务）
+      const transferResult = await ItemService.transferItem(
+        {
+          item_id: itemId,
+          new_owner_user_id: targetUser.user_id,
+          business_type: 'gift_transfer',
+          idempotency_key: `gift_${itemId}_${user_id}_${Date.now()}`,
+          meta: {
+            source: 'backpack_gift',
+            from_user_id: user_id,
+            to_user_id: targetUser.user_id,
+            remark: remark ? String(remark).slice(0, 200) : null
+          }
+        },
+        { transaction }
+      )
+
+      return { transferResult, remaining_today: dailyLimit - todayCount - 1 }
+    })
+
+    logger.info('用户转赠物品成功', {
+      from_user_id: user_id,
+      to_user_id: targetUser.user_id,
+      item_id: itemId,
+      is_duplicate: result.transferResult.is_duplicate
+    })
+
+    return res.apiSuccess(
+      {
+        item_id: itemId,
+        tracking_code: result.transferResult.item?.tracking_code || null,
+        to_user_id: targetUser.user_id,
+        is_duplicate: result.transferResult.is_duplicate,
+        remaining_today: Math.max(0, result.remaining_today)
+      },
+      result.transferResult.is_duplicate ? '物品已转赠（幂等回放）' : '转赠成功'
     )
   })
 )

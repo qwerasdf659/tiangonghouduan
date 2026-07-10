@@ -280,7 +280,10 @@ class ScheduledTasks {
     // 任务42: 每天凌晨3:20执行兑换商品 SPU 物化列对账（议题1·拍板项③：冗余列方案标准兜底）
     this.scheduleDailySpuSummaryReconciliation()
 
-    logger.info('所有定时任务已初始化完成（包含统一对账+物品锁定过期释放+市场价格快照+数据自动清理+定时上下架+库存预警+DIY超时解冻+SPU物化列对账）')
+    // 任务43: 每周一凌晨4:00执行用户累计积分周对账（成长等级方案 拍板⑭-(d)）
+    this.scheduleWeeklyHistoryPointsReconciliation()
+
+    logger.info('所有定时任务已初始化完成（包含统一对账+物品锁定过期释放+市场价格快照+数据自动清理+定时上下架+库存预警+DIY超时解冻+SPU物化列对账+累计积分周对账）')
   }
 
   /**
@@ -2857,6 +2860,50 @@ class ScheduledTasks {
     })
 
     logger.info('✅ 定时任务已设置: 兑换商品 SPU 物化列对账（每天凌晨3:20执行）')
+  }
+
+  /**
+   * 任务43: 用户累计积分周对账（以物易物与会员成长等级功能启用方案 拍板⑭-(d)）
+   * Cron表达式: 0 4 * * 1（每周一凌晨4:00）
+   *
+   * 比对 users.history_total_points（成长等级派生的单一数据源）与 asset_transactions
+   * 重算值（用户账户正向 points 流水，排除防复利名单 level_bonus_reward/activity_bonus_reward），
+   * 不一致向管理员告警——防"等级凭空错了"信任事故。只告警不自动修（互锁数据须人工判定）。
+   *
+   * @since 2026-07-11
+   * @returns {void}
+   */
+  static scheduleWeeklyHistoryPointsReconciliation() {
+    cron.schedule('0 4 * * 1', async () => {
+      try {
+        // R1 双保险：与其它对账任务同款，withLock 防止多机重复执行
+        await distributedLock.withLock(
+          'weekly_history_points_reconciliation',
+          async () => {
+            logger.info('[定时任务] 开始执行用户累计积分周对账...')
+
+            const { executeHistoryPointsReconciliation } = require('../../scripts/reconcile-items')
+            const report = await executeHistoryPointsReconciliation()
+
+            if (report.status === 'OK') {
+              logger.info('[定时任务] 累计积分周对账完成：全部一致', report)
+            } else {
+              logger.warn('[定时任务] 累计积分周对账完成：存在不一致（已告警管理员）', {
+                mismatch_count: report.mismatch_count
+              })
+            }
+          },
+          { ttl: 300000 }
+        )
+      } catch (error) {
+        logger.error('[定时任务] 累计积分周对账执行失败', {
+          error: error.message,
+          stack: error.stack
+        })
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 用户累计积分周对账（每周一凌晨4:00执行）')
   }
 
   /**

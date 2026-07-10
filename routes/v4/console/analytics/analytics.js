@@ -136,4 +136,40 @@ router.get(
   })
 )
 
+/**
+ * GET /growth-level/distribution - 成长等级分布看板（P0-3，拍板⑫）
+ *
+ * @description 各档人数分布、本月升级人数、各档累计消费贡献——等级阈值调整的数据依据
+ * @route GET /api/v4/console/analytics/growth-level/distribution
+ * @access Private (需要管理员权限)
+ */
+router.get(
+  '/growth-level/distribution',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const growthLevelService = req.app.locals.services.getService('user_growth_level')
+    const distribution = await growthLevelService.getLevelDistribution()
+    return res.apiSuccess(distribution, '成长等级分布数据获取成功')
+  })
+)
+
+/**
+ * GET /growth-level/cost - 成长等级成本看板（P1-4，拍板⑫）
+ *
+ * @description 等级加成发放量（按日/按档）、预算注入量、加成成本占营收比、积分负债余额监控
+ *              （拍板⑰积分永不过期口径下负债只增不销，此监控为唯一财务闸口）
+ * @route GET /api/v4/console/analytics/growth-level/cost?days=30
+ * @access Private (需要管理员权限)
+ */
+router.get(
+  '/growth-level/cost',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const { days = 30 } = req.query
+    const growthLevelService = req.app.locals.services.getService('user_growth_level')
+    const report = await growthLevelService.getLevelCostReport({ days })
+    return res.apiSuccess(report, '成长等级成本数据获取成功')
+  })
+)
+
 module.exports = router

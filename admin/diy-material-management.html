@@ -23,24 +23,50 @@
 
     <div x-cloak class="space-y-6">
 
-      <!-- 统计卡片 -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <!-- P0 数据完备度卡片（点击带筛选过滤，运营录数工作清单，拍板决议 11.6-4） -->
+      <div x-show="completeness" class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="bg-white rounded-xl shadow p-4">
           <div class="text-xs text-gray-500">素材总数</div>
-          <div class="text-2xl font-bold text-blue-600 mt-1" x-text="total"></div>
+          <div class="text-2xl font-bold text-blue-600 mt-1" x-text="completeness?.total ?? total"></div>
+          <div class="text-xs text-gray-400 mt-1">已启用 <span x-text="completeness?.enabled_count ?? '-'"></span></div>
         </div>
-        <div class="bg-white rounded-xl shadow p-4">
-          <div class="text-xs text-gray-500">已启用</div>
-          <div class="text-2xl font-bold text-green-600 mt-1" x-text="materials.filter(m => m.is_enabled).length"></div>
-        </div>
-        <div class="bg-white rounded-xl shadow p-4">
-          <div class="text-xs text-gray-500">材料分组</div>
-          <div class="text-2xl font-bold text-purple-600 mt-1" x-text="groupOptions.length"></div>
-        </div>
-        <div class="bg-white rounded-xl shadow p-4">
-          <div class="text-xs text-gray-500">尺寸规格</div>
-          <div class="text-sm font-semibold text-amber-600 mt-1" x-text="[...new Set(materials.map(m => m.diameter))].sort((a,b) => a-b).map(d => d + 'mm').join(' / ') || '-'"></div>
-        </div>
+        <button @click="toggleCompletenessFilter('missing_image')"
+                class="text-left bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-red-300 transition"
+                :class="filterCompleteness === 'missing_image' ? 'ring-2 ring-red-400' : ''">
+          <div class="text-xs text-gray-500">缺图素材 ▸ 点击筛选</div>
+          <div class="text-2xl font-bold mt-1" :class="(completeness?.missing_image_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
+               x-text="completeness?.missing_image_count ?? '-'"></div>
+          <div class="text-xs text-gray-400 mt-1">缺图无法在小程序渲染</div>
+        </button>
+        <button @click="toggleCompletenessFilter('missing_copy')"
+                class="text-left bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-amber-300 transition"
+                :class="filterCompleteness === 'missing_copy' ? 'ring-2 ring-amber-400' : ''">
+          <div class="text-xs text-gray-500">缺文案素材 ▸ 点击筛选</div>
+          <div class="text-2xl font-bold mt-1" :class="(completeness?.missing_copy_count ?? 0) > 0 ? 'text-amber-600' : 'text-green-600'"
+               x-text="completeness?.missing_copy_count ?? '-'"></div>
+          <div class="text-xs text-gray-400 mt-1">寓意/五行任一为空</div>
+        </button>
+        <button @click="toggleCompletenessFilter('zero_price_enabled')"
+                class="text-left bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-red-300 transition"
+                :class="filterCompleteness === 'zero_price_enabled' ? 'ring-2 ring-red-400' : ''">
+          <div class="text-xs text-gray-500">0价且启用 ▸ 点击筛选</div>
+          <div class="text-2xl font-bold mt-1" :class="(completeness?.zero_price_enabled_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
+               x-text="completeness?.zero_price_enabled_count ?? '-'"></div>
+          <div class="text-xs text-gray-400 mt-1">异常价，需先定价</div>
+        </button>
+      </div>
+
+      <!-- 素材大类 Tab（饰品/配饰/吊坠，item_type 过滤） -->
+      <div class="bg-white rounded-xl shadow p-2 flex gap-2">
+        <button @click="switchItemType('')"
+                class="px-4 py-2 text-sm rounded-lg transition"
+                :class="filterItemType === '' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'">全部</button>
+        <template x-for="opt in itemTypeOptions" :key="opt.value">
+          <button @click="switchItemType(opt.value)"
+                  class="px-4 py-2 text-sm rounded-lg transition"
+                  :class="filterItemType === opt.value ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'"
+                  x-text="itemTypeLabels[opt.value]"></button>
+        </template>
       </div>
 
       <!-- 筛选栏 -->
@@ -86,6 +112,7 @@
                 <th class="px-4 py-3 text-left">素材编码</th>
                 <th class="px-4 py-3 text-left">名称</th>
                 <th class="px-4 py-3 text-left">材质</th>
+                <th class="px-4 py-3 text-left">大类</th>
                 <th class="px-4 py-3 text-left">分组</th>
                 <th class="px-4 py-3 text-center">直径</th>
                 <th class="px-4 py-3 text-center">形状</th>
@@ -109,6 +136,7 @@
                   <td class="px-4 py-3 font-mono text-xs" x-text="mat.material_code"></td>
                   <td class="px-4 py-3 font-medium" x-text="mat.display_name"></td>
                   <td class="px-4 py-3 text-gray-600" x-text="mat.material_name"></td>
+                  <td class="px-4 py-3 text-xs text-gray-500" x-text="itemTypeLabels[mat.item_type] || mat.item_type"></td>
                   <td class="px-4 py-3">
                     <span class="px-2 py-0.5 rounded text-xs"
                           :class="getGroupBadgeClass(mat.group_code)"
@@ -132,10 +160,10 @@
                 </tr>
               </template>
               <tr x-show="!loading && materials.length === 0">
-                <td colspan="12" class="px-4 py-8 text-center text-gray-400">暂无素材数据</td>
+                <td colspan="13" class="px-4 py-8 text-center text-gray-400">暂无素材数据</td>
               </tr>
               <tr x-show="loading">
-                <td colspan="12" class="px-4 py-8 text-center text-gray-400">加载中...</td>
+                <td colspan="13" class="px-4 py-8 text-center text-gray-400">加载中...</td>
               </tr>
             </tbody>
           </table>
@@ -217,6 +245,26 @@
               </div>
             </div>
 
+            <!-- 素材大类 + 材质光影档位（两个独立业务概念，勿混淆） -->
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">素材大类（前端 Tab 归类）</label>
+                <select x-model="form.item_type" class="input-field w-full">
+                  <template x-for="opt in itemTypeOptions" :key="opt.value">
+                    <option :value="opt.value" x-text="opt.label"></option>
+                  </template>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">材质光影档位（渲染高光）</label>
+                <select x-model="form.material_type" class="input-field w-full">
+                  <template x-for="opt in materialTypeOptions" :key="opt.value">
+                    <option :value="opt.value" x-text="opt.label"></option>
+                  </template>
+                </select>
+              </div>
+            </div>
+
             <div class="grid grid-cols-3 gap-4">
               <div>
                 <label class="block text-xs text-gray-500 mb-1">单价 *</label>
@@ -252,6 +300,68 @@
                   <option :value="true">是（同款可多颗）</option>
                   <option :value="false">否</option>
                 </select>
+              </div>
+            </div>
+
+            <!-- 展示文案（小程序详情弹窗，措辞须符合广告法：用"寓意/象征"，禁功效性表述） -->
+            <div class="border-t pt-4 space-y-4">
+              <div class="text-xs font-semibold text-gray-600">展示文案（小程序珠子详情）</div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">五行属性（多选）</label>
+                  <div class="flex flex-wrap gap-3 pt-2">
+                    <template x-for="opt in fiveElementOptions" :key="opt.value">
+                      <label class="inline-flex items-center gap-1 text-sm">
+                        <input type="checkbox" :value="opt.value" x-model="form.five_elements" class="rounded">
+                        <span x-text="opt.label"></span>
+                      </label>
+                    </template>
+                  </div>
+                  <p class="text-xs text-gray-400 mt-1">五行雷达图数据源，可多选</p>
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">单颗净重 (g)</label>
+                  <input type="number" x-model.number="form.weight" class="input-field w-full" min="0" step="0.1" placeholder="如 0.7">
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">寓意文案</label>
+                <input type="text" x-model="form.meaning" class="input-field w-full" placeholder="如：传统文化中被称为「财富之石」，象征财富与丰盛">
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">能量属性</label>
+                  <input type="text" x-model="form.energy" class="input-field w-full" placeholder="如：财富·活力">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">搭配建议</label>
+                  <input type="text" x-model="form.pairing" class="input-field w-full" placeholder="如：搭配白水晶提亮">
+                </div>
+              </div>
+            </div>
+
+            <!-- 异形珠几何参数（管珠/药片渲染必需，圆珠留空） -->
+            <div x-show="form.shape !== 'circle'" x-transition class="border-t pt-4 space-y-4">
+              <div class="text-xs font-semibold text-gray-600">异形珠几何参数（圆珠无需填写）</div>
+              <div class="grid grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">实物长边 (mm)</label>
+                  <input type="number" x-model.number="form.size_length_mm" class="input-field w-full" min="0" step="0.1" placeholder="如 14.5">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">实物短边 (mm)</label>
+                  <input type="number" x-model.number="form.size_width_mm" class="input-field w-full" min="0" step="0.1" placeholder="如 4.5">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">穿绳方向</label>
+                  <select x-model="form.bore_orientation" class="input-field w-full">
+                    <template x-for="opt in boreOrientationOptions" :key="opt.value">
+                      <option :value="opt.value" x-text="opt.label"></option>
+                    </template>
+                  </select>
+                </div>
               </div>
             </div>
 

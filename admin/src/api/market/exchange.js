@@ -49,6 +49,14 @@ export const EXCHANGE_ENDPOINTS = {
   // 以物易物配方（后端: routes/v4/console/exchange/barter-recipes.js）
   BARTER_RECIPES: `${API_PREFIX}/console/exchange/barter-recipes`,
 
+  // 兑换等级门槛配置（后端: routes/v4/console/exchange/redeem-requirements.js，拍板⑪）
+  REDEEM_REQUIREMENT_LIST: `${API_PREFIX}/console/exchange/redeem-requirements/:exchange_item_id`,
+  REDEEM_REQUIREMENT_SAVE: `${API_PREFIX}/console/exchange/redeem-requirements`,
+  REDEEM_REQUIREMENT_DELETE: `${API_PREFIX}/console/exchange/redeem-requirements/:exchange_redeem_requirement_id`,
+
+  /** 换物运营看板统计（后端: GET /console/exchange/stats/barter，P2-5） */
+  STATS_BARTER: `${API_PREFIX}/console/exchange/stats/barter`,
+
   /**
    * B2C 兑换聚合统计（订单/商品/履约/趋势）
    * 后端: GET /api/v4/console/exchange/stats ，query: trend_days（默认 90）
@@ -293,6 +301,53 @@ export const ExchangeAPI = {
       method: 'PUT',
       data: { recipes }
     })
+  },
+
+  // ===== 兑换等级门槛配置（拍板⑪，P0-2） =====
+
+  /**
+   * 获取某商品的等级门槛配置列表
+   * @param {number} exchange_item_id - 兑换商品 ID
+   * @returns {Promise<Object>} { requirements: [{exchange_redeem_requirement_id, min_growth_level_key, max_growth_level_key, is_enabled, publish_at, unpublish_at, ...}] }
+   */
+  async getRedeemRequirements(exchange_item_id) {
+    const url = buildURL(EXCHANGE_ENDPOINTS.REDEEM_REQUIREMENT_LIST, { exchange_item_id })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 创建/更新等级门槛配置（带 exchange_redeem_requirement_id 为更新）
+   * @param {Object} data - 门槛数据（snake_case 直接对接后端：exchange_item_id, min_growth_level_key, max_growth_level_key, is_enabled, publish_at, unpublish_at）
+   * @returns {Promise<Object>} 保存后的门槛配置
+   */
+  async saveRedeemRequirement(data) {
+    return await request({
+      url: EXCHANGE_ENDPOINTS.REDEEM_REQUIREMENT_SAVE,
+      method: 'POST',
+      data
+    })
+  },
+
+  /**
+   * 删除等级门槛配置
+   * @param {number} exchange_redeem_requirement_id - 门槛配置 ID
+   * @returns {Promise<Object>} 删除结果
+   */
+  async deleteRedeemRequirement(exchange_redeem_requirement_id) {
+    const url = buildURL(EXCHANGE_ENDPOINTS.REDEEM_REQUIREMENT_DELETE, {
+      exchange_redeem_requirement_id
+    })
+    return await request({ url, method: 'DELETE' })
+  },
+
+  /**
+   * 获取换物运营看板统计（P2-5）
+   * @param {Object} [params={}] - 查询参数（days 统计天数）
+   * @returns {Promise<Object>} { period_days, daily, by_recipe, status_distribution, summary }
+   */
+  async getBarterStats(params = {}) {
+    const url = EXCHANGE_ENDPOINTS.STATS_BARTER + buildQueryString(params)
+    return await request({ url, method: 'GET' })
   }
 }
 

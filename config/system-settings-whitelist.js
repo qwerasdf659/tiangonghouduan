@@ -223,6 +223,28 @@ const SYSTEM_SETTINGS_WHITELIST = {
     approvalRequired: false
   },
 
+  /*
+   * 活动加成率（拍板⑮-(b) 加法叠加，2026-07-11 落地）：
+   * 总加成 = 基础 × (1 + 等级加成率 + 活动加成率)，活动加成独立成 activity_bonus_reward 笔、
+   * 不计 history_total_points（防复利排除名单）。0 = 无活动（默认，行为与现状一致）。
+   * 提交时锁定（与 earn_multiplier 同点位）：改本配置只影响此后提交的小票。
+   * 硬封顶联动：可用积分总倍数 ≤ 3.0（发放侧对活动率按剩余空间截断），故上限设 2.0。
+   */
+  'points/activity_bonus_rate': {
+    type: 'number',
+    min: 0, // 0 = 无活动加成（默认关闭态）
+    max: 2.0, // 总倍数硬封顶 3.0 = 基础 1 + 加成空间 2.0（拍板⑮-(d)）
+    step: 0.01,
+    default: 0,
+    readonly: false,
+    description:
+      '消费积分活动加成率（限时活动放大主积分用，加法叠加：总倍数=1+等级加成率+活动加成率；0=无活动）',
+    changeRequiresRestart: false,
+    businessImpact: 'CRITICAL',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
   'points/star_stone_quota_ratio': {
     type: 'number',
     min: 0.1,
@@ -336,6 +358,35 @@ const SYSTEM_SETTINGS_WHITELIST = {
     default: 0, // 0=关闭（管理员操作本身就是审批行为）
     readonly: false,
     description: '退款大额审批阈值（材料数量）：退款金额超过此值需二次审批，0=关闭',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  // ===== S3 寄卖佣金率（拍板 #33：首版不抽佣，预留配置项，启用时改配置不改表）=====
+  'exchange/consignment_commission_rate': {
+    type: 'number',
+    min: 0,
+    max: 0.5, // 上限 50%（防误配；Steam 15%、得物 ~9.5% 供参考）
+    step: 0.01,
+    default: 0, // 0=不抽佣（拍板 #33 首版口径）
+    readonly: false,
+    description: '寄卖成交平台佣金率（0=不抽佣；成交结算时读取，调整不改代码）',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  // ===== S3 转赠每日限额（拍板 #35：免审核 + 每用户每日 5 次，运营可调）=====
+  'exchange/gift_transfer_daily_limit': {
+    type: 'number',
+    min: 0, // 0=关闭转赠功能
+    max: 100,
+    default: 5, // 拍板 #35 定稿值
+    readonly: false,
+    description: '用户物品转赠每日次数上限（每用户每日，0=关闭转赠），账本 gift_transfer 流水计数',
     changeRequiresRestart: false,
     businessImpact: 'HIGH',
     auditRequired: true,
@@ -503,6 +554,41 @@ const SYSTEM_SETTINGS_WHITELIST = {
     description: '臻选空间解锁后有效期（小时），过期需重新解锁',
     changeRequiresRestart: false,
     businessImpact: 'MEDIUM',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  /*
+   * ===== 风控异常检测阈值（拍板⑱，2026-07-10 迁入配置中心）=====
+   * 背景：等级发放线上线后伪造小票收益放大（v9 顶档 1 元刷 1.5 分 + 预算 0.12），
+   * 且原硬编码阈值按大众餐饮定（500/100 元），在桌均约 2,000 元的中高端业态下全是噪音
+   * （每张正常小票都触发"大额"、每个首访客都被标记，告警疲劳=没有风控）。
+   * 阈值改经 AdminSystemService 读取本配置，改阈值即改即生效不发版；
+   * 规则权重/天数窗口等结构性参数仍留 AnomalyService 常量。
+   */
+  'risk/anomaly_large_amount_threshold': {
+    type: 'number',
+    min: 100, // 防误填过低导致全量告警
+    max: 100000, // 防误填天文数字导致风控失效
+    default: 5000, // 拍板⑭-(a)：中高端餐饮桌均约 2,000 元口径，单笔 ≥5,000 元视为大额
+    readonly: false,
+    description:
+      '消费异常检测-大额消费阈值（元）：单笔消费超过此值标记 large_amount 并计入风险评分',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'risk/anomaly_new_user_large_threshold': {
+    type: 'number',
+    min: 100,
+    max: 100000,
+    default: 3000, // 拍板⑭-(a)：注册 7 天内单笔超 3,000 元标记新用户大额
+    readonly: false,
+    description: '消费异常检测-新用户大额阈值（元）：注册7天内单笔消费超过此值标记 new_user_large',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
     auditRequired: true,
     approvalRequired: false
   },

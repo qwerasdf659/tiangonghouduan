@@ -18,11 +18,14 @@
  * 4. getHighRiskRecords() - 获取高风险记录列表
  * 5. markAnomaly() - 手动标记异常
  *
- * 异常检测规则（D-5 技术决策）：
- * - large_amount: 大额消费（>¥500）- 权重30分
+ * 异常检测规则（D-5 技术决策 + 拍板⑱ 阈值配置化，2026-07-10）：
+ * - large_amount: 大额消费（金额阈值经 system_settings risk/anomaly_large_amount_threshold 配置，默认 5000 元）- 权重30分
  * - high_frequency: 高频消费（24h内>5次）- 权重25分
- * - new_user_large: 新用户大额（注册<7天且>¥100）- 权重25分
+ * - new_user_large: 新用户大额（注册<7天，金额阈值经 system_settings risk/anomaly_new_user_large_threshold 配置，默认 3000 元）- 权重25分
  * - cross_store: 跨店消费（同日多店消费）- 权重20分
+ *
+ * 阈值配置化边界（拍板⑱）：金额类阈值进配置中心（运营随业态调整、改即生效）；
+ * 规则权重 / 天数窗口 / 次数阈值等结构性参数仍留本模块常量（改动=业务规则变更，需发版评审）。
  *
  * 评分规则：
  * - 0: 正常
@@ -39,22 +42,24 @@ const BusinessError = require('../../utils/BusinessError')
 const { Op, fn, col, literal } = require('sequelize')
 const logger = require('../../utils/logger').logger
 const BeijingTimeHelper = require('../../utils/timeHelper')
+const AdminSystemService = require('../AdminSystemService')
 
 /**
- * 异常检测规则配置
- * 每个规则包含：name（规则名）、weight（权重分值）、threshold（阈值）
+ * 异常检测规则配置（结构性参数：权重/窗口/次数留常量；金额阈值配置化见 _getAmountThresholds）
+ * 每个规则包含：name（规则名）、weight（权重分值）等
  */
 const ANOMALY_RULES = {
   /**
    * 大额消费规则
-   * 触发条件：消费金额 > ¥500
+   * 触发条件：消费金额 > 大额阈值（system_settings risk/anomaly_large_amount_threshold，默认 5000 元）
    */
   large_amount: {
     name: 'large_amount',
     label: '大额消费',
     weight: 30,
-    threshold: 500,
-    description: '消费金额超过¥500'
+    // 配置缺失时的兜底阈值（与白名单默认值一致，拍板⑭-(a) 中高端业态口径）
+    default_threshold: 5000,
+    description: '消费金额超过大额阈值（运营可在系统设置调整）'
   },
 
   /**
@@ -72,15 +77,17 @@ const ANOMALY_RULES = {
 
   /**
    * 新用户大额规则
-   * 触发条件：用户注册 < 7天 且 消费金额 > ¥100
+   * 触发条件：用户注册 < 7天 且 消费金额 > 新用户大额阈值
+   * （system_settings risk/anomaly_new_user_large_threshold，默认 3000 元）
    */
   new_user_large: {
     name: 'new_user_large',
     label: '新用户大额',
     weight: 25,
     days_threshold: 7,
-    amount_threshold: 100,
-    description: '注册7天内消费超过¥100'
+    // 配置缺失时的兜底阈值（与白名单默认值一致）
+    default_amount_threshold: 3000,
+    description: '注册7天内消费超过新用户大额阈值（运营可在系统设置调整）'
   },
 
   /**
@@ -139,12 +146,19 @@ class AnomalyService {
       const anomalyFlags = []
       let totalScore = 0
 
+      // 金额阈值读取（拍板⑱ 配置化：system_settings risk 分类，60s Redis 缓存，改即生效）
+      const thresholds = await AnomalyService._getAmountThresholds()
+
       // 1. 大额消费检测
       const amount = parseFloat(record.consumption_amount || 0)
-      if (amount > ANOMALY_RULES.large_amount.threshold) {
+      if (amount > thresholds.large_amount_threshold) {
         anomalyFlags.push(ANOMALY_RULES.large_amount.name)
         totalScore += ANOMALY_RULES.large_amount.weight
-        logger.debug('检测到大额消费', { record_id: recordId, amount })
+        logger.debug('检测到大额消费', {
+          record_id: recordId,
+          amount,
+          threshold: thresholds.large_amount_threshold
+        })
       }
 
       // 2. 高频消费检测（需要查询数据库）
@@ -166,7 +180,9 @@ class AnomalyService {
 
       // 3. 新用户大额检测（需要查询用户信息）
       if (models && record.user_id) {
-        const newUserResult = await AnomalyService._checkNewUserLarge(record, models, transaction)
+        const newUserResult = await AnomalyService._checkNewUserLarge(record, models, transaction, {
+          amount_threshold: thresholds.new_user_large_threshold
+        })
         if (newUserResult.isAnomaly) {
           anomalyFlags.push(ANOMALY_RULES.new_user_large.name)
           totalScore += ANOMALY_RULES.new_user_large.weight
@@ -439,16 +455,23 @@ class AnomalyService {
 
       const offset = (page - 1) * page_size
 
+      /*
+       * 手机号取数口径（与 exchange/QueryService.getAdminOrders 同款既有模式，2026-07-11 加固）：
+       * mobile 是 User 模型的 VIRTUAL 字段（读时解密 mobile_encrypted，users 表无 mobile 物理列），
+       * attributes 显式取密文列 mobile_encrypted 保证解密数据源必定加载（不依赖虚拟字段的
+       * 依赖声明），映射时经虚拟 getter 上提为明文 user_mobile / merchant_mobile，
+       * 出口删除嵌套关联对象（密文不下发）。web 管理后台允许手机号明文（非小程序端）。
+       */
       const { count, rows } = await models.ConsumptionRecord.findAndCountAll({
         where,
         include: [
           {
             association: 'user',
-            attributes: ['user_id', 'mobile', 'nickname', 'created_at']
+            attributes: ['user_id', 'nickname', 'mobile_encrypted', 'created_at']
           },
           {
             association: 'merchant',
-            attributes: ['user_id', 'mobile', 'nickname']
+            attributes: ['user_id', 'nickname', 'mobile_encrypted']
           },
           {
             association: 'store',
@@ -463,11 +486,22 @@ class AnomalyService {
         offset
       })
 
-      const records = rows.map(record => ({
-        ...record.get({ plain: true }),
-        risk_level: AnomalyService._getRiskLevel(record.anomaly_score),
-        anomaly_descriptions: AnomalyService._getAnomalyDescriptions(record.anomaly_flags)
-      }))
+      const records = rows.map(record => {
+        const plain = record.get({ plain: true })
+        // 用户/商家信息上提为顶层明文字段（经 User.mobile 虚拟 getter 解密），密文对象不下发
+        plain.user_nickname = record.user?.nickname || null
+        plain.user_mobile = record.user?.mobile || null
+        plain.user_registered_at = record.user?.created_at || null
+        plain.merchant_nickname = record.merchant?.nickname || null
+        plain.merchant_mobile = record.merchant?.mobile || null
+        delete plain.user
+        delete plain.merchant
+        return {
+          ...plain,
+          risk_level: AnomalyService._getRiskLevel(record.anomaly_score),
+          anomaly_descriptions: AnomalyService._getAnomalyDescriptions(record.anomaly_flags)
+        }
+      })
 
       logger.info('高风险记录查询完成', {
         total: count,
@@ -626,19 +660,59 @@ class AnomalyService {
   }
 
   /**
+   * 读取金额类异常检测阈值（拍板⑱ 配置化，经 AdminSystemService 读 system_settings）
+   *
+   * 配置缺失/读取失败时回退 ANOMALY_RULES 兜底默认值（风控不因配置问题中断）。
+   *
+   * @private
+   * @returns {Promise<Object>} { large_amount_threshold, new_user_large_threshold }（单位：元）
+   */
+  static async _getAmountThresholds() {
+    try {
+      const [largeAmountThreshold, newUserLargeThreshold] = await Promise.all([
+        AdminSystemService.getSettingValue(
+          'risk',
+          'anomaly_large_amount_threshold',
+          ANOMALY_RULES.large_amount.default_threshold
+        ),
+        AdminSystemService.getSettingValue(
+          'risk',
+          'anomaly_new_user_large_threshold',
+          ANOMALY_RULES.new_user_large.default_amount_threshold
+        )
+      ])
+      return {
+        large_amount_threshold:
+          Number(largeAmountThreshold) || ANOMALY_RULES.large_amount.default_threshold,
+        new_user_large_threshold:
+          Number(newUserLargeThreshold) || ANOMALY_RULES.new_user_large.default_amount_threshold
+      }
+    } catch (error) {
+      logger.warn('读取风控阈值配置失败，回退默认值', { error: error.message })
+      return {
+        large_amount_threshold: ANOMALY_RULES.large_amount.default_threshold,
+        new_user_large_threshold: ANOMALY_RULES.new_user_large.default_amount_threshold
+      }
+    }
+  }
+
+  /**
    * 检测新用户大额消费
    * @private
    * @param {Object} record - 消费记录对象
    * @param {Object} models - Sequelize 模型集合
    * @param {Object} [transaction] - 事务对象
+   * @param {Object} [options] - 选项
+   * @param {number} [options.amount_threshold] - 金额阈值（元，由 detectAnomalies 统一读取配置传入）
    * @returns {Promise<Object>} 检测结果 { isAnomaly: boolean, userAgeDays?: number }
    */
-  static async _checkNewUserLarge(record, models, transaction) {
+  static async _checkNewUserLarge(record, models, transaction, options = {}) {
     const rule = ANOMALY_RULES.new_user_large
     const amount = parseFloat(record.consumption_amount || 0)
+    const amountThreshold = Number(options.amount_threshold) || rule.default_amount_threshold
 
     // 金额未达阈值，直接返回
-    if (amount <= rule.amount_threshold) {
+    if (amount <= amountThreshold) {
       return { isAnomaly: false }
     }
 

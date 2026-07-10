@@ -82,6 +82,76 @@ module.exports = sequelize => {
         defaultValue: 'circle',
         comment: '切割形状'
       },
+      item_type: {
+        type: DataTypes.ENUM('beads', 'accessories', 'pendants'),
+        allowNull: false,
+        defaultValue: 'beads',
+        comment: '素材大类：beads珠子 / accessories配饰(隔片佛头流苏) / pendants吊坠'
+      },
+      material_type: {
+        type: DataTypes.ENUM('crystal', 'stone', 'metal', 'matte'),
+        allowNull: false,
+        defaultValue: 'crystal',
+        comment:
+          '材质光影档位（前端立体渲染高光参数）：crystal通透水晶/stone玉石奶体/metal金属镜面/matte哑光'
+      },
+      five_elements: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment:
+          '五行属性，逗号分隔多值：metal金/wood木/water水/fire火/earth土（五行雷达图玩法数据源）'
+      },
+      weight: {
+        type: DataTypes.DECIMAL(6, 1),
+        allowNull: true,
+        comment: '单颗珠子净重(g)，保留1位小数，仅详情展示',
+        /** @returns {number|null} 克重数值 */
+        get() {
+          const val = this.getDataValue('weight')
+          return val !== null ? Number(val) : null
+        }
+      },
+      meaning: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+        comment: '寓意文案（详情弹窗展示，措辞须符合广告法：用"寓意/象征"，禁功效性表述）'
+      },
+      energy: {
+        type: DataTypes.STRING(200),
+        allowNull: true,
+        comment: '能量属性文案（如"财富·活力"，软性运营文案）'
+      },
+      pairing: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+        comment: '搭配建议文案（如"搭配白水晶提亮"）'
+      },
+      size_length_mm: {
+        type: DataTypes.DECIMAL(5, 1),
+        allowNull: true,
+        comment: '异形珠实物长边(mm)，如跑环14.5；圆珠为空',
+        /** @returns {number|null} 长边数值 */
+        get() {
+          const val = this.getDataValue('size_length_mm')
+          return val !== null ? Number(val) : null
+        }
+      },
+      size_width_mm: {
+        type: DataTypes.DECIMAL(5, 1),
+        allowNull: true,
+        comment: '异形珠实物短边(mm)，如跑环4.5；圆珠为空',
+        /** @returns {number|null} 短边数值 */
+        get() {
+          const val = this.getDataValue('size_width_mm')
+          return val !== null ? Number(val) : null
+        }
+      },
+      bore_orientation: {
+        type: DataTypes.ENUM('along_length', 'along_width', 'none'),
+        allowNull: false,
+        defaultValue: 'none',
+        comment: '穿绳方向：along_length绳穿长轴(管珠) / along_width绳穿短边(药片) / none圆珠'
+      },
       price: {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,

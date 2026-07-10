@@ -322,6 +322,27 @@ module.exports = {
       ],
       storage_folder: 'chat-files' // Sealos对象存储目录
     }
+  },
+
+  // ====================================
+  // 💎 DIY 饰品设计引擎配置（代码层固定规则）
+  // ====================================
+  diy: {
+    /**
+     * DIY 作品小程序码配置（拍板决议 11.5-C）
+     *
+     * @description 生成 DIY 作品分享小程序码（wxacode.getUnlimited）的固定规则
+     * @业务规则
+     * - 扫码路径：packageDIY/diy-lite/diy-lite（diy-lite 为唯一生产设计台，
+     *   原 diy-design 工作台路径作废，见拍板决议 10.4 节）
+     * - scene 参数格式：diy_work_id={id}（微信限制 32 字符内）
+     * - 生成后缓存到 Sealos 确定性路径 diy-qrcodes/work_{id}.png，二次请求直接回缓存
+     */
+    qrcode: {
+      page: 'packageDIY/diy-lite/diy-lite', // 小程序扫码落地页路径（不带前导斜杠，微信 API 要求）
+      width: 280, // 小程序码宽度(px)，微信允许 280~1280
+      storage_folder: 'diy-qrcodes' // Sealos对象存储目录（确定性路径缓存）
+    }
   }
 }
 

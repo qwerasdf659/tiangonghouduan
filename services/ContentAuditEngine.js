@@ -329,57 +329,71 @@ class ContentAuditEngine {
 
   /**
    * 触发审核回调
-   * 业务场景：审核通过/拒绝后，触发对应业务逻辑的回调处理
-   * 设计模式：回调机制，实现审核引擎与具体业务的解耦
+   *
+   * 业务场景：审核通过/拒绝后，触发对应业务逻辑的回调处理（如消费审核通过 → 发放积分）。
+   * 设计模式：回调机制，实现审核引擎与具体业务的解耦。
+   *
+   * 一致性约束（2026-07-11 修正，替代旧"吞错"行为）：
+   * - 回调与审核记录状态更新在同一事务内，回调【执行失败必须抛出】→ 整个事务回滚，
+   *   审核记录回到 pending，管理员可重试——杜绝"审核记录已 approved 但发分回调失败"
+   *   的资损级不一致（旧实现 catch 后只记日志，审核照常提交）。
+   * - 回调处理器"未配置/未实现"（callbackMap 无此类型、模块不存在、方法缺失）不属于
+   *   执行失败，保持 warn 跳过——这是"该类型无业务动作"的合法形态，不阻断审核。
+   *
    * @param {ContentReviewRecord} auditRecord - 审核记录
    * @param {string} result - 审核结果（approved/rejected）
    * @param {Object} transaction - 数据库事务
-   * @returns {Promise<void>} 无返回值，回调执行失败不影响审核结果
+   * @returns {Promise<void>} 无返回值；回调执行失败时抛出原错误（由入口层事务回滚）
+   * @throws {Error} 回调业务逻辑执行失败时抛出（触发事务回滚，保证审核状态与业务落地一致）
    * @private
    */
   static async triggerAuditCallback(auditRecord, result, transaction) {
+    logger.info(`[审核回调] 触发回调: type=${auditRecord.auditable_type}, result=${result}`)
+
+    /*
+     * 动态加载对应的回调处理器
+     * 支持类型：exchange, feedback, consumption, merchant_points
+     */
+    const callbackMap = {
+      exchange: '../callbacks/ExchangeAuditCallback',
+      feedback: '../callbacks/FeedbackAuditCallback',
+      consumption: '../callbacks/ConsumptionAuditCallback',
+      merchant_points: '../callbacks/MerchantPointsAuditCallback'
+    }
+
+    const callbackPath = callbackMap[auditRecord.auditable_type]
+    if (!callbackPath) {
+      logger.warn(`[审核回调] 未找到回调处理器: ${auditRecord.auditable_type}`)
+      return
+    }
+
+    // 动态require，如果文件不存在则跳过（该类型无业务动作，非执行失败）
+    let callback
     try {
-      logger.info(`[审核回调] 触发回调: type=${auditRecord.auditable_type}, result=${result}`)
-
-      /*
-       * 动态加载对应的回调处理器
-       * 支持类型：exchange, feedback, consumption, merchant_points
-       */
-      const callbackMap = {
-        exchange: '../callbacks/ExchangeAuditCallback',
-        feedback: '../callbacks/FeedbackAuditCallback',
-        consumption: '../callbacks/ConsumptionAuditCallback',
-        merchant_points: '../callbacks/MerchantPointsAuditCallback'
-      }
-
-      const callbackPath = callbackMap[auditRecord.auditable_type]
-      if (!callbackPath) {
-        logger.warn(`[审核回调] 未找到回调处理器: ${auditRecord.auditable_type}`)
+      callback = require(callbackPath)
+    } catch (err) {
+      if (err.code === 'MODULE_NOT_FOUND') {
+        logger.warn(`[审核回调] 回调处理器未实现: ${callbackPath}`)
         return
       }
+      throw err
+    }
 
-      // 动态require，如果文件不存在则跳过
-      let callback
-      try {
-        callback = require(callbackPath)
-      } catch (err) {
-        if (err.code === 'MODULE_NOT_FOUND') {
-          logger.warn(`[审核回调] 回调处理器未实现: ${callbackPath}`)
-          return
-        }
-        throw err
-      }
+    if (!callback || typeof callback[result] !== 'function') {
+      logger.warn(`[审核回调] 回调方法未实现: ${auditRecord.auditable_type}.${result}`)
+      return
+    }
 
-      // 执行回调
-      if (callback && typeof callback[result] === 'function') {
-        await callback[result](auditRecord.auditable_id, auditRecord, transaction)
-        logger.info(`[审核回调] 回调执行成功: ${auditRecord.auditable_type}.${result}`)
-      } else {
-        logger.warn(`[审核回调] 回调方法未实现: ${auditRecord.auditable_type}.${result}`)
-      }
+    // 执行回调：失败原样抛出 → 入口层事务回滚，审核记录与业务落地保持一致
+    try {
+      await callback[result](auditRecord.auditable_id, auditRecord, transaction)
+      logger.info(`[审核回调] 回调执行成功: ${auditRecord.auditable_type}.${result}`)
     } catch (error) {
-      logger.error(`[审核回调] 回调执行失败: ${error.message}`)
-      // 回调失败不影响审核结果，记录错误但不抛出
+      logger.error(
+        `[审核回调] 回调执行失败（将回滚本次审核）: ${auditRecord.auditable_type}.${result}`,
+        { auditable_id: auditRecord.auditable_id, error: error.message }
+      )
+      throw error
     }
   }
 

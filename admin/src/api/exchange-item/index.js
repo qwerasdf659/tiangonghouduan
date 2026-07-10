@@ -55,7 +55,37 @@ export const EXCHANGE_ITEM_ENDPOINTS = {
   PRODUCT_SERIES_DETAIL: `${CONSOLE_PREFIX}/exchange/product-series/:series_id`,
   PRODUCT_SERIES_CREATE: `${CONSOLE_PREFIX}/exchange/product-series`,
   PRODUCT_SERIES_UPDATE: `${CONSOLE_PREFIX}/exchange/product-series/:series_id`,
-  PRODUCT_SERIES_DELETE: `${CONSOLE_PREFIX}/exchange/product-series/:series_id`
+  PRODUCT_SERIES_DELETE: `${CONSOLE_PREFIX}/exchange/product-series/:series_id`,
+  // S1–S5 商品体系（2026-07-10 §17 落地）
+  PURCHASE_ORDER_LIST: `${CONSOLE_PREFIX}/exchange/purchase-orders`,
+  PURCHASE_ORDER_DETAIL: `${CONSOLE_PREFIX}/exchange/purchase-orders/:purchase_order_id`,
+  PURCHASE_ORDER_CREATE: `${CONSOLE_PREFIX}/exchange/purchase-orders`,
+  PURCHASE_ORDER_UPDATE: `${CONSOLE_PREFIX}/exchange/purchase-orders/:purchase_order_id`,
+  PURCHASE_ORDER_SUBMIT: `${CONSOLE_PREFIX}/exchange/purchase-orders/:purchase_order_id/submit`,
+  PURCHASE_ORDER_RECEIVE: `${CONSOLE_PREFIX}/exchange/purchase-orders/:purchase_order_id/receive`,
+  PURCHASE_ORDER_CANCEL: `${CONSOLE_PREFIX}/exchange/purchase-orders/:purchase_order_id/cancel`,
+  PRODUCT_BATCH_LIST: `${CONSOLE_PREFIX}/exchange/product-batches`,
+  PRODUCT_BATCH_DETAIL: `${CONSOLE_PREFIX}/exchange/product-batches/:batch_id`,
+  PRODUCT_BATCH_CREATE: `${CONSOLE_PREFIX}/exchange/product-batches`,
+  PRODUCT_BATCH_UPDATE: `${CONSOLE_PREFIX}/exchange/product-batches/:batch_id`,
+  PRODUCT_BATCH_RECALL: `${CONSOLE_PREFIX}/exchange/product-batches/:batch_id/recall`,
+  PRODUCT_BUNDLE_LIST: `${CONSOLE_PREFIX}/exchange/product-bundles`,
+  PRODUCT_BUNDLE_DETAIL: `${CONSOLE_PREFIX}/exchange/product-bundles/:bundle_id`,
+  PRODUCT_BUNDLE_CREATE: `${CONSOLE_PREFIX}/exchange/product-bundles`,
+  PRODUCT_BUNDLE_UPDATE: `${CONSOLE_PREFIX}/exchange/product-bundles/:bundle_id`,
+  CHANNEL_MAPPING_DICT: `${CONSOLE_PREFIX}/exchange/channel-mappings/channel-dict`,
+  CHANNEL_MAPPING_LIST: `${CONSOLE_PREFIX}/exchange/channel-mappings`,
+  CHANNEL_MAPPING_DETAIL: `${CONSOLE_PREFIX}/exchange/channel-mappings/:mapping_id`,
+  CHANNEL_MAPPING_CREATE: `${CONSOLE_PREFIX}/exchange/channel-mappings`,
+  CHANNEL_MAPPING_UPDATE: `${CONSOLE_PREFIX}/exchange/channel-mappings/:mapping_id`,
+  CHANNEL_MAPPING_DELETE: `${CONSOLE_PREFIX}/exchange/channel-mappings/:mapping_id`,
+  CONSIGNMENT_LIST: `${CONSOLE_PREFIX}/exchange/consignments`,
+  CONSIGNMENT_DETAIL: `${CONSOLE_PREFIX}/exchange/consignments/:consignment_id`,
+  CONSIGNMENT_CREATE: `${CONSOLE_PREFIX}/exchange/consignments`,
+  CONSIGNMENT_LIST_ACTION: `${CONSOLE_PREFIX}/exchange/consignments/:consignment_id/list`,
+  CONSIGNMENT_SOLD: `${CONSOLE_PREFIX}/exchange/consignments/:consignment_id/sold`,
+  CONSIGNMENT_WITHDRAW: `${CONSOLE_PREFIX}/exchange/consignments/:consignment_id/withdraw`,
+  CONSIGNMENT_REJECT: `${CONSOLE_PREFIX}/exchange/consignments/:consignment_id/reject`
 }
 
 /**
@@ -561,6 +591,138 @@ export const ExchangeItemAPI = {
     return request({
       url: buildURL(EXCHANGE_ITEM_ENDPOINTS.PRODUCT_SERIES_DELETE, { series_id: seriesId }),
       method: 'DELETE'
+    })
+  },
+
+  // ===== S1–S5 商品体系 API =====
+  async listPurchaseOrders(params = {}) {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.PURCHASE_ORDER_LIST + buildQueryString(params) })
+  },
+  async getPurchaseOrder(id) {
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.PURCHASE_ORDER_DETAIL, { purchase_order_id: id }) })
+  },
+  async createPurchaseOrder(data) {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.PURCHASE_ORDER_CREATE, method: 'POST', data })
+  },
+  async updatePurchaseOrder(id, data) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.PURCHASE_ORDER_UPDATE, { purchase_order_id: id }),
+      method: 'PUT',
+      data
+    })
+  },
+  async submitPurchaseOrder(id) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.PURCHASE_ORDER_SUBMIT, { purchase_order_id: id }),
+      method: 'POST'
+    })
+  },
+  async receivePurchaseOrder(id) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.PURCHASE_ORDER_RECEIVE, { purchase_order_id: id }),
+      method: 'POST'
+    })
+  },
+  async cancelPurchaseOrder(id) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.PURCHASE_ORDER_CANCEL, { purchase_order_id: id }),
+      method: 'POST'
+    })
+  },
+  async listProductBatches(params = {}) {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.PRODUCT_BATCH_LIST + buildQueryString(params) })
+  },
+  async getProductBatch(id) {
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.PRODUCT_BATCH_DETAIL, { batch_id: id }) })
+  },
+  async createProductBatch(data) {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.PRODUCT_BATCH_CREATE, method: 'POST', data })
+  },
+  async updateProductBatch(id, data) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.PRODUCT_BATCH_UPDATE, { batch_id: id }),
+      method: 'PUT',
+      data
+    })
+  },
+  async recallProductBatch(id) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.PRODUCT_BATCH_RECALL, { batch_id: id }),
+      method: 'POST'
+    })
+  },
+  async listProductBundles(params = {}) {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.PRODUCT_BUNDLE_LIST + buildQueryString(params) })
+  },
+  async getProductBundle(id) {
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.PRODUCT_BUNDLE_DETAIL, { bundle_id: id }) })
+  },
+  async createProductBundle(data) {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.PRODUCT_BUNDLE_CREATE, method: 'POST', data })
+  },
+  async updateProductBundle(id, data) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.PRODUCT_BUNDLE_UPDATE, { bundle_id: id }),
+      method: 'PUT',
+      data
+    })
+  },
+  async listChannelDict() {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.CHANNEL_MAPPING_DICT })
+  },
+  async listChannelMappings(params = {}) {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.CHANNEL_MAPPING_LIST + buildQueryString(params) })
+  },
+  async getChannelMapping(id) {
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CHANNEL_MAPPING_DETAIL, { mapping_id: id }) })
+  },
+  async createChannelMapping(data) {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.CHANNEL_MAPPING_CREATE, method: 'POST', data })
+  },
+  async updateChannelMapping(id, data) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CHANNEL_MAPPING_UPDATE, { mapping_id: id }),
+      method: 'PUT',
+      data
+    })
+  },
+  async deleteChannelMapping(id) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CHANNEL_MAPPING_DELETE, { mapping_id: id }),
+      method: 'DELETE'
+    })
+  },
+  async listConsignments(params = {}) {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.CONSIGNMENT_LIST + buildQueryString(params) })
+  },
+  async getConsignment(id) {
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CONSIGNMENT_DETAIL, { consignment_id: id }) })
+  },
+  async createConsignment(data) {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.CONSIGNMENT_CREATE, method: 'POST', data })
+  },
+  async listConsignmentAction(id) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CONSIGNMENT_LIST_ACTION, { consignment_id: id }),
+      method: 'POST'
+    })
+  },
+  async markConsignmentSold(id) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CONSIGNMENT_SOLD, { consignment_id: id }),
+      method: 'POST'
+    })
+  },
+  async withdrawConsignment(id) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CONSIGNMENT_WITHDRAW, { consignment_id: id }),
+      method: 'POST'
+    })
+  },
+  async rejectConsignment(id) {
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CONSIGNMENT_REJECT, { consignment_id: id }),
+      method: 'POST'
     })
   }
 }

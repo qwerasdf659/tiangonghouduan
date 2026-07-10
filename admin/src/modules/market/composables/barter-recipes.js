@@ -13,6 +13,8 @@
  * - required_quantity: 需消耗旧物数量
  * - output_exchange_item_id: 产出标的（官方库存 exchange_items）
  * - is_enabled: 是否启用
+ * - per_user_limit: 每人限换次数（拍板⑬-(c) 防薅，0=不限）
+ * - total_limit: 配方总量（拍板⑬-(c) 防薅，0=不限）
  */
 
 import { logger } from '../../../utils/logger.js'
@@ -71,7 +73,9 @@ export function useBarterRecipesMethods() {
         required_item_template_id: null,
         required_quantity: 1,
         output_exchange_item_id: null,
-        is_enabled: true
+        is_enabled: true,
+        per_user_limit: 0,
+        total_limit: 0
       })
     },
 
@@ -89,7 +93,7 @@ export function useBarterRecipesMethods() {
      * @returns {Promise<void>}
      */
     async saveBarterRecipes() {
-      // 前端基本校验：必填项 + 配方码唯一
+      // 前端基本校验：必填项 + 配方码唯一 + 限量字段非负整数（与后端 saveRecipes 同口径）
       const codes = new Set()
       for (const r of this.barterRecipes) {
         if (!r.recipe_code || !r.output_exchange_item_id || !r.required_item_template_id) {
@@ -101,6 +105,15 @@ export function useBarterRecipesMethods() {
           return
         }
         codes.add(r.recipe_code)
+        for (const limit_field of ['per_user_limit', 'total_limit']) {
+          if (r[limit_field] !== undefined && r[limit_field] !== null && r[limit_field] !== '') {
+            const limit_value = Number(r[limit_field])
+            if (!Number.isInteger(limit_value) || limit_value < 0) {
+              this.showError?.(`配方 ${r.recipe_code} 的限量必须为非负整数（0=不限）`)
+              return
+            }
+          }
+        }
       }
 
       this.barterSaving = true

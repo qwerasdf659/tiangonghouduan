@@ -2,14 +2,21 @@
  * DIY 珠子素材管理页面
  *
  * @file admin/src/modules/diy/pages/diy-material-management.js
- * @description 珠子/宝石素材 CRUD，支持分组筛选、直径筛选、图片上传
+ * @description 珠子/宝石素材 CRUD，支持素材大类 Tab、分组筛选、直径筛选、图片上传、
+ *   展示文案录入（寓意/能量/搭配/五行/克重）、异形珠几何参数、P0 数据完备度卡片
  *
  * 后端数据结构（GET /api/v4/console/diy/materials）：
  * - data.rows[]: { diy_material_id, material_code, display_name, material_name,
- *     group_code, diameter, shape, price, price_asset_code, stock, is_stackable,
+ *     group_code, diameter, shape, item_type, material_type, five_elements, weight,
+ *     meaning, energy, pairing, size_length_mm, size_width_mm, bore_orientation,
+ *     price, price_asset_code, stock, is_stackable,
  *     image_media_id, category_id, sort_order, is_enabled, meta,
  *     image_media{}, category{} }
  * - data.count: number
+ *
+ * 完备度数据（GET /api/v4/console/diy/stats → data.completeness.materials）：
+ * - { total, enabled_count, disabled_count, missing_image_count,
+ *     missing_copy_count, zero_price_enabled_count }
  */
 
 import { logger } from '@/utils/logger.js'
@@ -19,7 +26,8 @@ import {
   getAdminMaterialList,
   createMaterial,
   updateMaterial,
-  deleteMaterial
+  deleteMaterial,
+  getDiyStats
 } from '@/api/diy.js'
 
 /** 分组标签（对齐 asset_group_defs） */
@@ -52,6 +60,44 @@ const SHAPE_LABELS = {
   teardrop: '水滴形'
 }
 
+/** 素材大类标签（item_type，与 material_type 材质档位是两个独立业务概念） */
+const ITEM_TYPE_LABELS = {
+  beads: '珠子',
+  accessories: '配饰',
+  pendants: '吊坠'
+}
+
+/** 素材大类 Tab 选项（列表筛选 + 表单下拉共用） */
+const ITEM_TYPE_OPTIONS = [
+  { value: 'beads', label: '珠子（饰品主体）' },
+  { value: 'accessories', label: '配饰（隔片/佛头/流苏）' },
+  { value: 'pendants', label: '吊坠' }
+]
+
+/** 材质光影档位选项（前端立体渲染高光参数） */
+const MATERIAL_TYPE_OPTIONS = [
+  { value: 'crystal', label: '通透水晶（大而亮高光）' },
+  { value: 'stone', label: '玉石/奶体（柔和温润）' },
+  { value: 'metal', label: '金属/镜面（小而锐高光）' },
+  { value: 'matte', label: '哑光/不透光（漫反射）' }
+]
+
+/** 五行属性选项（多选 → 逗号串存库） */
+const FIVE_ELEMENT_OPTIONS = [
+  { value: 'metal', label: '金' },
+  { value: 'wood', label: '木' },
+  { value: 'water', label: '水' },
+  { value: 'fire', label: '火' },
+  { value: 'earth', label: '土' }
+]
+
+/** 穿绳方向选项（异形珠几何参数） */
+const BORE_ORIENTATION_OPTIONS = [
+  { value: 'none', label: '圆珠（无方向）' },
+  { value: 'along_length', label: '绳穿长轴（管珠）' },
+  { value: 'along_width', label: '绳穿短边（药片）' }
+]
+
 /** 空表单 */
 function emptyForm() {
   return {
@@ -61,6 +107,16 @@ function emptyForm() {
     group_code: '',
     diameter: 10,
     shape: 'circle',
+    item_type: 'beads',
+    material_type: 'crystal',
+    five_elements: [], // 多选数组，保存时 join(',') 转逗号串
+    weight: null,
+    meaning: '',
+    energy: '',
+    pairing: '',
+    size_length_mm: null,
+    size_width_mm: null,
+    bore_orientation: 'none',
     price: 0,
     price_asset_code: 'star_stone',
     stock: -1,
@@ -92,6 +148,12 @@ function diyMaterialManagement() {
     filterGroup: '',
     filterDiameter: '',
     filterKeyword: '',
+    filterItemType: '', // 素材大类 Tab（'' 全部 / beads / accessories / pendants）
+    /* 完备度快捷筛选（'' 无 / missing_image 缺图 / missing_copy 缺文案 / zero_price_enabled 0价启用） */
+    filterCompleteness: '',
+
+    // ========== P0 数据完备度（来自 stats 接口 completeness.materials） ==========
+    completeness: null,
 
     // ========== 表单弹窗 ==========
     showFormModal: false,
@@ -106,6 +168,11 @@ function diyMaterialManagement() {
     groupLabels: GROUP_LABELS,
     allGroupOptions: ALL_GROUP_OPTIONS,
     shapeLabels: SHAPE_LABELS,
+    itemTypeLabels: ITEM_TYPE_LABELS,
+    itemTypeOptions: ITEM_TYPE_OPTIONS,
+    materialTypeOptions: MATERIAL_TYPE_OPTIONS,
+    fiveElementOptions: FIVE_ELEMENT_OPTIONS,
+    boreOrientationOptions: BORE_ORIENTATION_OPTIONS,
 
     // ========== 动态选项（从数据中提取） ==========
     get groupOptions() {
@@ -118,10 +185,27 @@ function diyMaterialManagement() {
 
     async init() {
       logger.info('[DIY-Materials] 素材管理页面初始化')
-      await this.loadData()
+      /* URL 带完备度筛选参数时直接应用（大屏指标点击跳转带参，如 ?filter=missing_image） */
+      const urlFilter = new URLSearchParams(window.location.search).get('filter')
+      if (['missing_image', 'missing_copy', 'zero_price_enabled'].includes(urlFilter)) {
+        this.filterCompleteness = urlFilter
+      }
+      await Promise.all([this.loadData(), this.loadCompleteness()])
     },
 
     // ==================== 数据加载 ====================
+
+    /** 加载 P0 数据完备度卡片（缺图/缺文案/0价，运营录数工作清单） */
+    async loadCompleteness() {
+      try {
+        const res = await getDiyStats()
+        if (res.success) {
+          this.completeness = res.data?.completeness?.materials || null
+        }
+      } catch (e) {
+        logger.error('[DIY-Materials] 加载完备度统计异常', e)
+      }
+    },
 
     async loadData() {
       this.loading = true
@@ -130,6 +214,8 @@ function diyMaterialManagement() {
         if (this.filterGroup) params.group_code = this.filterGroup
         if (this.filterDiameter) params.diameter = this.filterDiameter
         if (this.filterKeyword) params.keyword = this.filterKeyword
+        if (this.filterItemType) params.item_type = this.filterItemType
+        if (this.filterCompleteness) params[this.filterCompleteness] = true
 
         const res = await getAdminMaterialList(params)
         if (res.success) {
@@ -168,6 +254,22 @@ function diyMaterialManagement() {
       this.filterGroup = ''
       this.filterDiameter = ''
       this.filterKeyword = ''
+      this.filterItemType = ''
+      this.filterCompleteness = ''
+      this.page = 1
+      await this.loadData()
+    },
+
+    /** 切换素材大类 Tab（饰品/配饰/吊坠） */
+    async switchItemType(itemType) {
+      this.filterItemType = itemType
+      this.page = 1
+      await this.loadData()
+    },
+
+    /** 点完备度卡片即带筛选过滤（缺图/缺文案/0价，二次点击取消） */
+    async toggleCompletenessFilter(filterKey) {
+      this.filterCompleteness = this.filterCompleteness === filterKey ? '' : filterKey
       this.page = 1
       await this.loadData()
     },
@@ -194,6 +296,19 @@ function diyMaterialManagement() {
         group_code: mat.group_code || '',
         diameter: mat.diameter || 10,
         shape: mat.shape || 'circle',
+        item_type: mat.item_type || 'beads',
+        material_type: mat.material_type || 'crystal',
+        /* 后端存逗号串，表单用多选数组 */
+        five_elements: mat.five_elements
+          ? mat.five_elements.split(',').map(el => el.trim())
+          : [],
+        weight: mat.weight ?? null,
+        meaning: mat.meaning || '',
+        energy: mat.energy || '',
+        pairing: mat.pairing || '',
+        size_length_mm: mat.size_length_mm ?? null,
+        size_width_mm: mat.size_width_mm ?? null,
+        bore_orientation: mat.bore_orientation || 'none',
         price: mat.price || 0,
         price_asset_code: mat.price_asset_code || 'star_stone',
         stock: mat.stock ?? -1,
@@ -232,11 +347,28 @@ function diyMaterialManagement() {
         Alpine.store('notification')?.show('请上传素材图片（小程序设计器渲染必需）', 'warning')
         return
       }
+      /* 价格护栏（拍板 ⑥，与后端同一规则）：0 价素材禁止启用 */
+      if (Number(this.form.price) === 0 && this.form.is_enabled === true) {
+        Alpine.store('notification')?.show('0 价素材禁止启用，请先定价（价格护栏）', 'warning')
+        return
+      }
 
       this.saving = true
       try {
         const data = { ...this.form }
         delete data.material_code
+        /* 五行多选数组 → 逗号串（后端 VARCHAR 存储约定）；空数组存 null */
+        data.five_elements = this.form.five_elements.length
+          ? this.form.five_elements.join(',')
+          : null
+        /* 数字类字段空串归一为 null，避免后端 DECIMAL 收到 '' */
+        for (const numField of ['weight', 'size_length_mm', 'size_width_mm']) {
+          if (data[numField] === '' || data[numField] === undefined) data[numField] = null
+        }
+        /* 文本类字段空串归一为 null */
+        for (const textField of ['meaning', 'energy', 'pairing']) {
+          if (!data[textField]?.trim()) data[textField] = null
+        }
         if (this.imageMediaId) {
           data.image_media_id = this.imageMediaId
         }
@@ -250,7 +382,7 @@ function diyMaterialManagement() {
 
         if (res.success) {
           this.showFormModal = false
-          await this.loadData()
+          await Promise.all([this.loadData(), this.loadCompleteness()])
           Alpine.store('notification')?.show(
             this.editingId ? '素材更新成功' : '素材创建成功',
             'success'

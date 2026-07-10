@@ -15,11 +15,77 @@ const { AssetCode } = require('../../constants/AssetCode')
 const { Category, DiyMaterial, DiyTemplate, MediaFile } = require('../../models')
 const TransactionManager = require('../../utils/TransactionManager')
 
+/**
+ * 用户端素材序列化（数据最小化 + 库存掩码，拍板决议 11.5-D）
+ *
+ * - image_media 用 MediaFile.toSafeJSON() 输出（隐藏 object_key/uploaded_by/thumbnail_keys，
+ *   补齐 public_url + thumbnails.w375/w750/w1080 衍生图 URL）
+ * - stock 掩码（拍板 ③）：-1=无限 / 0=售罄 原样，正数一律压成 1（不暴露精确库存）
+ * - 只输出小程序渲染/展示需要的字段，不下发 meta/is_stackable 等后台字段
+ *
+ * @param {DiyMaterial} material - 素材模型实例（含 image_media 关联）
+ * @returns {Object} 用户端安全的素材数据
+ */
+function toUserMaterialJSON(material) {
+  const plain = material.get({ plain: true })
+  return {
+    diy_material_id: plain.diy_material_id,
+    material_code: plain.material_code,
+    display_name: plain.display_name,
+    material_name: plain.material_name,
+    group_code: plain.group_code,
+    diameter: plain.diameter,
+    shape: plain.shape,
+    /* 素材大类（饰品/配饰/吊坠 Tab）与材质光影档位（渲染高光参数）为两个独立业务概念 */
+    item_type: plain.item_type,
+    material_type: plain.material_type,
+    five_elements: plain.five_elements,
+    weight: plain.weight,
+    meaning: plain.meaning,
+    energy: plain.energy,
+    pairing: plain.pairing,
+    size_length_mm: plain.size_length_mm,
+    size_width_mm: plain.size_width_mm,
+    bore_orientation: plain.bore_orientation,
+    price: plain.price,
+    price_asset_code: plain.price_asset_code,
+    stock: plain.stock > 0 ? 1 : plain.stock,
+    image_media: material.image_media ? material.image_media.toSafeJSON() : null,
+    sort_order: plain.sort_order,
+    is_enabled: plain.is_enabled
+  }
+}
+
+/**
+ * 素材价格护栏（拍板决议 11.8-⑥）：0 价素材禁止启用
+ *
+ * 从机制上杜绝「price=0 且 is_enabled=1」的事故（真机填槽后费用显示"0 星石"），
+ * createMaterial / updateMaterial 共用，按落库后的最终状态校验。
+ *
+ * @param {number} finalPrice - 落库后的最终价格
+ * @param {boolean} finalEnabled - 落库后的最终启用状态
+ * @returns {void}
+ */
+function assertPriceGuard(finalPrice, finalEnabled) {
+  if (Number(finalPrice) === 0 && finalEnabled === true) {
+    const error = new Error('0 价素材禁止启用，请先定价（价格护栏，拍板决议 11.8-⑥）')
+    error.statusCode = 400
+    throw error
+  }
+}
+
 /** DIY 素材管理服务 */
 class DiyMaterialService {
   /**
    * 管理端获取材料列表（分页/筛选）
-   * @param {Object} params - { page, page_size, group_code, category_id, keyword, is_enabled }
+   *
+   * 完备度快捷筛选（拍板决议 11.6-4 P0，配合完备度卡片做成运营工作清单）：
+   * - missing_image=true       缺图素材（image_media_id IS NULL）
+   * - missing_copy=true        缺文案素材（meaning 或 five_elements 为空）
+   * - zero_price_enabled=true  0 价且启用素材（价格护栏兜底排查）
+   *
+   * @param {Object} params - { page, page_size, group_code, category_id, item_type, keyword,
+   *   is_enabled, missing_image, missing_copy, zero_price_enabled }
    * @returns {{rows: DiyMaterial[], count: number}} 分页材料列表
    */
   static async getAdminMaterialList(params = {}) {
@@ -29,9 +95,23 @@ class DiyMaterialService {
 
     if (params.group_code) where.group_code = params.group_code
     if (params.category_id) where.category_id = Number(params.category_id)
+    if (params.item_type) where.item_type = params.item_type
     if (params.is_enabled !== undefined && params.is_enabled !== '') {
       where.is_enabled =
         params.is_enabled === 'true' || params.is_enabled === true || params.is_enabled === 1
+    }
+    // 完备度快捷筛选（P0 运营工作清单）
+    if (params.missing_image === 'true' || params.missing_image === true) {
+      where.image_media_id = null
+    }
+    if (params.missing_copy === 'true' || params.missing_copy === true) {
+      /* 用 Op.and 承载，避免与 keyword 的 Op.or 相互覆盖 */
+      where[Op.and] = where[Op.and] || []
+      where[Op.and].push({ [Op.or]: [{ meaning: null }, { five_elements: null }] })
+    }
+    if (params.zero_price_enabled === 'true' || params.zero_price_enabled === true) {
+      where.price = 0
+      where.is_enabled = true
     }
     if (params.keyword) {
       where[Op.or] = [
@@ -132,6 +212,9 @@ class DiyMaterialService {
         }
       }
 
+      // 价格护栏（拍板 ⑥）：0 价素材禁止启用（按最终落库状态校验）
+      assertPriceGuard(data.price || 0, data.is_enabled ?? true)
+
       const material = await DiyMaterial.create(
         {
           material_code: 'DM_TEMP',
@@ -139,7 +222,18 @@ class DiyMaterialService {
           material_name: data.material_name || null,
           group_code: data.group_code || 'default',
           diameter: data.diameter || null,
-          shape: data.shape || 'round',
+          /* 默认取 ENUM 合法值 circle（历史 bug：'round' 不在 ENUM 内，不传 shape 会写库失败） */
+          shape: data.shape || 'circle',
+          item_type: data.item_type || 'beads',
+          material_type: data.material_type || 'crystal',
+          five_elements: data.five_elements || null,
+          weight: data.weight ?? null,
+          meaning: data.meaning || null,
+          energy: data.energy || null,
+          pairing: data.pairing || null,
+          size_length_mm: data.size_length_mm ?? null,
+          size_width_mm: data.size_width_mm ?? null,
+          bore_orientation: data.bore_orientation || 'none',
           price: data.price || 0,
           price_asset_code: assetCode,
           stock: data.stock ?? -1,
@@ -192,6 +286,16 @@ class DiyMaterialService {
         'group_code',
         'diameter',
         'shape',
+        'item_type',
+        'material_type',
+        'five_elements',
+        'weight',
+        'meaning',
+        'energy',
+        'pairing',
+        'size_length_mm',
+        'size_width_mm',
+        'bore_orientation',
         'price',
         'price_asset_code',
         'stock',
@@ -233,6 +337,14 @@ class DiyMaterialService {
           throw error
         }
       }
+
+      // 价格护栏（拍板 ⑥）：0 价素材禁止启用（按更新后的最终状态校验）
+      const finalPrice = updates.price !== undefined ? updates.price : material.price
+      const finalEnabled =
+        updates.is_enabled !== undefined
+          ? Boolean(updates.is_enabled)
+          : Boolean(material.is_enabled)
+      assertPriceGuard(finalPrice, finalEnabled)
 
       await material.update(updates, { transaction })
 
@@ -282,9 +394,13 @@ class DiyMaterialService {
    * 用户端：获取模板可用材料列表
    * 根据模板的 material_group_codes 和 category_id 筛选
    * 支持按 slot_id 的 allowed_diameters 约束过滤
+   * 支持按 item_type 素材大类过滤（饰品/配饰/吊坠 Tab，拍板决议 11.3-9：同一接口不另开）
+   *
+   * 输出经 toUserMaterialJSON 收敛（数据最小化 + 库存掩码，拍板决议 11.5-D）
+   *
    * @param {number} templateId - 模板 ID
-   * @param {Object} params - { group_code, diameter, keyword, slot_id }
-   * @returns {Object[]} 用户可见的材料列表
+   * @param {Object} params - { group_code, diameter, keyword, slot_id, item_type }
+   * @returns {Object[]} 用户可见的材料列表（安全序列化后的普通对象）
    */
   static async getUserMaterials(templateId, params = {}) {
     const template = await DiyTemplate.findByPk(templateId)
@@ -313,6 +429,7 @@ class DiyMaterialService {
     // 额外筛选条件
     if (params.group_code) where.group_code = params.group_code
     if (params.diameter) where.diameter = Number(params.diameter)
+    if (params.item_type) where.item_type = params.item_type
     if (params.keyword) {
       where[Op.or] = [
         { display_name: { [Op.like]: `%${params.keyword}%` } },
@@ -322,15 +439,7 @@ class DiyMaterialService {
 
     const materials = await DiyMaterial.findAll({
       where,
-      include: [
-        { model: MediaFile, as: 'image_media', required: false },
-        {
-          model: Category,
-          as: 'category',
-          attributes: ['category_id', 'category_name', 'category_code'],
-          required: false
-        }
-      ],
+      include: [{ model: MediaFile, as: 'image_media', required: false }],
       order: [
         ['group_code', 'ASC'],
         ['sort_order', 'ASC']
@@ -338,7 +447,8 @@ class DiyMaterialService {
       limit: 200
     })
 
-    return materials
+    /* 用户端数据最小化 + 库存掩码（拍板决议 11.5-D / 11.8-③） */
+    return materials.map(toUserMaterialJSON)
   }
 
   /**

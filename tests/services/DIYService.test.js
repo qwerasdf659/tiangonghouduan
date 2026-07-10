@@ -28,6 +28,7 @@ let adminToken = null
 let testAccountId = null
 let createdTemplateId = null
 let createdWorkId = null
+let realMediaId = null // 库中真实存在的媒体ID（media_id=1 不一定存在，测试用真实值避免外键失败）
 
 beforeAll(async () => {
   // 使用 quick-login 获取 token
@@ -44,6 +45,10 @@ beforeAll(async () => {
     where: { user_id: userId }
   })
   testAccountId = account.account_id
+
+  // 取库中真实存在的媒体ID（供模板底图/预览图外键使用）
+  const media = await models.MediaFile.findOne({ order: [['media_id', 'ASC']] })
+  realMediaId = media ? media.media_id : null
 })
 
 afterAll(async () => {
@@ -175,8 +180,8 @@ describe('DIY 款式模板 — 管理端 API', () => {
         sort_order: 99,
         status: 'draft',
         is_enabled: false,
-        base_image_media_id: 1,
-        preview_media_id: 1
+        base_image_media_id: realMediaId,
+        preview_media_id: realMediaId
       })
 
     expect(res.status).toBe(200)
@@ -359,7 +364,7 @@ describe('DIY 整数定价校验', () => {
         diameter: 8,
         price: 7,
         price_asset_code: 'star_stone',
-        image_media_id: 1
+        image_media_id: realMediaId
       })
 
     expect(res.body.success).toBe(true)
@@ -411,6 +416,128 @@ describe('DIY 模板管理 — 清理', () => {
     expect(res.body.success).toBe(true)
 
     createdTemplateId = null
+  })
+})
+
+describe('DIY 素材展示字段与护栏（拍板决议 11.5-A/B）', () => {
+  let createdMaterialId = null
+
+  afterAll(async () => {
+    if (createdMaterialId) {
+      await models.DiyMaterial.destroy({ where: { diy_material_id: createdMaterialId } }).catch(
+        () => {}
+      )
+    }
+  })
+
+  test('POST /api/v4/console/diy/materials — 创建时接受展示/几何新字段并落库', async () => {
+    // 取一张真实存在的媒体图（media_id=1 不存在，用库中首个）
+    const media = await models.MediaFile.findOne({ order: [['media_id', 'ASC']] })
+    expect(media).toBeTruthy()
+
+    const res = await request(app)
+      .post('/api/v4/console/diy/materials')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        material_name: '测试管珠',
+        display_name: '测试管珠_新字段',
+        group_code: 'green',
+        diameter: 8,
+        shape: 'ellipse',
+        item_type: 'accessories',
+        material_type: 'metal',
+        five_elements: 'wood,water',
+        weight: 1.2,
+        meaning: '寓意测试文案',
+        energy: '活力·测试',
+        pairing: '搭配白水晶',
+        size_length_mm: 14.5,
+        size_width_mm: 4.5,
+        bore_orientation: 'along_length',
+        price: 12,
+        price_asset_code: 'star_stone',
+        image_media_id: media.media_id
+      })
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    createdMaterialId = res.body.data.diy_material_id
+
+    // 回读数据库确认新字段真实落库（不信任响应，直连模型核对）
+    const saved = await models.DiyMaterial.findByPk(createdMaterialId)
+    expect(saved.item_type).toBe('accessories')
+    expect(saved.material_type).toBe('metal')
+    expect(saved.five_elements).toBe('wood,water')
+    expect(Number(saved.weight)).toBe(1.2)
+    expect(saved.meaning).toBe('寓意测试文案')
+    expect(saved.bore_orientation).toBe('along_length')
+  })
+
+  test('POST /api/v4/console/diy/materials — 不传 shape 时默认 circle（历史 round bug 已修）', async () => {
+    const media = await models.MediaFile.findOne({ order: [['media_id', 'ASC']] })
+    const res = await request(app)
+      .post('/api/v4/console/diy/materials')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        material_name: '测试默认形状',
+        display_name: '测试默认形状_' + Date.now(),
+        group_code: 'blue',
+        diameter: 10,
+        price: 8,
+        price_asset_code: 'star_stone',
+        image_media_id: media.media_id
+        // 故意不传 shape
+      })
+
+    expect(res.body.success).toBe(true)
+    const saved = await models.DiyMaterial.findByPk(res.body.data.diy_material_id)
+    expect(saved.shape).toBe('circle')
+
+    // 清理
+    await models.DiyMaterial.destroy({ where: { diy_material_id: res.body.data.diy_material_id } })
+  })
+
+  test('POST /api/v4/console/diy/materials — 0 价且启用被价格护栏拒绝（拍板 ⑥）', async () => {
+    const media = await models.MediaFile.findOne({ order: [['media_id', 'ASC']] })
+    const res = await request(app)
+      .post('/api/v4/console/diy/materials')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        material_name: '测试0价启用',
+        display_name: '测试0价启用_' + Date.now(),
+        group_code: 'green',
+        diameter: 8,
+        price: 0,
+        is_enabled: true,
+        price_asset_code: 'star_stone',
+        image_media_id: media.media_id
+      })
+
+    expect(res.body.success).toBe(false)
+    expect(res.body.message).toMatch(/0 价素材禁止启用/)
+  })
+
+  test('GET /api/v4/diy/templates/:id/beads — 用户端库存掩码（正数压成1）+ 隐藏对象存储字段', async () => {
+    // 用真实 published 模板 #65
+    const res = await request(app).get('/api/v4/diy/templates/65/beads')
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(Array.isArray(res.body.data)).toBe(true)
+
+    for (const bead of res.body.data) {
+      // 库存掩码：只允许 -1 / 0 / 1 三值
+      expect([-1, 0, 1]).toContain(bead.stock)
+      // 展示字段存在
+      expect(bead).toHaveProperty('item_type')
+      expect(bead).toHaveProperty('material_type')
+      // 媒体字段脱敏：不下发 object_key / uploaded_by
+      if (bead.image_media) {
+        expect(bead.image_media).not.toHaveProperty('object_key')
+        expect(bead.image_media).not.toHaveProperty('uploaded_by')
+        expect(bead.image_media).toHaveProperty('public_url')
+      }
+    }
   })
 })
 

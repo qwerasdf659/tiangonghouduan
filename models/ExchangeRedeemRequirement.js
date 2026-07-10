@@ -96,6 +96,12 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         comment: '最低成长等级门槛（关联 user_growth_levels.level_key，NULL=不限等级）'
       },
+      max_growth_level_key: {
+        type: DataTypes.STRING(32),
+        allowNull: true,
+        comment:
+          '最高成长等级门槛（关联 user_growth_levels.level_key，NULL=不限；与 min 组合成区间，拍板⑪）'
+      },
       extra_cost_assets: {
         type: DataTypes.JSON,
         allowNull: true,

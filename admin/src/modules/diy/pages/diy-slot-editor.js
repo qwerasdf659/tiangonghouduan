@@ -342,10 +342,14 @@ async function saveSlots() {
   state.saving = true
 
   try {
+    /*
+     * 保存前剥离 _previewMaterial（编辑器内部预览态，含素材价格/图片 URL）
+     * 修复：预览脏数据曾随保存入库并经公开模板接口下发（拍板决议 11.6-2）
+     */
     const newLayout = {
       ...state.layout,
       shape: 'slots',
-      slot_definitions: state.slots
+      slot_definitions: state.slots.map(({ _previewMaterial, ...slot }) => slot)
     }
 
     const res = await updateTemplate(state.templateId, { layout: newLayout })

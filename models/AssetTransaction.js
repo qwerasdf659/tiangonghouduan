@@ -95,7 +95,9 @@ class AssetTransaction extends Model {
     // 抽奖相关（Lottery - 抽奖业务）
     LOTTERY_CONSUME: 'lottery_consume', // 抽奖消耗积分
     LOTTERY_REWARD: 'lottery_reward', // 抽奖奖励发放
-    CONSUMPTION_REWARD: 'consumption_reward', // 消费奖励
+    CONSUMPTION_REWARD: 'consumption_reward', // 消费奖励（基础积分，计入 history_total_points 驱动成长等级）
+    LEVEL_BONUS_REWARD: 'level_bonus_reward', // 成长等级发放线加成积分（可花不计等级，防复利；见 BalanceService.HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES）
+    ACTIVITY_BONUS_REWARD: 'activity_bonus_reward', // 活动加成积分（预留，同样不计等级累计）
 
     // 市场购买相关（Market Purchase - 交易市场star_stone结算）
     MARKET_PURCHASE_BUYER_DEBIT: 'market_purchase_buyer_debit', // 市场购买买家扣减
