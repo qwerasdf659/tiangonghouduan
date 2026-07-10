@@ -100,6 +100,61 @@ class BarterService {
   }
 
   /**
+   * C 端配方列表视图（仅启用配方 + 产出商品展示字段，2026-07-11 小程序对接 B-1）
+   *
+   * 在原始配方之上追加两个只读展示字段（批量 IN 查询防 N+1）：
+   * - output_item_name: 产出商品名称（exchange_items.item_name，配方卡片直接展示"产出：毛巾礼盒"）
+   * - output_fulfillment_type: 产出履约类型，与 executeBarter 履约分流【同一判定源】（模板 item_type）：
+   *   'physical'（模板 item_type='product'，前端据此要求选收货地址，与 BARTER_ADDRESS_REQUIRED 同口径）
+   *   / 'voucher'（券）/ 'virtual'（其它道具类）——避免前端另查商品详情多一次请求往返。
+   *
+   * @param {Object} [options] - 选项
+   * @param {Object} [options.transaction] - 事务对象
+   * @returns {Promise<Array>} 启用配方数组（含产出展示字段）
+   */
+  async getEnabledRecipesForDisplay(options = {}) {
+    const recipes = await this.getRecipes(options)
+    const enabled = recipes.filter(r => r.is_enabled !== false)
+    if (enabled.length === 0) return []
+
+    const outputIds = [
+      ...new Set(enabled.map(r => Number(r.output_exchange_item_id)).filter(Boolean))
+    ]
+    const outputs = await this.ExchangeItem.findAll({
+      where: { exchange_item_id: outputIds },
+      attributes: ['exchange_item_id', 'item_name'],
+      include: [
+        {
+          model: this.ItemTemplate,
+          as: 'itemTemplate',
+          attributes: ['item_type'],
+          required: false
+        }
+      ],
+      transaction: options.transaction
+    })
+    const outputMap = new Map(outputs.map(o => [Number(o.exchange_item_id), o]))
+
+    return enabled.map(r => {
+      const output = outputMap.get(Number(r.output_exchange_item_id))
+      const templateItemType = output?.itemTemplate?.item_type || null
+      let fulfillmentType = null
+      if (templateItemType === 'product') {
+        fulfillmentType = 'physical'
+      } else if (templateItemType === 'voucher') {
+        fulfillmentType = 'voucher'
+      } else if (templateItemType) {
+        fulfillmentType = 'virtual'
+      }
+      return {
+        ...r,
+        output_item_name: output ? output.item_name : null,
+        output_fulfillment_type: fulfillmentType
+      }
+    })
+  }
+
+  /**
    * 执行以物易物（核心写操作，事务由路由层传入）
    *
    * 流程：
@@ -469,8 +524,15 @@ class BarterService {
       const outputItems = await this.ExchangeItem.findAll({
         where: { exchange_item_id: outputIds },
         attributes: ['exchange_item_id', 'item_name', 'item_template_id'],
-        transaction,
-        raw: true
+        include: [
+          {
+            model: this.ItemTemplate,
+            as: 'itemTemplate',
+            attributes: ['item_type'],
+            required: false
+          }
+        ],
+        transaction
       })
       const outputMap = new Map(outputItems.map(i => [Number(i.exchange_item_id), i]))
       for (const r of recipes) {
@@ -482,10 +544,26 @@ class BarterService {
             400
           )
         }
-        if (!output.item_template_id) {
+        if (!output.item_template_id || !output.itemTemplate) {
           throw new BusinessError(
             `配方 ${r.recipe_code} 的产出商品「${output.item_name}」未关联物品模板——模板是方向守卫价值锚与履约分流依据，请先在商品管理中关联 item_template_id`,
             'BARTER_OUTPUT_TEMPLATE_MISSING',
+            400
+          )
+        }
+        /*
+         * 库存口径拍板（2026-07-11）：配方 total_limit 是换物发放总量的唯一权威——
+         * exchange_items.stock 是 SKU 聚合的物化列（属商城购买链路，SPU 对账任务每日全量重算），
+         * 换物不读不写 stock，杜绝"两套库存"账实漂移。
+         * 实物产出（模板 item_type='product'）是真金白银的官方库存承诺，必须显式限量
+         * （total_limit ≥ 1）；券/道具产出允许不限（0/缺省），成本天然可控。
+         */
+        const isPhysicalOutput = output.itemTemplate.item_type === 'product'
+        const totalLimit = Number(r.total_limit) || 0
+        if (isPhysicalOutput && totalLimit < 1) {
+          throw new BusinessError(
+            `配方 ${r.recipe_code} 的产出为实物「${output.item_name}」，必须设置配方总量 total_limit ≥ 1（换物发放总量的唯一库存口径，防实物无限发放）`,
+            'BARTER_TOTAL_LIMIT_REQUIRED',
             400
           )
         }
@@ -571,6 +649,39 @@ class BarterService {
       0
     )
 
+    /*
+     * 配方限额对账（库存口径拍板 2026-07-11）：total_limit 是换物发放总量的唯一权威，
+     * 看板下发每个启用配方的 总量/已用/剩余——运营据此对账补货（扩总量）或停用配方。
+     * 已用口径与 _assertRecipeLimits 完全一致：全时段（非统计窗口）、取消/拒绝/退款不占额。
+     */
+    const recipes = await this.getRecipes()
+    let recipeLimits = []
+    if (recipes.length > 0) {
+      const [usedRows] = await this.sequelize.query(
+        `SELECT JSON_UNQUOTE(JSON_EXTRACT(item_snapshot, '$.recipe_code')) AS recipe_code,
+                COUNT(*) AS used_count
+         FROM exchange_records
+         WHERE source = 'barter'
+           AND status IN ('pending', 'approved', 'shipped', 'received', 'rated', 'completed')
+         GROUP BY recipe_code`
+      )
+      const usedMap = new Map(usedRows.map(r => [r.recipe_code, Number(r.used_count)]))
+      recipeLimits = recipes
+        .filter(r => r.is_enabled !== false)
+        .map(r => {
+          const totalLimit = Number(r.total_limit) || 0
+          const used = usedMap.get(r.recipe_code) || 0
+          return {
+            recipe_code: r.recipe_code,
+            recipe_name: r.name || null,
+            total_limit: totalLimit,
+            used_count: used,
+            // 剩余额度：不限量配方为 null（前端展示"不限"）
+            remaining: totalLimit > 0 ? Math.max(0, totalLimit - used) : null
+          }
+        })
+    }
+
     return {
       period_days: days,
       daily: dailyRows.map(r => ({ stat_date: r.stat_date, order_count: Number(r.order_count) })),
@@ -580,6 +691,7 @@ class BarterService {
         order_count: Number(r.order_count),
         consumed_item_count: Number(r.consumed_item_count || 0)
       })),
+      recipe_limits: recipeLimits,
       status_distribution: statusRows.map(r => ({
         status: r.status,
         order_count: Number(r.order_count)

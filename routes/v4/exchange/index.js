@@ -981,7 +981,10 @@ router.use('/decorations', decorationRoutes)
 /**
  * GET /api/v4/exchange/barter/recipes
  *
- * @description 获取以物易物配方列表（旧物组合 → 官方产出物）
+ * @description 获取以物易物配方列表（旧物组合 → 官方产出物，仅启用项）。
+ *              每项含产出商品展示字段（2026-07-11 小程序对接 B-1）：
+ *              output_item_name（产出商品名）、output_fulfillment_type
+ *              （'physical'=实物快递需选地址 / 'voucher' / 'virtual'，与履约分流同一判定源）。
  * @access Private（登录用户）
  *
  * @returns {Object} { recipes }
@@ -991,10 +994,8 @@ router.get(
   authenticateToken,
   asyncHandler(async (req, res) => {
     const BarterService = req.app.locals.services.getService('exchange_barter')
-    const recipes = await BarterService.getRecipes()
-    // 仅返回启用的配方给用户端
-    const enabled = recipes.filter(r => r.is_enabled !== false)
-    return res.apiSuccess({ recipes: enabled })
+    const recipes = await BarterService.getEnabledRecipesForDisplay()
+    return res.apiSuccess({ recipes })
   })
 )
 

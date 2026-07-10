@@ -28,6 +28,13 @@ export function useBarterRecipesState() {
   return {
     /** @type {Array<Object>} 配方列表 */
     barterRecipes: [],
+    /**
+     * 配方限额对账（recipe_code → { total_limit, used_count, remaining }）
+     * 数据源：后端换物看板 recipe_limits（库存口径拍板 2026-07-11：
+     * 配方 total_limit 是换物发放总量的唯一权威，已用口径=全时段非取消订单计数）
+     * @type {Object<string, {total_limit:number, used_count:number, remaining:number|null}>}
+     */
+    barterRecipeLimits: {},
     /** @type {boolean} 配方加载中 */
     barterLoading: false,
     /** @type {boolean} 配方保存中 */
@@ -54,12 +61,55 @@ export function useBarterRecipesMethods() {
         } else {
           this.showError?.(res.message || '加载以物易物配方失败')
         }
+        // 限额对账（已用/剩余）：读换物看板 recipe_limits，与配方表并排展示
+        await this.loadBarterRecipeLimits()
       } catch (e) {
         logger.error('[BarterRecipes] 加载失败:', e)
         this.showError?.('加载以物易物配方失败')
       } finally {
         this.barterLoading = false
       }
+    },
+
+    /**
+     * 加载配方限额对账数据（total_limit / used_count / remaining）
+     * @returns {Promise<void>}
+     */
+    async loadBarterRecipeLimits() {
+      try {
+        const res = await ExchangeAPI.getBarterStats()
+        const limits = res.success && Array.isArray(res.data?.recipe_limits) ? res.data.recipe_limits : []
+        const map = {}
+        for (const row of limits) {
+          map[row.recipe_code] = row
+        }
+        this.barterRecipeLimits = map
+      } catch (e) {
+        // 对账数据加载失败不阻塞配方管理（配方 CRUD 仍可用），直接暴露错误便于排查
+        logger.error('[BarterRecipes] 限额对账数据加载失败:', e)
+        this.showError?.('换物限额对账数据加载失败')
+      }
+    },
+
+    /**
+     * 配方"已用次数"展示值（未保存的新配方/无数据显示 —）
+     * @param {string} recipe_code - 配方码
+     * @returns {string} 已用次数文本
+     */
+    barterRecipeUsedText(recipe_code) {
+      const row = this.barterRecipeLimits[recipe_code]
+      return row ? String(row.used_count) : '—'
+    },
+
+    /**
+     * 配方"剩余额度"展示值（remaining=null 表示不限量）
+     * @param {string} recipe_code - 配方码
+     * @returns {string} 剩余额度文本
+     */
+    barterRecipeRemainingText(recipe_code) {
+      const row = this.barterRecipeLimits[recipe_code]
+      if (!row) return '—'
+      return row.remaining === null ? '不限' : String(row.remaining)
     },
 
     /**

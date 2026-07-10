@@ -10,6 +10,11 @@
  *     preview_media_id, base_image_media_id, status, is_enabled, sort_order,
  *     meta, created_at, updated_at, category{}, preview_media{}, base_image_media{} }
  * - data.count: number
+ *
+ * 完备度数据（GET /api/v4/console/diy/stats → data.completeness.templates）：
+ * - { total, missing_preview_count, missing_base_image_count,
+ *     draft_count, published_without_materials_count }
+ * 列表接口支持完备度快捷筛选参数：missing_preview=true / missing_base_image=true（后端已实现）
  */
 
 import { logger } from '@/utils/logger.js'
@@ -91,6 +96,11 @@ function diyTemplateManagement() {
     filterStatus: '',
     filterEnabled: '',
     filterKeyword: '',
+    /* 完备度快捷筛选（'' 无 / missing_preview 缺预览图 / missing_base_image 缺底图） */
+    filterCompleteness: '',
+
+    // ========== P0 数据完备度（来自 stats 接口 completeness.templates） ==========
+    completeness: null,
 
     // ========== 表单弹窗 ==========
     showFormModal: false,
@@ -119,11 +129,15 @@ function diyTemplateManagement() {
 
     async init() {
       logger.info('[DIY] 模板管理页面初始化')
-      await Promise.all([
-        this.loadCategories(),
-        this.loadData(),
-        this.loadStats()
-      ])
+      /* URL 带完备度筛选参数时直接应用（大屏指标点击跳转带参，如 ?filter=missing_preview） */
+      const urlFilter = new URLSearchParams(window.location.search).get('filter')
+      if (['missing_preview', 'missing_base_image'].includes(urlFilter)) {
+        this.filterCompleteness = urlFilter
+      } else if (urlFilter === 'draft') {
+        /* 草稿未发布走已有的状态筛选（后端 status 参数），不与完备度布尔参数混用 */
+        this.filterStatus = 'draft'
+      }
+      await Promise.all([this.loadCategories(), this.loadData(), this.loadStats()])
     },
 
     // ==================== 数据加载 ====================
@@ -135,6 +149,7 @@ function diyTemplateManagement() {
         if (this.filterStatus) params.status = this.filterStatus
         if (this.filterEnabled !== '') params.is_enabled = this.filterEnabled
         if (this.filterKeyword) params.keyword = this.filterKeyword
+        if (this.filterCompleteness) params[this.filterCompleteness] = true
 
         const res = await getTemplateList(params)
         if (res.success) {
@@ -174,6 +189,8 @@ function diyTemplateManagement() {
         const res = await getDiyStats()
         if (res.success) {
           this.stats = res.data || {}
+          /* P0 完备度卡片数据源（缺预览图/缺底图/草稿未发布/发布无素材，运营录数工作清单） */
+          this.completeness = res.data?.completeness?.templates || null
         }
       } catch (e) {
         logger.error('[DIY] 加载统计失败', e)
@@ -213,6 +230,21 @@ function diyTemplateManagement() {
       this.filterStatus = ''
       this.filterEnabled = ''
       this.filterKeyword = ''
+      this.filterCompleteness = ''
+      this.page = 1
+      await this.loadData()
+    },
+
+    /** 点完备度卡片即带筛选过滤（缺预览图/缺底图，二次点击取消） */
+    async toggleCompletenessFilter(filterKey) {
+      this.filterCompleteness = this.filterCompleteness === filterKey ? '' : filterKey
+      this.page = 1
+      await this.loadData()
+    },
+
+    /** 草稿未发布卡片：切换 status=draft 状态筛选（与筛选栏共用同一状态，二次点击取消） */
+    async toggleDraftFilter() {
+      this.filterStatus = this.filterStatus === 'draft' ? '' : 'draft'
       this.page = 1
       await this.loadData()
     },
@@ -302,9 +334,20 @@ function diyTemplateManagement() {
         const data = { ...this.form }
 
         // JSON 字段：如果是字符串则解析
-        for (const key of ['layout', 'bead_rules', 'sizing_rules', 'capacity_rules', 'material_group_codes', 'meta']) {
+        for (const key of [
+          'layout',
+          'bead_rules',
+          'sizing_rules',
+          'capacity_rules',
+          'material_group_codes',
+          'meta'
+        ]) {
           if (typeof data[key] === 'string' && data[key].trim()) {
-            try { data[key] = JSON.parse(data[key]) } catch { /* 保持原值 */ }
+            try {
+              data[key] = JSON.parse(data[key])
+            } catch {
+              /* 保持原值 */
+            }
           }
         }
 
@@ -330,7 +373,8 @@ function diyTemplateManagement() {
 
         if (res.success) {
           this.showFormModal = false
-          await this.loadData()
+          /* 完备度计数随补图/发布实时变化，保存后与列表一起刷新 */
+          await Promise.all([this.loadData(), this.loadStats()])
           Alpine.store('notification')?.show(
             this.editingId ? '模板更新成功' : '模板创建成功',
             'success'
@@ -351,7 +395,7 @@ function diyTemplateManagement() {
       try {
         const res = await deleteTemplate(id)
         if (res.success) {
-          await this.loadData()
+          await Promise.all([this.loadData(), this.loadStats()])
           Alpine.store('notification')?.show('模板已删除', 'success')
         } else {
           Alpine.store('notification')?.show(res.message || '删除失败', 'error')
@@ -378,7 +422,11 @@ function diyTemplateManagement() {
       } else {
         this.form.layout = { shape, bead_count: 18, radius_x: 120, radius_y: 120 }
         if (!this.form.bead_rules) {
-          this.form.bead_rules = { margin: 10, default_diameter: 10, allowed_diameters: [6, 8, 10, 12] }
+          this.form.bead_rules = {
+            margin: 10,
+            default_diameter: 10,
+            allowed_diameters: [6, 8, 10, 12]
+          }
         }
       }
     },

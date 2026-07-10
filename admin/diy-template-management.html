@@ -28,16 +28,47 @@
         <p>管理手链/项链/戒指/吊坠等款式模板，配置排列形状、珠子尺寸、可用材料</p>
       </div>
 
-      <!-- 统计概览 -->
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <!-- P0 数据完备度卡片（点击带筛选过滤，运营录数工作清单，拍板决议 11.6-4） -->
+      <div x-show="completeness" class="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div class="bg-white rounded-xl shadow p-4">
           <div class="text-xs text-gray-500">模板总数</div>
-          <div class="text-2xl font-bold text-blue-600 mt-1" x-text="stats.templates?.total ?? '-'"></div>
+          <div class="text-2xl font-bold text-blue-600 mt-1" x-text="completeness?.total ?? stats.templates?.total ?? '-'"></div>
+          <div class="text-xs text-gray-400 mt-1">已发布 <span x-text="stats.templates?.published ?? '-'"></span></div>
         </div>
+        <button @click="toggleCompletenessFilter('missing_preview')"
+                class="text-left bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-red-300 transition"
+                :class="filterCompleteness === 'missing_preview' ? 'ring-2 ring-red-400' : ''">
+          <div class="text-xs text-gray-500">缺预览图 ▸ 点击筛选</div>
+          <div class="text-2xl font-bold mt-1" :class="(completeness?.missing_preview_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
+               x-text="completeness?.missing_preview_count ?? '-'"></div>
+          <div class="text-xs text-gray-400 mt-1">款式选择页缩略图会空白</div>
+        </button>
+        <button @click="toggleCompletenessFilter('missing_base_image')"
+                class="text-left bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-red-300 transition"
+                :class="filterCompleteness === 'missing_base_image' ? 'ring-2 ring-red-400' : ''">
+          <div class="text-xs text-gray-500">缺底图 ▸ 点击筛选</div>
+          <div class="text-2xl font-bold mt-1" :class="(completeness?.missing_base_image_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
+               x-text="completeness?.missing_base_image_count ?? '-'"></div>
+          <div class="text-xs text-gray-400 mt-1">镶嵌模式只能画几何占位</div>
+        </button>
+        <button @click="toggleDraftFilter()"
+                class="text-left bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-amber-300 transition"
+                :class="filterStatus === 'draft' ? 'ring-2 ring-amber-400' : ''">
+          <div class="text-xs text-gray-500">草稿未发布 ▸ 点击筛选</div>
+          <div class="text-2xl font-bold mt-1" :class="(completeness?.draft_count ?? 0) > 0 ? 'text-amber-600' : 'text-green-600'"
+               x-text="completeness?.draft_count ?? '-'"></div>
+          <div class="text-xs text-gray-400 mt-1">发布前需补齐预览图/底图</div>
+        </button>
         <div class="bg-white rounded-xl shadow p-4">
-          <div class="text-xs text-gray-500">已发布</div>
-          <div class="text-2xl font-bold text-green-600 mt-1" x-text="stats.templates?.published ?? 0"></div>
+          <div class="text-xs text-gray-500">已发布但无可用素材</div>
+          <div class="text-2xl font-bold mt-1" :class="(completeness?.published_without_materials_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
+               x-text="completeness?.published_without_materials_count ?? '-'"></div>
+          <div class="text-xs text-gray-400 mt-1">用户进入设计台会无珠可选</div>
         </div>
+      </div>
+
+      <!-- 作品概览 -->
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
         <div class="bg-white rounded-xl shadow p-4">
           <div class="text-xs text-gray-500">用户作品总数</div>
           <div class="text-2xl font-bold text-purple-600 mt-1" x-text="stats.works?.total ?? 0"></div>

@@ -83,11 +83,12 @@ function diyWorkManagement() {
 
     async init() {
       logger.info('[DIY-Works] 作品管理页面初始化')
-      await Promise.all([
-        this.loadStats(),
-        this.loadTemplateOptions(),
-        this.loadData()
-      ])
+      /* URL 带状态筛选参数时直接应用（大屏「待发货/缺地址/GMV」指标点击跳转带参，如 ?status=frozen） */
+      const urlStatus = new URLSearchParams(window.location.search).get('status')
+      if (Object.keys(STATUS_LABELS).includes(urlStatus)) {
+        this.filterStatus = urlStatus
+      }
+      await Promise.all([this.loadStats(), this.loadTemplateOptions(), this.loadData()])
     },
 
     // ==================== 数据加载 ====================
@@ -195,7 +196,10 @@ function diyWorkManagement() {
         }
       } catch (err) {
         logger.error('[DIY-Works] 获取关联订单失败', err)
-        Alpine.store('notification').show('获取关联订单失败: ' + (err.message || '未知错误'), 'error')
+        Alpine.store('notification').show(
+          '获取关联订单失败: ' + (err.message || '未知错误'),
+          'error'
+        )
       } finally {
         this.orderLoading = false
       }
@@ -230,7 +234,11 @@ function diyWorkManagement() {
 
     /** 保存地址 */
     async saveAddress() {
-      if (!this.addressForm.receiver_name || !this.addressForm.receiver_phone || !this.addressForm.detail_address) {
+      if (
+        !this.addressForm.receiver_name ||
+        !this.addressForm.receiver_phone ||
+        !this.addressForm.detail_address
+      ) {
         Alpine.store('notification').show('收件人姓名、手机号、详细地址为必填项', 'warning')
         return
       }

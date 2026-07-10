@@ -6,8 +6,9 @@
  * 将原 AdminService.js (2308行) 拆分为 4 个子服务，
  * 通过 Facade 模式对外暴露统一接口，保持向后兼容。
  *
- * 子服务清单：
- * - ItemManagementService: 商品 CRUD（createExchangeItem/updateExchangeItem/deleteExchangeItem/_logStockChange）
+ * 子服务清单（2026-07-11 写路径收口：商品 CRUD 唯一权威 = ExchangeItemService，
+ * 本 Facade 不再承载 create/update/delete 商品——死代码双轨已删除，见 ItemManagementService 头注释）：
+ * - ItemManagementService: 商品运营操作（pinItem/recommendItem/batchUpdateSort）
  * - BatchOperationService: 批量操作（batchBindImages/batchUpdateSpace/batchUpdateStatus/batchUpdatePrice/batchSetIndividualPrices/batchUpdateCategory/batchUpdateRarity/getMissingImageItems）
  * - MarketQueryService: 市场查询/统计（checkTimeoutAndAlert/getAdminMarketItems/getMarketItemStatistics/getExchangeTopline/getItemDashboard/getSpaceDistribution）
  * - SkuService: SKU 管理（listSkus/createSku/updateSku/deleteSku/_updateSpuSummary）
@@ -29,14 +30,10 @@ class ExchangeAdminFacade {
     this._sku = new SkuService(models)
   }
 
-  // --- ItemManagementService ---
-  createExchangeItem(...args) { return this._item.createExchangeItem(...args) }
-  updateExchangeItem(...args) { return this._item.updateExchangeItem(...args) }
-  deleteExchangeItem(...args) { return this._item.deleteExchangeItem(...args) }
+  // --- ItemManagementService（商品运营操作；CRUD 收口至 ExchangeItemService，不在本 Facade）---
   pinItem(...args) { return this._item.pinItem(...args) }
   recommendItem(...args) { return this._item.recommendItem(...args) }
   batchUpdateSort(...args) { return this._item.batchUpdateSort(...args) }
-  _logStockChange(...args) { return this._item._logStockChange(...args) }
 
   // --- BatchOperationService ---
   batchBindImages(...args) { return this._batch.batchBindImages(...args) }

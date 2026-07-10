@@ -412,7 +412,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/exchange/product-bundles': 'ADMIN_PRODUCT_BUNDLE_CREATE',
   '/api/v4/console/exchange/product-bundles/:id': 'ADMIN_PRODUCT_BUNDLE_UPDATE',
   '/api/v4/console/exchange/channel-mappings': 'ADMIN_CHANNEL_MAPPING_CREATE',
-  '/api/v4/console/exchange/channel-mappings/:id': 'ADMIN_CHANNEL_MAPPING_UPDATE',
+  '/api/v4/console/exchange/channel-mappings/:id': 'ADMIN_CHANNEL_MAPPING_UPDATE', // 更新/删除渠道映射（PUT/DELETE 共用同一路径键，与 suppliers/items 的 :id 约定一致；指纹含 HTTP 方法可区分两种操作）
   '/api/v4/console/exchange/consignments': 'ADMIN_CONSIGNMENT_CREATE',
   '/api/v4/console/exchange/consignments/:id/list': 'ADMIN_CONSIGNMENT_LIST',
   '/api/v4/console/exchange/consignments/:id/sold': 'ADMIN_CONSIGNMENT_SOLD',

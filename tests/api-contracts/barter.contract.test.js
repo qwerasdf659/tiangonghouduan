@@ -202,7 +202,9 @@ describe('API契约测试 - 以物易物 (/api/v4/exchange/barter)', () => {
             required_item_template_id: voucher_template.item_template_id,
             required_quantity: 1,
             output_exchange_item_id: upward_item.exchange_item_id,
-            is_enabled: true
+            is_enabled: true,
+            // 实物产出（product 模板）必须显式限量（库存口径拍板 2026-07-11）
+            total_limit: 10
           },
           {
             recipe_code: RECIPE_PHYSICAL,
@@ -210,7 +212,9 @@ describe('API契约测试 - 以物易物 (/api/v4/exchange/barter)', () => {
             required_item_template_id: towel_template.item_template_id,
             required_quantity: 1,
             output_exchange_item_id: physical_item.exchange_item_id,
-            is_enabled: true
+            is_enabled: true,
+            // 实物产出（product 模板）必须显式限量（库存口径拍板 2026-07-11）
+            total_limit: 10
           }
         ],
         test_user_id,
@@ -386,6 +390,17 @@ describe('API契约测试 - 以物易物 (/api/v4/exchange/barter)', () => {
       expect(voucher_recipe).toBeDefined()
       expect(voucher_recipe.required_item_template_id).toBe(voucher_template.item_template_id)
       expect(voucher_recipe.per_user_limit).toBe(2)
+      // 产出商品展示字段（2026-07-11 小程序对接 B-1：配方卡片直接展示产出名 + 履约类型判定免二次请求）
+      expect(voucher_recipe.output_item_name).toBe('契约测试-券产出商品')
+      expect(voucher_recipe.output_fulfillment_type).toBe('voucher')
+
+      // 实物产出配方：output_fulfillment_type='physical'（前端据此要求选收货地址，与 BARTER_ADDRESS_REQUIRED 同口径）
+      const physical_recipe = response.body.data.recipes.find(
+        r => r.recipe_code === RECIPE_PHYSICAL
+      )
+      expect(physical_recipe).toBeDefined()
+      expect(physical_recipe.output_item_name).toBe('契约测试-实物产出商品')
+      expect(physical_recipe.output_fulfillment_type).toBe('physical')
     })
 
     test('未认证用户应返回 401', async () => {
@@ -665,6 +680,30 @@ describe('API契约测试 - 以物易物 (/api/v4/exchange/barter)', () => {
           )
         })
       ).rejects.toMatchObject({ code: 'BARTER_OUTPUT_NOT_FOUND' })
+    })
+
+    test('实物产出配方未设 total_limit 应被拒绝（库存口径：配方总量是发放的唯一权威）', async () => {
+      const barter_service = app.locals.services.getService('exchange_barter')
+
+      await expect(
+        TransactionManager.execute(async transaction => {
+          return barter_service.saveRecipes(
+            [
+              {
+                recipe_code: `test_barter_nolimit_${FIXTURE_TS}`,
+                name: '契约测试-实物产出无总量（应被拒绝）',
+                required_item_template_id: towel_template.item_template_id,
+                required_quantity: 1,
+                // 产出为实物（毛巾礼盒模板 item_type='product'）但未设 total_limit
+                output_exchange_item_id: fixtures.physical_exchange_item_id,
+                is_enabled: true
+              }
+            ],
+            test_user_id,
+            { transaction }
+          )
+        })
+      ).rejects.toMatchObject({ code: 'BARTER_TOTAL_LIMIT_REQUIRED' })
     })
   })
 })

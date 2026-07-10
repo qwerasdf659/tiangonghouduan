@@ -63,26 +63,25 @@ class MediaFile extends Model {
   }
 
   /**
-   * 安全输出（前端使用，包含公网 URL，隐藏 object_key）
+   * 安全输出（用户端使用，数据最小化，拍板决议 11.5-D）
    *
-   * @returns {Object} 前端安全的媒体文件数据
+   * 最小字段集权威口径 { media_id, width, height, public_url, thumbnails }：
+   * - 隐藏 object_key / uploaded_by / thumbnail_keys（对象存储内部标识，防抓包泄露存储结构）
+   * - 不下发 original_name / file_size / mime_type / folder / tags / status /
+   *   created_at / updated_at（上传管理属性，前端渲染不需要，遵循数据最小化原则）
+   * - width / height 供异形珠按真实比例绘制（图片上传时已裁透明边）
+   * - thumbnails 为 { w375, w750, w1080 } 三档宽度 WebP 衍生图 URL（前端降级链数据源）
+   *
+   * @returns {Object} 用户端安全的媒体文件数据
    */
   toSafeJSON() {
     const plain = this.get({ plain: true })
     return {
       media_id: plain.media_id,
-      original_name: plain.original_name,
-      file_size: plain.file_size,
-      mime_type: plain.mime_type,
       width: plain.width,
       height: plain.height,
-      folder: plain.folder,
-      tags: plain.tags,
-      status: plain.status,
       public_url: this.getPublicUrl(),
-      thumbnails: this.getThumbnailUrls(),
-      created_at: plain.created_at,
-      updated_at: plain.updated_at
+      thumbnails: this.getThumbnailUrls()
     }
   }
 

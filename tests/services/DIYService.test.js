@@ -541,6 +541,214 @@ describe('DIY 素材展示字段与护栏（拍板决议 11.5-A/B）', () => {
   })
 })
 
+describe('DIY 素材价格护栏 — 更新路径（拍板决议 11.8-⑥，11.9 复核要求的 update 用例）', () => {
+  let guardMaterialId = null
+
+  afterAll(async () => {
+    if (guardMaterialId) {
+      await models.DiyMaterial.destroy({ where: { diy_material_id: guardMaterialId } }).catch(
+        () => {}
+      )
+    }
+  })
+
+  test('PUT /api/v4/console/diy/materials/:id — 已启用素材改成 0 价被拒（按更新后最终状态校验）', async () => {
+    const media = await models.MediaFile.findOne({ order: [['media_id', 'ASC']] })
+    expect(media).toBeTruthy()
+
+    // 先建一个正常素材（价 15 且启用），作为更新护栏的被测对象
+    const createRes = await request(app)
+      .post('/api/v4/console/diy/materials')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        material_name: '测试更新护栏',
+        display_name: '测试更新护栏_' + Date.now(),
+        group_code: 'green',
+        diameter: 8,
+        price: 15,
+        is_enabled: true,
+        price_asset_code: 'star_stone',
+        image_media_id: media.media_id
+      })
+    expect(createRes.body.success).toBe(true)
+    guardMaterialId = createRes.body.data.diy_material_id
+
+    // 只改价格为 0（不动 is_enabled）→ 最终状态 = 0 价 + 启用 → 护栏拒绝
+    const updRes = await request(app)
+      .put(`/api/v4/console/diy/materials/${guardMaterialId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ price: 0 })
+
+    expect(updRes.body.success).toBe(false)
+    expect(updRes.body.message).toMatch(/0 价素材禁止启用/)
+
+    // 回读数据库确认价格未被改动（护栏在写库前拦截）
+    const saved = await models.DiyMaterial.findByPk(guardMaterialId)
+    expect(Number(saved.price)).toBe(15)
+    expect(Boolean(saved.is_enabled)).toBe(true)
+  })
+
+  test('PUT /api/v4/console/diy/materials/:id — 0 价 + 同时停用可通过；再单独启用被拒', async () => {
+    expect(guardMaterialId).toBeTruthy()
+
+    // 0 价 + 停用是合法组合（未上架的待定价素材）
+    const disableRes = await request(app)
+      .put(`/api/v4/console/diy/materials/${guardMaterialId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ price: 0, is_enabled: false })
+    expect(disableRes.body.success).toBe(true)
+
+    const saved = await models.DiyMaterial.findByPk(guardMaterialId)
+    expect(Number(saved.price)).toBe(0)
+    expect(Boolean(saved.is_enabled)).toBe(false)
+
+    // 0 价素材单独启用（不改价）→ 最终状态 = 0 价 + 启用 → 护栏拒绝（#27 绿宝石01 同型事故防复发）
+    const enableRes = await request(app)
+      .put(`/api/v4/console/diy/materials/${guardMaterialId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ is_enabled: true })
+    expect(enableRes.body.success).toBe(false)
+    expect(enableRes.body.message).toMatch(/0 价素材禁止启用/)
+  })
+})
+
+describe('DIY 作品分享还原 — 非作者只读权限与脱敏（拍板决议 11.8-② / 11.5-E，11.9 复核要求的权限用例）', () => {
+  let otherToken = null
+  let shareTemplateId = null
+  let shareWorkId = null
+
+  beforeAll(async () => {
+    // 第二个真实测试账号 13612227930（ID 31），作为「非作者」访问方
+    const loginRes = await request(app)
+      .post('/api/v4/auth/quick-login')
+      .send({ mobile: '13612227930' })
+    expect(loginRes.body.success).toBe(true)
+    otherToken = loginRes.body.data.access_token
+
+    // 作者（13612227910）建测试模板 + 草稿作品
+    const tplRes = await request(app)
+      .post('/api/v4/console/diy/templates')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        display_name: '测试模板_分享还原权限',
+        category_id: 191,
+        layout: { shape: 'circle', bead_count: 16, radius_x: 100, radius_y: 100 },
+        bead_rules: { margin: 8, default_diameter: 10, allowed_diameters: [8, 10] },
+        capacity_rules: { min_beads: 12, max_beads: 20 },
+        status: 'draft',
+        is_enabled: false,
+        base_image_media_id: realMediaId,
+        preview_media_id: realMediaId
+      })
+    expect(tplRes.body.success).toBe(true)
+    shareTemplateId = tplRes.body.data.diy_template_id
+
+    const workRes = await request(app)
+      .post('/api/v4/diy/works')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        diy_template_id: shareTemplateId,
+        work_name: '分享还原权限测试作品',
+        // 空珠位草稿（材料校验允许空设计保存；本组用例只验证读权限与脱敏，不做计价链路）
+        design_data: { mode: 'beading', beads: [] }
+      })
+    expect(workRes.body.success).toBe(true)
+    shareWorkId = workRes.body.data.diy_work_id
+  })
+
+  afterAll(async () => {
+    if (shareWorkId) {
+      await models.DiyWork.destroy({ where: { diy_work_id: shareWorkId } }).catch(() => {})
+    }
+    if (shareTemplateId) {
+      await models.DiyTemplate.destroy({ where: { diy_template_id: shareTemplateId } }).catch(
+        () => {}
+      )
+    }
+  })
+
+  test('GET /api/v4/diy/works/:id — 非作者读草稿返回 403（草稿不可被分享还原）', async () => {
+    expect(shareWorkId).toBeTruthy()
+
+    const res = await request(app)
+      .get(`/api/v4/diy/works/${shareWorkId}`)
+      .set('Authorization', `Bearer ${otherToken}`)
+
+    expect(res.status).toBe(403)
+    expect(res.body.success).toBe(false)
+  })
+
+  test('GET /api/v4/diy/works/:id — 非作者读 frozen 作品返回脱敏只读版', async () => {
+    expect(shareWorkId).toBeTruthy()
+
+    /*
+     * 权限口径测试夹具：直接把作品置为 frozen 并写入含 price_snapshot 的冻结快照。
+     * diy_works 不在余额/物品互锁表内（此处不触碰 account_asset_balances / item_ledger），
+     * confirm 全链路计价冻结另有业务覆盖，本用例只验证读权限与脱敏口径。
+     */
+    await models.DiyWork.update(
+      {
+        status: 'frozen',
+        frozen_at: new Date(),
+        total_cost: {
+          payments: [{ asset_code: 'star_stone', amount: 30 }],
+          price_snapshot: [{ material_code: 'DM_TEST', price: 30 }]
+        }
+      },
+      { where: { diy_work_id: shareWorkId } }
+    )
+
+    const res = await request(app)
+      .get(`/api/v4/diy/works/${shareWorkId}`)
+      .set('Authorization', `Bearer ${otherToken}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+
+    // 脱敏：去 account_id / idempotency_key / total_cost.price_snapshot
+    expect(res.body.data).not.toHaveProperty('account_id')
+    expect(res.body.data).not.toHaveProperty('idempotency_key')
+    expect(res.body.data.total_cost).toHaveProperty('payments')
+    expect(res.body.data.total_cost).not.toHaveProperty('price_snapshot')
+
+    // 保留分享还原所需字段：design_data / work_name / template
+    expect(res.body.data.work_name).toBe('分享还原权限测试作品')
+    expect(res.body.data.design_data).toHaveProperty('mode', 'beading')
+    expect(res.body.data).toHaveProperty('template')
+  })
+
+  test('GET /api/v4/diy/works/:id — 作者本人读 frozen 作品返回完整数据（含 account_id）', async () => {
+    expect(shareWorkId).toBeTruthy()
+
+    const res = await request(app)
+      .get(`/api/v4/diy/works/${shareWorkId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.data.account_id).toBe(testAccountId)
+    // 作者可见完整冻结快照（price_snapshot 不脱敏）
+    expect(res.body.data.total_cost).toHaveProperty('price_snapshot')
+  })
+
+  test('GET /api/v4/diy/templates/:id/beads — image_media 输出为 11.5-D 最小字段集', async () => {
+    // 复核 MediaFile.toSafeJSON 收敛：仅 { media_id, width, height, public_url, thumbnails }
+    const res = await request(app).get('/api/v4/diy/templates/65/beads')
+
+    expect(res.status).toBe(200)
+    for (const bead of res.body.data) {
+      if (bead.image_media) {
+        expect(Object.keys(bead.image_media).sort()).toEqual([
+          'height',
+          'media_id',
+          'public_url',
+          'thumbnails',
+          'width'
+        ])
+      }
+    }
+  })
+})
+
 describe('DIY 素材图上传 — trim_transparent 裁剪透明边距', () => {
   const sharp = require('sharp')
   let uploadedMediaId = null

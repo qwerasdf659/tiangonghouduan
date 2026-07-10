@@ -9,6 +9,8 @@
  *   - getUserOrders: 用户订单查询
  *   - getOrderDetail: 订单详情查询
  *   - 管理员功能: createExchangeItem, updateExchangeItem, deleteExchangeItem
+ *     （2026-07-11 写路径收口：商品 CRUD 唯一权威 = ExchangeItemService，
+ *      测试对象与路由实际使用的写路径一致，admin Facade 不再承载 CRUD）
  *
  * 创建时间：2026-01-29
  * 技术栈：Jest + Sequelize + MySQL (真实数据库)
@@ -64,15 +66,18 @@ describe('ExchangeService - 兑换市场服务测试', () => {
     /*
      * V4.7.0 大文件拆分：ExchangeService 已拆分为多个子服务
      * - QueryService: 查询方法 (getMarketItems, getItemDetail, getUserOrders, getAdminOrders)
-     * - admin/ (Facade): 管理方法 (createExchangeItem, updateExchangeItem, deleteExchangeItem 等)
-     *   原 AdminService.js 已拆为 services/exchange/admin/ 下多个子服务，经 admin/index.js Facade 统一暴露
+     * - ExchangeItemService: 商品 CRUD 唯一权威写路径（2026-07-11 收口，
+     *   与 routes/v4/console/exchange/items.js 实际使用的服务一致）
+     * - admin/ (Facade): 运营操作与查询统计（pinItem/getAdminMarketItems/checkTimeoutAndAlert 等）
      * - CoreService: 核心方法 (executeExchange)
      * 测试需要同时使用这些服务的方法，创建组合对象
      */
     const ExchangeQueryService = require('../../services/exchange/QueryService')
+    const ExchangeItemService = require('../../services/exchange/ExchangeItemService')
     const ExchangeAdminService = require('../../services/exchange/admin')
 
     const queryService = new ExchangeQueryService(models)
+    const exchangeItemService = new ExchangeItemService(models)
     const adminService = new ExchangeAdminService(models)
 
     // 创建组合服务对象，包含所有需要的方法
@@ -85,15 +90,18 @@ describe('ExchangeService - 兑换市场服务测试', () => {
       getAdminOrders: queryService.getAdminOrders.bind(queryService),
       getAdminOrderDetail: queryService.getAdminOrderDetail.bind(queryService),
       getMarketStatistics: queryService.getMarketStatistics.bind(queryService),
-      // 管理方法（AdminService）
-      createExchangeItem: adminService.createExchangeItem.bind(adminService),
-      updateExchangeItem: adminService.updateExchangeItem.bind(adminService),
-      deleteExchangeItem: adminService.deleteExchangeItem.bind(adminService),
+      // 商品 CRUD（唯一权威写路径 ExchangeItemService，与路由一致）
+      createExchangeItem: exchangeItemService.createExchangeItem.bind(exchangeItemService),
+      updateExchangeItem: exchangeItemService.updateExchangeItem.bind(exchangeItemService),
+      deleteExchangeItem: exchangeItemService.deleteExchangeItem.bind(exchangeItemService),
+      // 管理查询统计（admin Facade）
       getAdminMarketItems: adminService.getAdminMarketItems.bind(adminService),
       getMarketItemStatistics: adminService.getMarketItemStatistics.bind(adminService),
       checkTimeoutAndAlert: adminService.checkTimeoutAndAlert.bind(adminService)
     }
-    console.log('✅ ExchangeService 拆分子服务加载成功（QueryService + admin Facade）')
+    console.log(
+      '✅ ExchangeService 拆分子服务加载成功（QueryService + ExchangeItemService + admin Facade）'
+    )
 
     if (!ExchangeService) {
       throw new Error('ExchangeService 加载失败')
@@ -341,74 +349,62 @@ describe('ExchangeService - 兑换市场服务测试', () => {
 
   // ==================== 管理员商品管理测试 ====================
 
-  describe('管理员商品管理功能', () => {
+  describe('管理员商品管理功能（唯一权威写路径 ExchangeItemService，与路由契约一致）', () => {
     describe('createExchangeItem - 创建商品', () => {
-      it('应该成功创建商品', async () => {
-        // 执行：创建商品（在事务内）
+      it('应该成功创建商品（item_code 由系统生成 SP 规范码）', async () => {
+        // 执行：创建商品（在事务内；实物快递履约不铸实例 → mint_instance=false 无需模板）
         const result = await TransactionManager.execute(async transaction => {
-          const item = await ExchangeService.createExchangeItem(
+          return await ExchangeService.createExchangeItem(
             {
-              name: '测试商品_' + Date.now(),
+              item_name: '测试商品_' + Date.now(),
               description: '单元测试创建的商品',
-              cost_asset_code: 'red_core_shard',
-              cost_amount: 10,
-              cost_price: 5.0,
-              stock: 100,
+              mint_instance: false,
+              fulfillment_type: 'physical',
               sort_order: 999,
               status: 'inactive' // 测试商品设为下架避免干扰
             },
-            test_user_id,
             { transaction }
           )
-          return item
         })
 
-        // 验证：商品创建成功（ExchangeItem 模型）
+        // 验证：商品创建成功（返回 ExchangeItem 模型行，item_code 为系统生成 SP+12 位规范码）
         expect(result).toBeDefined()
-        expect(result.item).toBeDefined()
-        expect(result.item.exchange_item_id).toBeDefined()
-        expect(result.item.item_name).toContain('测试商品')
+        expect(result.exchange_item_id).toBeDefined()
+        expect(result.item_name).toContain('测试商品')
+        expect(result.item_code).toMatch(/^SP[2-9A-HJKMNP-Z]{12}$/)
 
         // 记录用于清理
-        created_items.push(result.item.exchange_item_id)
+        created_items.push(result.exchange_item_id)
       })
 
-      it('创建商品时缺少必填字段应该报错', async () => {
-        // 执行：缺少 cost_asset_code
+      it('缺少商品名称（item_name）应该报错', async () => {
         await expect(
           TransactionManager.execute(async transaction => {
             return await ExchangeService.createExchangeItem(
               {
-                name: '测试商品',
                 description: '缺少必填字段',
-                cost_amount: 10,
-                cost_price: 5.0,
-                stock: 100
+                mint_instance: false,
+                status: 'inactive'
               },
-              test_user_id,
               { transaction }
             )
           })
-        ).rejects.toThrow('cost_asset_code')
+        ).rejects.toMatchObject({ code: 'PRODUCT_CENTER_NAME_REQUIRED' })
       })
 
-      it('cost_amount 必须大于0', async () => {
-        // 执行：cost_amount = 0
+      it('需铸造实例（mint_instance=true）但未关联模板应该报错（铸造模板守卫）', async () => {
         await expect(
           TransactionManager.execute(async transaction => {
             return await ExchangeService.createExchangeItem(
               {
-                name: '测试商品',
-                cost_asset_code: 'red_core_shard',
-                cost_amount: 0,
-                cost_price: 5.0,
-                stock: 100
+                item_name: '测试商品_无模板铸造',
+                mint_instance: true,
+                status: 'inactive'
               },
-              test_user_id,
               { transaction }
             )
           })
-        ).rejects.toThrow('cost_amount')
+        ).rejects.toMatchObject({ code: 'PRODUCT_CENTER_TEMPLATE_REQUIRED' })
       })
     })
 
@@ -417,37 +413,31 @@ describe('ExchangeService - 兑换市场服务测试', () => {
         // 准备：先创建一个测试商品
         let test_item_id
         await TransactionManager.execute(async transaction => {
-          const result = await ExchangeService.createExchangeItem(
+          const created = await ExchangeService.createExchangeItem(
             {
-              name: '待更新商品_' + Date.now(),
+              item_name: '待更新商品_' + Date.now(),
               description: '测试更新',
-              cost_asset_code: 'red_core_shard',
-              cost_amount: 10,
-              cost_price: 5.0,
-              stock: 50,
+              mint_instance: false,
               status: 'inactive'
             },
-            test_user_id,
             { transaction }
           )
-          test_item_id = result.item.exchange_item_id
+          test_item_id = created.exchange_item_id
           created_items.push(test_item_id)
         })
 
-        // 执行：更新商品
+        // 执行：更新商品（字段与模型 snake_case 一致，前后端零映射）
         const result = await TransactionManager.execute(async transaction => {
           return await ExchangeService.updateExchangeItem(
             test_item_id,
-            {
-              name: '已更新商品名称'
-            },
+            { item_name: '已更新商品名称' },
             { transaction }
           )
         })
 
         // 验证：更新成功
         expect(result).toBeDefined()
-        expect(result.item.item_name).toBe('已更新商品名称')
+        expect(result.item_name).toBe('已更新商品名称')
       })
 
       it('更新不存在的商品应该报错', async () => {
@@ -455,42 +445,68 @@ describe('ExchangeService - 兑换市场服务测试', () => {
           TransactionManager.execute(async transaction => {
             return await ExchangeService.updateExchangeItem(
               999999999,
-              { name: '测试' },
+              { item_name: '测试' },
               { transaction }
             )
           })
         ).rejects.toThrow('商品不存在')
       })
+
+      it('清空 mint_instance=true 商品的模板应该被守卫拦截（按更新后最终状态判定）', async () => {
+        // 准备：创建挂真实模板的可铸造商品（模板取真实库任一启用模板，不硬编码主键）
+        const template = await models.ItemTemplate.findOne({ where: { is_enabled: 1 } })
+        let test_item_id
+        await TransactionManager.execute(async transaction => {
+          const created = await ExchangeService.createExchangeItem(
+            {
+              item_name: '待清空模板商品_' + Date.now(),
+              mint_instance: true,
+              item_template_id: template.item_template_id,
+              status: 'inactive'
+            },
+            { transaction }
+          )
+          test_item_id = created.exchange_item_id
+          created_items.push(test_item_id)
+        })
+
+        // 执行：只清空模板（不改 mint_instance）→ 最终状态 mint=true 无模板 → 拒绝
+        await expect(
+          TransactionManager.execute(async transaction => {
+            return await ExchangeService.updateExchangeItem(
+              test_item_id,
+              { item_template_id: null },
+              { transaction }
+            )
+          })
+        ).rejects.toMatchObject({ code: 'PRODUCT_CENTER_TEMPLATE_REQUIRED' })
+      })
     })
 
     describe('deleteExchangeItem - 删除商品', () => {
-      it('应该成功删除无订单的商品', async () => {
+      it('应该成功删除无订单的商品（硬删除，级联子表）', async () => {
         // 准备：创建测试商品
         let test_item_id
         await TransactionManager.execute(async transaction => {
-          const result = await ExchangeService.createExchangeItem(
+          const created = await ExchangeService.createExchangeItem(
             {
-              name: '待删除商品_' + Date.now(),
-              cost_asset_code: 'red_core_shard',
-              cost_amount: 10,
-              cost_price: 5.0,
-              stock: 10,
+              item_name: '待删除商品_' + Date.now(),
+              mint_instance: false,
               status: 'inactive'
             },
-            test_user_id,
             { transaction }
           )
-          test_item_id = result.item.exchange_item_id
+          test_item_id = created.exchange_item_id
         })
 
         // 执行：删除商品
-        const result = await TransactionManager.execute(async transaction => {
+        await TransactionManager.execute(async transaction => {
           return await ExchangeService.deleteExchangeItem(test_item_id, { transaction })
         })
 
-        // 验证：删除成功
-        expect(result).toBeDefined()
-        expect(result.action).toBe('deleted')
+        // 验证：商品已硬删除
+        const gone = await ExchangeItem.findByPk(test_item_id)
+        expect(gone).toBeNull()
       })
 
       it('删除不存在的商品应该报错', async () => {

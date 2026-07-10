@@ -46,7 +46,7 @@
             <div class="text-2xl font-bold mt-1" :class="(completeness?.materials?.zero_price_enabled_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
                  x-text="completeness?.materials?.zero_price_enabled_count ?? '-'"></div>
           </a>
-          <a href="/admin/diy-template-management.html"
+          <a href="/admin/diy-template-management.html?filter=missing_preview"
              class="bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-amber-300 transition">
             <div class="text-xs text-gray-500">模板缺预览图 ▸ 去补图</div>
             <div class="text-2xl font-bold mt-1" :class="(completeness?.templates?.missing_preview_count ?? 0) > 0 ? 'text-amber-600' : 'text-green-600'"
@@ -62,11 +62,12 @@
               <span class="text-green-600" x-text="completeness?.materials?.enabled_count ?? '-'"></span>
             </div>
           </div>
-          <div class="bg-white rounded-xl shadow p-4">
-            <div class="text-xs text-gray-500">模板缺底图</div>
+          <a href="/admin/diy-template-management.html?filter=missing_base_image"
+             class="bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-amber-300 transition">
+            <div class="text-xs text-gray-500">模板缺底图 ▸ 去补图</div>
             <div class="text-xl font-bold text-amber-600 mt-1" x-text="completeness?.templates?.missing_base_image_count ?? '-'"></div>
-          </div>
-          <a href="/admin/diy-template-management.html"
+          </a>
+          <a href="/admin/diy-template-management.html?filter=draft"
              class="bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-gray-300 transition">
             <div class="text-xs text-gray-500">草稿未发布模板 ▸ 去发布</div>
             <div class="text-xl font-bold text-gray-600 mt-1" x-text="completeness?.templates?.draft_count ?? '-'"></div>
@@ -105,16 +106,18 @@
             <div class="text-xs text-gray-500">待发货（pending）▸ 去处理</div>
             <div class="text-2xl font-bold text-amber-600 mt-1" x-text="fulfillment?.pending_shipment_count ?? '-'"></div>
           </a>
-          <div class="bg-white rounded-xl shadow p-4">
-            <div class="text-xs text-gray-500">待发货中缺收货地址</div>
+          <a href="/admin/diy-work-management.html?status=frozen"
+             class="bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-red-300 transition">
+            <div class="text-xs text-gray-500">待发货中缺收货地址 ▸ 去补录</div>
             <div class="text-2xl font-bold" :class="(fulfillment?.missing_address_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
                  x-text="fulfillment?.missing_address_count ?? '-'"></div>
-          </div>
+          </a>
           <template x-for="asset in (gmv?.by_asset || [])" :key="asset.asset_code">
-            <div class="bg-white rounded-xl shadow p-4">
-              <div class="text-xs text-gray-500">GMV · <span x-text="asset.asset_code"></span></div>
+            <a href="/admin/diy-work-management.html?status=completed"
+               class="bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-blue-300 transition">
+              <div class="text-xs text-gray-500">GMV · <span x-text="asset.asset_code"></span> ▸ 看已完成作品</div>
               <div class="text-2xl font-bold text-blue-600 mt-1" x-text="asset.total_amount"></div>
-            </div>
+            </a>
           </template>
         </div>
       </section>

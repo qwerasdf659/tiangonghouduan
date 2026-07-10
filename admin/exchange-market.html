@@ -552,7 +552,8 @@
         <div class="p-4">
           <p class="text-xs themed-text-muted mb-3">
             说明：以物易物为「用户↔官方」B2C 合成。用户投入旧物（按模板匹配的可用实例）→ 官方核销销毁旧物 → 从官方库存发放产出物。
-            产出禁为货币型资产、方向仅等价或向下（由后端守卫强制）。配方为运营配置，保存即生效。
+            产出禁为货币型资产、必须关联物品模板、方向仅等价或向下（由后端守卫强制）。配方为运营配置，保存即生效。
+            库存口径：<strong>配方总量（total_limit）是换物发放总量的唯一权威</strong>——实物产出必须设总量 ≥1（后端强制），商品库存（stock）属商城购买链路与换物无关；补货 = 调大配方总量。
           </p>
           <div x-show="barterLoading" class="text-center py-6 themed-text-muted">加载中…</div>
           <div x-show="!barterLoading && barterRecipes.length === 0" class="text-center py-6 themed-text-muted">
@@ -567,7 +568,9 @@
                 <th class="px-3 py-2 border-b">需投入数量</th>
                 <th class="px-3 py-2 border-b">产出商品ID <span class="text-red-500">*</span></th>
                 <th class="px-3 py-2 border-b" title="每人限换次数（拍板⑬-(c) 防薅），0=不限">每人限换</th>
-                <th class="px-3 py-2 border-b" title="配方总量（拍板⑬-(c) 防薅），0=不限">配方总量</th>
+                <th class="px-3 py-2 border-b" title="配方总量（换物发放总量的唯一库存口径）：实物产出必须 ≥1，券/道具 0=不限">配方总量</th>
+                <th class="px-3 py-2 border-b" title="全时段已成交换物次数（取消/拒绝/退款不占额）">已用</th>
+                <th class="px-3 py-2 border-b" title="剩余可换额度 = 配方总量 − 已用；不限量配方显示「不限」">剩余</th>
                 <th class="px-3 py-2 border-b">启用</th>
                 <th class="px-3 py-2 border-b">操作</th>
               </tr>
@@ -581,7 +584,9 @@
                   <td class="px-3 py-2"><input type="number" x-model.number="recipe.required_quantity" class="w-20 px-2 py-1 border rounded" min="1"></td>
                   <td class="px-3 py-2"><input type="number" x-model.number="recipe.output_exchange_item_id" class="w-24 px-2 py-1 border rounded" min="1"></td>
                   <td class="px-3 py-2"><input type="number" x-model.number="recipe.per_user_limit" class="w-20 px-2 py-1 border rounded" min="0" placeholder="0=不限"></td>
-                  <td class="px-3 py-2"><input type="number" x-model.number="recipe.total_limit" class="w-20 px-2 py-1 border rounded" min="0" placeholder="0=不限"></td>
+                  <td class="px-3 py-2"><input type="number" x-model.number="recipe.total_limit" class="w-20 px-2 py-1 border rounded" min="0" placeholder="实物≥1"></td>
+                  <td class="px-3 py-2 text-center themed-text-secondary" x-text="barterRecipeUsedText(recipe.recipe_code)"></td>
+                  <td class="px-3 py-2 text-center themed-text-secondary" x-text="barterRecipeRemainingText(recipe.recipe_code)"></td>
                   <td class="px-3 py-2 text-center"><input type="checkbox" x-model="recipe.is_enabled"></td>
                   <td class="px-3 py-2"><button @click="removeBarterRecipe(idx)" class="text-red-600 hover:underline">删除</button></td>
                 </tr>

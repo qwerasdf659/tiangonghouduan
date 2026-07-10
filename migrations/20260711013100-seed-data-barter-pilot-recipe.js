@@ -17,10 +17,13 @@
  *    - item_template_id=16（home_towel_set 毛巾礼盒，reference_price_points=100）；
  *    - fulfillment_type='physical'（实物快递履约，换物订单走 pending→shipped→received 发货链）；
  *    - mint_instance=0（实物产出不 mint 进背包，与发货链二选一防双重履约）；
- *    - status='inactive'（不在兑换商城售卖，仅作换物产出标的——C 端商城列表只下发 active）。
+ *    - status='inactive'（不在兑换商城售卖，仅作换物产出标的——C 端商城列表只下发 active）；
+ *    - stock=0（库存口径拍板 2026-07-11：exchange_items.stock 是 SKU 聚合物化列、属商城
+ *      购买链路，换物发放总量的唯一权威 = 配方 total_limit；本商品无 SKU，物化列按聚合口径
+ *      恒为 0，与每日 SPU 对账任务保持账实一致）。
  * 2. 写入 system_settings(exchange/barter_recipes) 试点配方：
  *    毛巾礼盒×2（投入价值 200）→ 毛巾礼盒（产出价值 100），方向等价向下 ✓；
- *    per_user_limit=1、total_limit=100（拍板⑬-(c) 限量防薅）。
+ *    per_user_limit=1、total_limit=100（拍板⑬-(c) 限量防薅 + 实物产出总量口径）。
  *
  * 回滚: 删除配方配置；产出商品无订单引用时删除，有引用则保留并告警。
  */
@@ -82,8 +85,8 @@ module.exports = {
               applicable_scope, created_at, updated_at)
            VALUES
              (:item_code, '毛巾礼盒（换物）',
-              '以物易物试点产出标的（拍板④）：旧毛巾礼盒×2 换新毛巾礼盒，实物快递履约。不在兑换商城售卖（status=inactive），仅作换物配方产出。',
-              :tpl, 0, 'physical', 'common', 'inactive', 100, 'lucky', 100, 0, 1,
+              '以物易物试点产出标的（拍板④）：旧毛巾礼盒×2 换新毛巾礼盒，实物快递履约。不在兑换商城售卖（status=inactive），仅作换物配方产出；发放总量由配方 total_limit 控制（stock 物化列与换物无关）。',
+              :tpl, 0, 'physical', 'common', 'inactive', 100, 'lucky', 0, 0, 1,
               'all', NOW(), NOW())`,
           { replacements: { item_code: itemCode, tpl: TOWEL_TEMPLATE_ID }, transaction }
         )

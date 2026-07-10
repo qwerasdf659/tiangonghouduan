@@ -158,7 +158,8 @@ class DataSanitizer {
         sanitized.image = {
           primary_media_id: safe.media_id,
           url: safe.public_url,
-          mime: safe.mime_type,
+          // mime 从模型实例直读（toSafeJSON 已按 11.5-D 收敛为最小字段集，不再含 mime_type）
+          mime: rawPrimaryMedia.mime_type,
           // thumbnail_url 默认取最小宽度档 w375（列表/小图占位用）
           thumbnail_url: safe.thumbnails?.w375 || safe.public_url,
           // thumbnails 三档宽度（w375/w750/w1080）：抽奖奖品图清晰度优化，前端按容器选档
@@ -1404,7 +1405,8 @@ class DataSanitizer {
         sanitized.primary_image = {
           primary_media_id: safe.media_id,
           url: safe.public_url,
-          mime: safe.mime_type,
+          // mime 从模型实例直读（toSafeJSON 已按 11.5-D 收敛为最小字段集，不再含 mime_type）
+          mime: rawPrimaryMedia.mime_type,
           // width/height：原图像素尺寸，前端按比例动态排版（完整显示不裁剪、首屏不抖动）
           width: safe.width ?? null,
           height: safe.height ?? null,

@@ -12,6 +12,7 @@ const BeijingTimeHelper = require('../../utils/timeHelper')
 const BusinessError = require('../../utils/BusinessError')
 const ProductCodeGenerator = require('../../utils/ProductCodeGenerator')
 const SeriesSeqAllocator = require('../../utils/SeriesSeqAllocator')
+const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 
 /** 兑换订单视为「已完成/不可删 SKU」的状态（业务上已占用该 SKU） */
 const EXCHANGE_RECORD_BLOCKING_STATUSES = ['approved', 'shipped', 'received', 'rated', 'completed']
@@ -260,6 +261,12 @@ class ExchangeItemService {
 
     const payload = ExchangeItemService._pickExchangeItemPayload(data)
 
+    // 商品名称必填（写入口合约校验：空名商品无法在商城/配方/订单快照中被辨识）
+    if (!payload.item_name || !String(payload.item_name).trim()) {
+      throw new BusinessError('商品名称（item_name）不能为空', 'PRODUCT_CENTER_NAME_REQUIRED', 400)
+    }
+    payload.item_name = String(payload.item_name).trim()
+
     /*
      * 铸造模板守卫（2026-07-11，方案文档 §十二-C.2 落地）：mint_instance=true（兑换后铸造
      * 物品实例进背包，模型默认值即 true）的商品必须关联 item_template_id——无模板铸造会产生
@@ -282,6 +289,10 @@ class ExchangeItemService {
     }
 
     const created = await ExchangeItem.create(payload, { transaction })
+
+    // C 端商品列表缓存失效（写路径收口后由唯一权威路径统一维护，2026-07-11）
+    await BusinessCacheHelper.invalidateExchangeItems('item_created')
+
     logger.info('ExchangeItemService.createExchangeItem 成功', {
       exchange_item_id: created.exchange_item_id,
       item_code: created.item_code,
@@ -315,6 +326,18 @@ class ExchangeItemService {
 
     const payload = ExchangeItemService._pickExchangeItemPayload(data)
 
+    // 商品名称合约校验（仅在本次更新携带该字段时检查，禁止清空为空名）
+    if (payload.item_name !== undefined) {
+      if (!payload.item_name || !String(payload.item_name).trim()) {
+        throw new BusinessError(
+          '商品名称（item_name）不能为空',
+          'PRODUCT_CENTER_NAME_REQUIRED',
+          400
+        )
+      }
+      payload.item_name = String(payload.item_name).trim()
+    }
+
     /*
      * 铸造模板守卫（与 createExchangeItem 同口径）：按"更新后的最终状态"判定——
      * payload 未传的字段沿用现有行值，防止只改 mint_instance 或只清空模板时绕过校验。
@@ -326,6 +349,10 @@ class ExchangeItemService {
     ExchangeItemService._assertMintInstanceHasTemplate(willMintAfterUpdate, templateAfterUpdate)
 
     await row.update(payload, { transaction })
+
+    // C 端商品列表缓存失效（名称/状态/上下架等变更即时可见）
+    await BusinessCacheHelper.invalidateExchangeItems('item_updated')
+
     logger.info('ExchangeItemService.updateExchangeItem 成功', {
       exchange_item_id: pid,
       ts: BeijingTimeHelper.apiTimestamp()
@@ -366,6 +393,10 @@ class ExchangeItemService {
     if (!deleted) {
       throw new BusinessError('商品不存在', 'PRODUCT_CENTER_PRODUCT_NOT_FOUND', 404)
     }
+
+    // C 端商品列表缓存失效（已删商品即时下架不残留）
+    await BusinessCacheHelper.invalidateExchangeItems('item_deleted')
+
     logger.info('ExchangeItemService.deleteExchangeItem 成功', {
       exchange_item_id: pid,
       ts: BeijingTimeHelper.apiTimestamp()
