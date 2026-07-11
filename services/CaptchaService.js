@@ -86,11 +86,12 @@ class CaptchaService {
    * 校验天御验证码票据（按来源自动分派小程序 / Web·App 校验接口）
    *
    * 业务流程：
-   * 1. 非生产环境：直接放行（跳过校验），返回 true。
-   * 2. 生产环境：票据缺失判失败；按是否携带 randstr 分派校验接口：
+   * 1. 未启用天御（非生产默认 / CAPTCHA_ENABLED=false）：直接放行，返回 true。
+   * 2. 票据缺失（多为天御停服/未接入）：按 CAPTCHA_FAIL_OPEN 开关降级（默认 fail-open 放行 + 频控兜底）。
+   * 3. 有票据：按是否携带 randstr 分派校验接口：
    *    - 有 randstr → Web/App → DescribeCaptchaResult（Ticket + Randstr）
    *    - 无 randstr → 微信小程序 → DescribeCaptchaMiniResult（仅 Ticket）
-   *    CaptchaCode === 1 视为通过；天御服务异常按 CAPTCHA_FAIL_OPEN 开关降级。
+   *    CaptchaCode === 1 视为通过；天御接口异常同样按 CAPTCHA_FAIL_OPEN 开关降级。
    *
    * @param {Object} params - 参数
    * @param {string} params.captcha_ticket - 天御票据（两端通用，必填）
@@ -108,10 +109,21 @@ class CaptchaService {
       return true
     }
 
-    // 2. 生产环境：ticket 缺失直接判定失败（前端必须先弹天御拿到票据）
+    /*
+     * 2. 票据缺失：接入 CAPTCHA_FAIL_OPEN 降级开关（2026-07-12 方案C）
+     *
+     * 天御套餐过期/停服时，前端加载不出验证码控件、用户拿不到票据，请求到后端即"票据缺失"。
+     * 此场景与"天御接口异常"同属天御不可用，统一按 fail-open 兜底：
+     * - CAPTCHA_FAIL_OPEN=true（默认）→ 放行发码，靠 SmsService 频控（同号 60s + 每日 10 次 + IP 限流）兜底，
+     *   保证天御失效时短信验证码仍可用（不阻断正常用户登录）；
+     * - CAPTCHA_FAIL_OPEN=false → 维持严格拒绝（要求前端必须先过天御拿到票据）。
+     */
     if (!captcha_ticket) {
-      logger.warn('🚫 天御校验失败：缺少票据（captcha_ticket）')
-      return false
+      const failOpen = CaptchaService.isFailOpen()
+      logger.warn(
+        `⚠️ 天御票据缺失（前端未拿到票据，多为天御停服/未接入），降级 ${failOpen ? 'fail-open 放行（频控兜底）' : 'fail-close 拒绝'}`
+      )
+      return failOpen
     }
 
     // 3. 按是否携带 randstr 分派校验接口（不可混用：小程序无 randstr）

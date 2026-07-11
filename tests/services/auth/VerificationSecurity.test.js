@@ -176,6 +176,15 @@ describe('SmsService - 验证码生成/频控/一次性/万能码（P2）', () =
     expect(SmsService._mapTencentFailCode('AuthFailure.SignatureFailure')).toBe(
       FC.PROVIDER_AUTH_FAILED
     )
+    // 运营商侧拒绝/送达失败（E:EXT、运营商内部错误、拦截等，2026-07-12 新增归一化）
+    expect(SmsService._mapTencentFailCode('E:EXT')).toBe(FC.PROVIDER_CARRIER_REJECTED)
+    expect(SmsService._mapTencentFailCode('', '运营商内部错误')).toBe(FC.PROVIDER_CARRIER_REJECTED)
+    expect(SmsService._mapTencentFailCode('', '号码被拦截')).toBe(FC.PROVIDER_CARRIER_REJECTED)
+    expect(SmsService._mapTencentFailCode('', '送达失败')).toBe(FC.PROVIDER_CARRIER_REJECTED)
+    // 优先级守卫：更具体的鉴权/签名码不能被运营商规则误伤（鉴权在前命中）
+    expect(SmsService._mapTencentFailCode('AuthFailure.SignatureFailure')).not.toBe(
+      FC.PROVIDER_CARRIER_REJECTED
+    )
     // 未知错误码归一化为通用 PROVIDER_ERROR
     expect(SmsService._mapTencentFailCode('Some.UnknownCode')).toBe(FC.PROVIDER_ERROR)
   })
@@ -189,18 +198,36 @@ describe('CaptchaService - 人机验证（P2，非生产放行）', () => {
     expect(CaptchaService).toBeTruthy()
   })
 
-  test('非生产环境 isEnabled=false（跳过天御校验）', () => {
-    expect(process.env.NODE_ENV).not.toBe('production')
-    expect(CaptchaService.isEnabled()).toBe(false)
+  test('非生产环境且 CAPTCHA_ENABLED 未配置时 isEnabled=false（跳过天御校验）', () => {
+    /*
+     * isEnabled() 的默认策略：未显式配置 CAPTCHA_ENABLED 时按 NODE_ENV（非生产=false）。
+     * 显式移除该环境变量以隔离外部 .env 干扰（.env 可能已配 true 用于灰度），
+     * 保证测试验证的是"未配置时回退默认策略"这一业务语义，而非依赖 .env 实际值。
+     */
+    const original = process.env.CAPTCHA_ENABLED
+    delete process.env.CAPTCHA_ENABLED
+    try {
+      expect(process.env.NODE_ENV).not.toBe('production')
+      expect(CaptchaService.isEnabled()).toBe(false)
+    } finally {
+      if (original !== undefined) process.env.CAPTCHA_ENABLED = original
+    }
   })
 
-  test('非生产环境 verify 直接放行（即使无票据）', async () => {
-    const passed = await CaptchaService.verify({
-      captcha_ticket: '',
-      captcha_randstr: '',
-      user_ip: '127.0.0.1'
-    })
-    expect(passed).toBe(true)
+  test('非生产环境且 CAPTCHA_ENABLED 未配置时 verify 直接放行（即使无票据）', async () => {
+    // 隔离 .env 干扰：显式移除 CAPTCHA_ENABLED，验证"未配置回退非生产放行"语义
+    const original = process.env.CAPTCHA_ENABLED
+    delete process.env.CAPTCHA_ENABLED
+    try {
+      const passed = await CaptchaService.verify({
+        captcha_ticket: '',
+        captcha_randstr: '',
+        user_ip: '127.0.0.1'
+      })
+      expect(passed).toBe(true)
+    } finally {
+      if (original !== undefined) process.env.CAPTCHA_ENABLED = original
+    }
   })
 
   test('O5：CAPTCHA_ENABLED=false 强制关闭（即使生产也跳过）', () => {
@@ -229,6 +256,39 @@ describe('CaptchaService - 人机验证（P2，非生产放行）', () => {
         process.env.CAPTCHA_ENABLED = original
       }
     }
+  })
+
+  /*
+   * 方案C（2026-07-12）：天御停服/未接入导致"票据缺失"时，接入 CAPTCHA_FAIL_OPEN 降级。
+   * 业务语义：天御套餐过期后前端拿不到票据，短信验证码应仍可用（fail-open），不阻断正常用户登录。
+   * 测试用 CAPTCHA_ENABLED=true 强制启用天御（绕过非生产默认放行），只验证"票据缺失"分支的降级行为。
+   */
+  describe('方案C：启用天御但票据缺失时按 CAPTCHA_FAIL_OPEN 降级', () => {
+    const origEnabled = process.env.CAPTCHA_ENABLED
+    const origFailOpen = process.env.CAPTCHA_FAIL_OPEN
+
+    beforeEach(() => {
+      process.env.CAPTCHA_ENABLED = 'true' // 强制启用，命中票据缺失分支
+    })
+
+    afterEach(() => {
+      if (origEnabled === undefined) delete process.env.CAPTCHA_ENABLED
+      else process.env.CAPTCHA_ENABLED = origEnabled
+      if (origFailOpen === undefined) delete process.env.CAPTCHA_FAIL_OPEN
+      else process.env.CAPTCHA_FAIL_OPEN = origFailOpen
+    })
+
+    test('CAPTCHA_FAIL_OPEN 默认（未配置）→ 票据缺失放行（天御失效时短信仍可用）', async () => {
+      delete process.env.CAPTCHA_FAIL_OPEN // 默认 fail-open
+      const passed = await CaptchaService.verify({ captcha_ticket: '', user_ip: '127.0.0.1' })
+      expect(passed).toBe(true)
+    })
+
+    test('CAPTCHA_FAIL_OPEN=false → 票据缺失严格拒绝', async () => {
+      process.env.CAPTCHA_FAIL_OPEN = 'false'
+      const passed = await CaptchaService.verify({ captcha_ticket: '', user_ip: '127.0.0.1' })
+      expect(passed).toBe(false)
+    })
   })
 })
 

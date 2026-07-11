@@ -82,6 +82,12 @@ const SMS_FAIL_CODE = Object.freeze({
   PROVIDER_INVALID_MOBILE: 'SMS_PROVIDER_INVALID_MOBILE',
   /** 腾讯云：鉴权失败（SecretId/SecretKey/AppId 配置错误） */
   PROVIDER_AUTH_FAILED: 'SMS_PROVIDER_AUTH_FAILED',
+  /**
+   * 运营商侧拒绝/送达失败（如 E:EXT、运营商内部错误、号码被运营商限频拦截）。
+   * 说明：此类结果多来自异步投递回执（SendSms 同步返回时尚未产生）；
+   * 但部分运营商受理失败码也会出现在同步 SendStatus.Code 中，故纳入归一化以即时命中。
+   */
+  PROVIDER_CARRIER_REJECTED: 'SMS_PROVIDER_CARRIER_REJECTED',
   /** 其它未归类的腾讯云错误或网络异常 */
   PROVIDER_ERROR: 'SMS_PROVIDER_ERROR'
 })
@@ -100,6 +106,7 @@ const SMS_FAIL_MESSAGE = Object.freeze({
   [SMS_FAIL_CODE.PROVIDER_BALANCE_INSUFFICIENT]: '短信服务额度不足，请联系管理员',
   [SMS_FAIL_CODE.PROVIDER_INVALID_MOBILE]: '手机号无效，无法发送短信',
   [SMS_FAIL_CODE.PROVIDER_AUTH_FAILED]: '短信服务异常（鉴权），请联系管理员',
+  [SMS_FAIL_CODE.PROVIDER_CARRIER_REJECTED]: '短信被运营商拦截或下发失败，请稍后重试或更换手机号',
   [SMS_FAIL_CODE.PROVIDER_ERROR]: '短信下发失败，请稍后再试'
 })
 
@@ -463,6 +470,20 @@ class SmsService {
       code.includes('InvalidParameterValue.IncorrectPhoneNumber')
     ) {
       return SMS_FAIL_CODE.PROVIDER_INVALID_MOBILE
+    }
+    /*
+     * 运营商侧拒绝/送达失败：E:EXT（运营商扩展错误，多为号码被限频拦截）、
+     * 运营商内部错误、运营商拒绝等。这些多见于异步投递回执的 Description/ReportStatus，
+     * 少数也出现在同步 SendStatus.Code；统一归一化，便于日志排查与前端一致文案。
+     */
+    if (
+      code.includes('EXT') ||
+      msg.includes('EXT') ||
+      msg.includes('运营商') ||
+      msg.includes('拦截') ||
+      msg.includes('送达失败')
+    ) {
+      return SMS_FAIL_CODE.PROVIDER_CARRIER_REJECTED
     }
     // 其它未归类
     return SMS_FAIL_CODE.PROVIDER_ERROR
