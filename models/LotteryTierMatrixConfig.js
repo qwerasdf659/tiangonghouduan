@@ -272,13 +272,13 @@ module.exports = (sequelize, DataTypes) => {
        * Budget Tier 预算层级（Pressure-Only 模式下固定为 'ALL'）
        *
        * 2026-03-04 架构重构：budget_tier 降级为纯监控指标，
-       * 新数据固定 'ALL'，保留旧 ENUM 值用于迁移回滚兼容。
+       * Pressure-Only 模式固定 'ALL'（矩阵仅按 pressure_tier 维度配置）。
        */
       budget_tier: {
-        type: DataTypes.ENUM('B0', 'B1', 'B2', 'B3', 'ALL'),
+        type: DataTypes.ENUM('ALL'),
         allowNull: false,
         defaultValue: 'ALL',
-        comment: 'Budget Tier 预算层级（Pressure-Only 模式固定 ALL）'
+        comment: '预算档位（Pressure Tier 重构后固定 ALL，矩阵仅按 pressure_tier 维度配置）'
       },
 
       /**

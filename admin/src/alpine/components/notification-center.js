@@ -331,7 +331,6 @@ export function notificationCenter() {
           logger.info('[NotificationCenter] Socket.IO 连接成功')
           this.wsConnected = true
           this.wsReconnectAttempts = 0
-          this.socket.emit('register_admin', { token })
         })
 
         this.socket.on('notification', data => {

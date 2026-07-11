@@ -610,7 +610,7 @@ router.get(
     }
 
     /** 通过 ServiceManager 获取服务（不直接 require） */
-    const ItemLifecycleService = req.app.locals.services.getService('item_lifecycle')
+    const ItemLifecycleService = req.app.locals.services.getService('asset_item_lifecycle')
 
     /** 通过 ItemLifecycleService 获取物品并验证所有权（避免直连 models） */
     const lifecycle = await ItemLifecycleService.getLifecycle(itemId)

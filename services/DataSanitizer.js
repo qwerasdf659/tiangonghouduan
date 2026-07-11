@@ -610,21 +610,6 @@ class DataSanitizer {
   }
 
   /**
-   * 积分记录数据脱敏（γ 模式：基于 V4 asset_transactions 表结构）
-   *
-   * 🗄️ 数据库表：asset_transactions（主键：asset_transaction_id）
-   *
-   * 委托 _sanitizeAssetTransactions() 实现（子决策 3：两个方法名保留，内部共享实现）
-   *
-   * @param {Array<Object>} records - 资产流水数组（来自 asset_transactions 查询）
-   * @param {string} dataLevel - 数据级别
-   * @returns {Array<Object>} 脱敏后的流水数组
-   */
-  static sanitizePointsRecords(records, dataLevel) {
-    return this._sanitizeAssetTransactions(records, dataLevel)
-  }
-
-  /**
    * 用户统计数据脱敏 - 新增前端需求
    *
    * 业务场景：用户统计API响应时调用，防止用户通过抓包获取消费模式、预测模型、风险评分等敏感分析数据
@@ -835,11 +820,12 @@ class DataSanitizer {
   }
 
   /**
-   * 交易记录数据脱敏（γ 模式：基于 V4 asset_transactions 表结构）
+   * 资产流水（交易记录）数据脱敏（γ 模式：基于 V4 asset_transactions 表结构）
    *
    * 🗄️ 数据库表：asset_transactions（主键：asset_transaction_id）
    *
-   * 委托 _sanitizeAssetTransactions() 实现（子决策 3：两个方法名保留，内部共享实现）
+   * 委托 _sanitizeAssetTransactions() 实现
+   * （2026-07-11 命名统一：原纯别名 sanitizePointsRecords 已删除，本方法为唯一入口）
    *
    * @param {Array<Object>} records - 资产流水数组（来自 asset_transactions 查询）
    * @param {string} dataLevel - 数据级别
@@ -850,7 +836,7 @@ class DataSanitizer {
   }
 
   /**
-   * 资产流水脱敏共享实现（子决策 3：sanitizePointsRecords 和 sanitizeTransactionRecords 共享）
+   * 资产流水脱敏共享实现（sanitizeTransactionRecords 的内部实现）
    *
    * 🗄️ 数据库表：asset_transactions（主键：asset_transaction_id）
    *

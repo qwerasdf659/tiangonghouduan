@@ -162,7 +162,7 @@ class SessionManagementService {
       user_id,
       device_id = null,
       login_ip = null,
-      login_platform = 'unknown',
+      login_platform,
       expires_in_minutes = 10080
     } = params
 

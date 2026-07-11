@@ -81,7 +81,6 @@ class UserService {
         nickname: nickname || `用户${mobile.slice(-4)}`,
         status,
         consecutive_fail_count: 0,
-        history_total_points: 0,
         login_count: 0,
         // 🔐 PII 流程合规：首次注册即记录隐私政策/用户协议同意时间（北京时间）
         privacy_consent_at: BeijingTimeHelper.createBeijingTime()
@@ -440,13 +439,16 @@ class UserService {
        * 缓存未命中，查库
        * 默认返回字段（用户视图）
        */
+      /*
+       * 注：history_total_points 冗余列已删除（拍板 4），
+       * 累计积分统一由 asset/QueryService.getHistoryTotalPoints 账本派生
+       */
       const defaultAttributes = [
         'user_id',
         'mobile',
         'nickname',
         'status',
         'user_level',
-        'history_total_points',
         'created_at',
         'last_login',
         'login_count',

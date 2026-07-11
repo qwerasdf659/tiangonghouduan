@@ -16,7 +16,7 @@
  *
  * 完备度数据（GET /api/v4/console/diy/stats → data.completeness.materials）：
  * - { total, enabled_count, disabled_count, missing_image_count,
- *     missing_copy_count, zero_price_enabled_count }
+ *     missing_copy_count, zero_price_enabled_count, missing_physical_count }
  */
 
 import { logger } from '@/utils/logger.js'
@@ -149,7 +149,7 @@ function diyMaterialManagement() {
     filterDiameter: '',
     filterKeyword: '',
     filterItemType: '', // 素材大类 Tab（'' 全部 / beads / accessories / pendants）
-    /* 完备度快捷筛选（'' 无 / missing_image 缺图 / missing_copy 缺文案 / zero_price_enabled 0价启用） */
+    /* 完备度快捷筛选（'' 无 / missing_image 缺图 / missing_copy 缺文案 / zero_price_enabled 0价启用 / missing_physical 缺物理数据） */
     filterCompleteness: '',
 
     // ========== P0 数据完备度（来自 stats 接口 completeness.materials） ==========
@@ -187,7 +187,11 @@ function diyMaterialManagement() {
       logger.info('[DIY-Materials] 素材管理页面初始化')
       /* URL 带完备度筛选参数时直接应用（大屏指标点击跳转带参，如 ?filter=missing_image） */
       const urlFilter = new URLSearchParams(window.location.search).get('filter')
-      if (['missing_image', 'missing_copy', 'zero_price_enabled'].includes(urlFilter)) {
+      if (
+        ['missing_image', 'missing_copy', 'zero_price_enabled', 'missing_physical'].includes(
+          urlFilter
+        )
+      ) {
         this.filterCompleteness = urlFilter
       }
       await Promise.all([this.loadData(), this.loadCompleteness()])
@@ -299,9 +303,7 @@ function diyMaterialManagement() {
         item_type: mat.item_type || 'beads',
         material_type: mat.material_type || 'crystal',
         /* 后端存逗号串，表单用多选数组 */
-        five_elements: mat.five_elements
-          ? mat.five_elements.split(',').map(el => el.trim())
-          : [],
+        five_elements: mat.five_elements ? mat.five_elements.split(',').map(el => el.trim()) : [],
         weight: mat.weight ?? null,
         meaning: mat.meaning || '',
         energy: mat.energy || '',
@@ -429,7 +431,9 @@ function diyMaterialManagement() {
         if (result.public_url) {
           this.imagePreviewUrl = result.public_url
         }
-        logger.info('[DIY-Materials] 素材图片上传成功（已裁剪透明边距）', { media_id: result.media_id })
+        logger.info('[DIY-Materials] 素材图片上传成功（已裁剪透明边距）', {
+          media_id: result.media_id
+        })
       }
     },
 

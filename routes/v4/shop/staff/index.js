@@ -5,15 +5,13 @@
  * @description 商家门店员工管理 API
  *
  * 📌 路径说明：
- * - 文档定义路径：/api/v4/admin/staff（管理员视角）
- * - 实际实现路径：/api/v4/shop/staff（商家域统一入口）
- * - 功能等价，权限一致，选择 shop 域是因为员工管理属于商家业务
+ * - 权威路径：/api/v4/shop/staff（商家域统一入口，员工管理属于商家业务）
  *
  * API列表：
- * - GET /list - 查询员工列表（对应文档 GET /api/v4/admin/staff）
- * - POST /add - 添加员工到门店（对应文档 POST /api/v4/admin/staff）
- * - POST /transfer - 员工调店（对应文档 POST /api/v4/admin/staff/:id/transfer）
- * - POST /disable - 禁用员工（对应文档 PUT /api/v4/admin/staff/user/:user_id/disable）
+ * - GET /list - 查询员工列表
+ * - POST /add - 添加员工到门店
+ * - POST /transfer - 员工调店
+ * - POST /disable - 禁用员工
  * - POST /enable - 启用员工
  *
  * 权限控制（2026年01月12日 商家员工域权限体系升级）：
@@ -153,7 +151,7 @@ router.post(
         operation_type: 'staff_add',
         action: 'create',
         target_user_id: parseInt(user_id, 10),
-        result: 'success',
+        status: 'success',
         extra_data: { role_in_store, notes, staff_record_id: result.id }
       })
     } catch (logError) {
@@ -225,7 +223,7 @@ router.post(
         operation_type: 'staff_transfer',
         action: 'update',
         target_user_id: parseInt(user_id, 10),
-        result: 'success',
+        status: 'success',
         extra_data: {
           from_store_id: parseInt(from_store_id, 10),
           to_store_id: parseInt(to_store_id, 10),
@@ -288,7 +286,7 @@ router.post(
         operation_type: 'staff_disable',
         action: 'update',
         target_user_id: parseInt(user_id, 10),
-        result: 'success',
+        status: 'success',
         extra_data: { reason, affected_stores: result.affected_stores }
       })
     } catch (logError) {
@@ -352,7 +350,7 @@ router.post(
         operation_type: 'staff_enable',
         action: 'update',
         target_user_id: parseInt(user_id, 10),
-        result: 'success',
+        status: 'success',
         extra_data: { notes }
       })
     } catch (logError) {

@@ -7,8 +7,11 @@
  * - user_id: 核心主键，必需，极高优先级
  * - mobile: 唯一标识+登录，必需，极高优先级
  * - consecutive_fail_count: 保底机制核心，必需，高优先级
- * - history_total_points: 臻选空间解锁，必需，高优先级
  * - nickname: 用户昵称，可选，中优先级
+ *
+ * 📌 累计积分说明：history_total_points 冗余列已删除（拍板 4），
+ *   累计获得积分由资产账本实时派生（AssetQueryService.getHistoryTotalPoints），
+ *   API 响应字段名 history_total_points 保持不变。
  *
  * 🛡️ 权限管理：通过UUID角色系统实现（role_level >= 100 为管理员）
  */
@@ -43,7 +46,7 @@ module.exports = sequelize => {
       mobile: {
         type: DataTypes.VIRTUAL(DataTypes.STRING, ['mobile_encrypted']),
         /**
-         * 读取手机号明文：优先解密 mobile_encrypted；过渡期兼容残留明文
+         * 读取手机号明文：解密 mobile_encrypted（列 NOT NULL，仅 attributes 未选取该列时返回 null）
          * @returns {string|null} 手机号明文
          */
         get() {
@@ -55,6 +58,7 @@ module.exports = sequelize => {
         },
         /**
          * 设置手机号：同时写入密文 mobile_encrypted 与盲索引 mobile_hash
+         * 手机号是唯一登录标识（业务必填），置空写入会被四列 NOT NULL 约束在数据库层面拒绝
          * @param {string} value - 手机号明文
          * @returns {void}
          */
@@ -75,17 +79,17 @@ module.exports = sequelize => {
         comment: '手机号（虚拟字段：读时解密 mobile_encrypted，写时同步密文+盲索引）'
       },
 
-      // 🔐 手机号密文列（AES-256-GCM）
+      // 🔐 手机号密文列（AES-256-GCM）——手机号是唯一登录标识，业务必填（NOT NULL 落库，2026-07-11）
       mobile_encrypted: {
         type: DataTypes.STRING(255),
-        allowNull: true,
+        allowNull: false,
         comment: '手机号密文（AES-256-GCM，格式 v1:iv:tag:cipher）'
       },
 
       // 🔐 手机号盲索引列（HMAC-SHA256，唯一约束/登录/判重）
       mobile_hash: {
         type: DataTypes.STRING(64),
-        allowNull: true,
+        allowNull: false,
         unique: true,
         comment: '手机号盲索引（HMAC-SHA256），不可逆，用于唯一性与等值查询'
       },
@@ -93,14 +97,14 @@ module.exports = sequelize => {
       // 🔐 手机号号段盲索引（前3位，管理端按号段搜，非唯一）
       mobile_prefix_hash: {
         type: DataTypes.STRING(64),
-        allowNull: true,
+        allowNull: false,
         comment: '手机号前3位号段盲索引（HMAC-SHA256），管理端按号段搜，非唯一'
       },
 
       // 🔐 手机号尾号盲索引（后4位，管理端按尾号搜，非唯一）
       mobile_suffix_hash: {
         type: DataTypes.STRING(64),
-        allowNull: true,
+        allowNull: false,
         comment: '手机号后4位尾号盲索引（HMAC-SHA256），管理端按尾号搜，非唯一'
       },
 
@@ -109,13 +113,6 @@ module.exports = sequelize => {
         type: DataTypes.INTEGER,
         defaultValue: 0,
         comment: '连续未中奖次数（保底机制核心）'
-      },
-
-      // ⭐⭐⭐⭐⭐ 臻选空间解锁 - 必需，高优先级
-      history_total_points: {
-        type: DataTypes.INTEGER,
-        defaultValue: 0,
-        comment: '历史累计总积分（臻选空间解锁条件）'
       },
 
       // 用户昵称 - 可选，中优先级
@@ -238,9 +235,6 @@ module.exports = sequelize => {
         },
         {
           fields: ['status']
-        },
-        {
-          fields: ['history_total_points']
         },
         {
           fields: ['last_login']

@@ -86,14 +86,13 @@ class QueryService {
       const formattedRecords = rows.map(r => r.toAPIResponse())
 
       const recordsWithDisplayNames = await attachDisplayNames(formattedRecords, [
-        { field: 'status', dictType: 'consumption_status' },
-        { field: 'final_status', dictType: 'consumption_final_status' }
+        { field: 'status', dictType: 'consumption_status' }
       ])
 
       /*
        * 装配审核进度 chain_info（仅 pending 在审记录，决策12）：
        * 批量查本页 pending 记录的审核链实例（auditable_type='consumption'），避免 N+1；
-       * 非 pending 记录 chain_info=null（终态由 final_status 展示）。前端零映射直读。
+       * 非 pending 记录 chain_info=null（终态由 status 展示）。前端零映射直读。
        */
       const pendingIds = recordsWithDisplayNames
         .filter(r => r.status === 'pending')
@@ -232,8 +231,7 @@ class QueryService {
       const formattedRecords = rows.map(r => r.toAPIResponse())
 
       const recordsWithDisplayNames = await attachDisplayNames(formattedRecords, [
-        { field: 'status', dictType: 'consumption_status' },
-        { field: 'final_status', dictType: 'consumption_final_status' }
+        { field: 'status', dictType: 'consumption_status' }
       ])
 
       return {
@@ -390,8 +388,7 @@ class QueryService {
       const formattedRecords = rows.map(r => r.toAPIResponse())
 
       const recordsWithDisplayNames = await attachDisplayNames(formattedRecords, [
-        { field: 'status', dictType: 'consumption_status' },
-        { field: 'final_status', dictType: 'consumption_final_status' }
+        { field: 'status', dictType: 'consumption_status' }
       ])
 
       return {
@@ -493,9 +490,9 @@ class QueryService {
         })
       }
 
-      if (options.include_points_transaction) {
+      if (options.include_reward_transaction) {
         include.push({
-          association: 'points_transaction',
+          association: 'reward_transaction',
           required: false
         })
       }
@@ -517,8 +514,7 @@ class QueryService {
       const formattedRecord = record.toAPIResponse()
 
       const recordWithDisplayNames = await attachDisplayNames(formattedRecord, [
-        { field: 'status', dictType: 'consumption_status' },
-        { field: 'final_status', dictType: 'consumption_final_status' }
+        { field: 'status', dictType: 'consumption_status' }
       ])
 
       return recordWithDisplayNames

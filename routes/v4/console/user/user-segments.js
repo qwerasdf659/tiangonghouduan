@@ -55,7 +55,7 @@ function getModels(req) {
 }
 
 /**
- * @api {get} /api/v4/admin/users/segments 获取分层统计
+ * @api {get} /api/v4/console/users/segments 获取分层统计
  * @apiName GetSegmentStats
  * @apiGroup UserSegments
  * @apiVersion 1.0.0
@@ -87,7 +87,7 @@ router.get(
 )
 
 /**
- * @api {get} /api/v4/admin/users/segments/:type 获取分层用户列表
+ * @api {get} /api/v4/console/users/segments/:type 获取分层用户列表
  * @apiName GetSegmentUsers
  * @apiGroup UserSegments
  * @apiVersion 1.0.0
@@ -145,7 +145,7 @@ router.get(
 )
 
 /**
- * @api {get} /api/v4/admin/users/activity-heatmap 获取活跃时段热力图
+ * @api {get} /api/v4/console/users/activity-heatmap 获取活跃时段热力图
  * @apiName GetActivityHeatmap
  * @apiGroup UserSegments
  * @apiVersion 1.0.0
@@ -186,7 +186,7 @@ router.get(
 )
 
 /**
- * @api {get} /api/v4/admin/users/exchange-preferences 获取兑换偏好
+ * @api {get} /api/v4/console/users/exchange-preferences 获取兑换偏好
  * @apiName GetExchangePreferences
  * @apiGroup UserSegments
  * @apiVersion 1.0.0
@@ -303,7 +303,7 @@ router.get(
 )
 
 /**
- * @api {get} /api/v4/admin/users/funnel 获取行为漏斗
+ * @api {get} /api/v4/console/users/funnel 获取行为漏斗
  * @apiName GetBehaviorFunnel
  * @apiGroup UserSegments
  * @apiVersion 1.0.0
@@ -345,7 +345,7 @@ router.get(
 )
 
 /**
- * @api {get} /api/v4/admin/users/segment-rules 获取分层规则配置
+ * @api {get} /api/v4/console/users/segment-rules 获取分层规则配置
  * @apiName GetSegmentRules
  * @apiGroup UserSegments
  * @apiVersion 1.0.0

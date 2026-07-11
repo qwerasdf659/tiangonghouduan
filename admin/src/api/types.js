@@ -389,7 +389,6 @@
  * @property {number} consumption_amount - 消费金额（DECIMAL(10,2)）
  * @property {number} points_to_award - 待发放积分
  * @property {'pending'|'approved'|'rejected'|'expired'} status - 审核状态
- * @property {'pending_review'|'approved'|'rejected'} final_status - 最终状态
  * @property {string} qr_code - 消费二维码
  * @property {string} idempotency_key - 幂等键
  * @property {string} business_id - 业务唯一ID

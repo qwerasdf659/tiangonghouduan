@@ -2,7 +2,7 @@
  * 物品锁定记录模型（ItemHold Model） — 三表模型锁定层
  *
  * 业务定位：
- * - 唯一的锁定状态真相，替代旧 item_instances.locks JSON 字段
+ * - 唯一的锁定状态真相（可索引、可查询、有审计历史）
  * - 有状态变更：active → released / expired / overridden
  * - 释放/过期的记录保留，作为锁定/解锁的完整审计
  *
@@ -178,7 +178,7 @@ module.exports = sequelize => {
       tableName: 'item_holds',
       timestamps: false, // 手动管理 created_at 和 released_at
       underscored: true,
-      comment: '物品锁定/保留记录（替代旧 JSON locks，可索引可查询有审计历史）',
+      comment: '物品锁定/保留记录（可索引、可查询、有审计历史）',
 
       indexes: [
         {

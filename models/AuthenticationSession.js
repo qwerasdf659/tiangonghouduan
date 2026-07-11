@@ -45,8 +45,8 @@ const { DataTypes } = require('sequelize')
 const logger = require('../utils/logger').logger
 const { VALID_PLATFORMS } = require('../utils/platformDetector')
 
-/** 落库允许的平台白名单（前端可声明的平台 + unknown 兜底），用于堵住空串等非法值入库 */
-const PLATFORM_WHITELIST = new Set([...VALID_PLATFORMS, 'unknown'])
+/** 落库允许的平台白名单（与 platformDetector 一致，2026-07-11 枚举收窄后不含 unknown），非法值 fail-fast */
+const PLATFORM_WHITELIST = VALID_PLATFORMS
 
 module.exports = sequelize => {
   const AuthenticationSession = sequelize.define(
@@ -86,11 +86,10 @@ module.exports = sequelize => {
       },
 
       login_platform: {
-        type: DataTypes.ENUM('web', 'wechat_mp', 'douyin_mp', 'alipay_mp', 'app', 'unknown'),
+        type: DataTypes.ENUM('web', 'wechat_mp', 'douyin_mp', 'alipay_mp', 'app'),
         allowNull: false,
-        defaultValue: 'unknown',
         comment:
-          '登录平台：web=浏览器, wechat_mp=微信小程序, douyin_mp=抖音小程序, alipay_mp=支付宝小程序, app=原生App(预留), unknown=旧数据兜底'
+          '登录平台：web=浏览器, wechat_mp=微信小程序, douyin_mp=抖音小程序, alipay_mp=支付宝小程序, app=原生App(预留)。由 platformDetector 识别，调用方必传'
       },
 
       device_id: {
@@ -196,7 +195,7 @@ module.exports = sequelize => {
    * @param {string} sessionData.user_type - 用户类型 (user/admin)
    * @param {number} sessionData.user_id - 用户ID
    * @param {string} [sessionData.login_ip] - 登录IP地址
-   * @param {string} [sessionData.login_platform='unknown'] - 登录平台（web/wechat_mp/douyin_mp/alipay_mp/app/unknown）
+   * @param {string} sessionData.login_platform - 登录平台（web/wechat_mp/douyin_mp/alipay_mp/app），必传，由 platformDetector 识别
    * @param {string} [sessionData.device_id] - 设备标识（前端生成的UUID）。缺失则为 NULL（未知设备）
    * @param {number} [sessionData.expires_in_minutes=120] - 过期时间（分钟），默认2小时
    * @param {Object} [options] - Sequelize 选项（支持 transaction）
@@ -208,13 +207,18 @@ module.exports = sequelize => {
       user_type,
       user_id,
       login_ip,
-      login_platform = 'unknown',
+      login_platform,
       device_id = null,
       expires_in_minutes = 120 // 默认2小时
     } = sessionData
 
-    // 平台白名单兜底：非法值（如空串）统一落库为 unknown，从机制上堵住"僵尸会话"
-    const safePlatform = PLATFORM_WHITELIST.has(login_platform) ? login_platform : 'unknown'
+    // 平台白名单校验（fail-fast）：登录链路统一走 platformDetector（兜底 web），非法值即调用方 bug
+    if (!PLATFORM_WHITELIST.has(login_platform)) {
+      throw new Error(
+        `login_platform 非法值: ${login_platform}（合法值: ${[...PLATFORM_WHITELIST].join('/')}）`
+      )
+    }
+    const safePlatform = login_platform
 
     // ✅ futureTime 使用 Date.now()，与 new Date() 时间基准一致
     const expires_at = BeijingTimeHelper.futureTime(expires_in_minutes * 60 * 1000)

@@ -115,7 +115,10 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
     // 清理余额记录
     for (const balance_id of created_balances) {
       try {
-        await AccountAssetBalance.destroy({ where: { balance_id }, force: true })
+        await AccountAssetBalance.destroy({
+          where: { account_asset_balance_id: balance_id },
+          force: true
+        })
       } catch (error) {
         // 忽略清理错误
       }
@@ -294,7 +297,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
 
         // 验证
         expect(result).toBeDefined()
-        expect(result.balance_id).toBeDefined()
+        expect(result.account_asset_balance_id).toBeDefined()
         expect(result.account_id).toBe(test_account_id)
         expect(result.asset_code).toBe('points')
         expect(Number(result.available_amount)).toBeGreaterThanOrEqual(0)
@@ -340,8 +343,8 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.getOrCreateBalance(test_account_id, 'points', { transaction })
         })
 
-        // 验证：balance_id 相同
-        expect(second_balance.balance_id).toBe(first_balance.balance_id)
+        // 验证：account_asset_balance_id 相同
+        expect(second_balance.account_asset_balance_id).toBe(first_balance.account_asset_balance_id)
       })
 
       it('相同账户不同资产类型应返回不同余额记录', async () => {
@@ -356,8 +359,10 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           })
         })
 
-        // 验证：balance_id 不同
-        expect(star_stone_balance.balance_id).not.toBe(points_balance.balance_id)
+        // 验证：account_asset_balance_id 不同
+        expect(star_stone_balance.account_asset_balance_id).not.toBe(
+          points_balance.account_asset_balance_id
+        )
         expect(star_stone_balance.asset_code).toBe('star_stone')
         expect(points_balance.asset_code).toBe('points')
       })
@@ -1982,7 +1987,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
       })
 
       expect(balance).toBeDefined()
-      expect(balance.balance_id).toBeDefined()
+      expect(balance.account_asset_balance_id).toBeDefined()
 
       // 3. 变更余额
       const idempotency_key = generateIdempotencyKey('test_full_flow')

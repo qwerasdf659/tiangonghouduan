@@ -949,6 +949,58 @@ class BusinessCacheHelper {
   }
 
   /**
+   * 构建用户累计积分缓存 key（history_total_points 账本派生值，拍板 4）
+   *
+   * @param {number} user_id - 用户ID
+   * @returns {string} 缓存 key
+   *
+   * @example
+   * const key = BusinessCacheHelper.buildHistoryPointsKey(31)
+   * // 返回: 'app:v4:dev:api:user:history_points:31'
+   */
+  static buildHistoryPointsKey(user_id) {
+    return `${KEY_PREFIX}${CACHE_PREFIX.USER}:history_points:${user_id}`
+  }
+
+  /**
+   * 获取用户累计积分缓存（账本派生值）
+   *
+   * @param {number} user_id - 用户ID
+   * @returns {Promise<number|null>} 累计积分或 null（未命中）
+   */
+  static async getHistoryPoints(user_id) {
+    const key = this.buildHistoryPointsKey(user_id)
+    return await this.get(key)
+  }
+
+  /**
+   * 写入用户累计积分缓存（账本派生值）
+   *
+   * @param {number} user_id - 用户ID
+   * @param {number} points - 累计积分派生值
+   * @returns {Promise<boolean>} 是否写入成功
+   */
+  static async setHistoryPoints(user_id, points) {
+    const key = this.buildHistoryPointsKey(user_id)
+    return await this.set(key, points, DEFAULT_TTL.USER)
+  }
+
+  /**
+   * 失效用户累计积分缓存
+   *
+   * 触发时机：BalanceService.changeBalance 对「用户账户 + points + 正向入账 + 非防复利名单」
+   * 流水提交后（transaction.afterCommit），下次读取重新从账本派生
+   *
+   * @param {number} user_id - 用户ID
+   * @param {string} reason - 失效原因
+   * @returns {Promise<boolean>} 是否删除成功
+   */
+  static async invalidateHistoryPoints(user_id, reason = 'points_awarded') {
+    const key = this.buildHistoryPointsKey(user_id)
+    return await this.del(key, reason)
+  }
+
+  /**
    * 失效用户缓存（同时失效 mobile_hash 和 id 两个维度）
    *
    * @description 决策7A：用户信息变更时调用，确保缓存一致性

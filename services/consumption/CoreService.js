@@ -24,6 +24,7 @@ const {
   UserGrowthLevel
 } = require('../../models')
 const BalanceService = require('../asset/BalanceService')
+const AssetQueryService = require('../asset/QueryService') // 累计积分账本派生（拍板 4：users.history_total_points 冗余列已删除）
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const OrderNoGenerator = require('../../utils/OrderNoGenerator')
 const { generateConsumptionBusinessId } = require('../../utils/IdempotencyHelper')
@@ -199,8 +200,13 @@ class CoreService {
      *   锁定 level_key_locked + earn_multiplier_locked 随消费记录落表；
      * - 审核发分按锁定值执行，审核快慢不影响到账金额（用户承诺一致）；
      * - 无启用等级（等级体系未配置）时按 1.00 锁定，行为与基准完全一致。
+     * - 累计积分由资产账本实时派生（拍板 4：users.history_total_points 冗余列已删除），
+     *   事务内直查账本保证一致性。
      */
-    const lockedLevel = await UserGrowthLevel.resolveLevel(user.history_total_points, {
+    const userHistoryPoints = await AssetQueryService.getHistoryTotalPoints(userId, {
+      transaction
+    })
+    const lockedLevel = await UserGrowthLevel.resolveLevel(userHistoryPoints, {
       transaction
     })
     const levelKeyLocked = lockedLevel ? lockedLevel.level_key : null
@@ -350,17 +356,16 @@ class CoreService {
 
     /*
      * 升级检测基准（拍板⑬-(d)）：发分前先记录用户当前等级。
-     * 事务内读取用户累计积分 + 等级表（绕过进程内缓存，保证事务一致性）。
+     * 累计积分由资产账本实时派生（拍板 4），事务内直查账本 + 等级表（保证事务一致性）。
      */
-    const userBefore = await User.findByPk(record.user_id, {
-      attributes: ['user_id', 'history_total_points'],
+    const historyPointsBefore = await AssetQueryService.getHistoryTotalPoints(record.user_id, {
       transaction
     })
-    const levelKeyBefore = userBefore
-      ? await UserGrowthLevel.resolveLevelKey(userBefore.history_total_points, { transaction })
-      : null
+    const levelKeyBefore = await UserGrowthLevel.resolveLevelKey(historyPointsBefore, {
+      transaction
+    })
 
-    // ── 1. 基础笔（计入 history_total_points，驱动等级）─────────────────
+    // ── 1. 基础笔（计入累计积分派生口径，驱动等级）─────────────────
     // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
     const pointsResult = await BalanceService.changeBalance(
       {
@@ -616,7 +621,7 @@ class CoreService {
       star_stone_quota_allocated: starStoneQuotaAllocated,
       level_upgrade: levelUpgrade,
       new_balance: pointsResult.new_balance,
-      points_transaction: pointsResult.transaction
+      reward_transaction: pointsResult.transaction
     }
   }
 
@@ -684,7 +689,7 @@ class CoreService {
    * 升级检测（发分后对比等级，拍板⑬-(d)）
    *
    * 等级实时派生无升级事件，审核发分是唯一可靠触达点：
-   * 基础笔已在同事务内累加 history_total_points，事务内重读即为"发分后"值。
+   * 基础笔流水已在同事务内落账，事务内重新派生累计积分（拍板 4：账本直查）即为"发分后"值。
    *
    * @param {number} user_id - 用户ID
    * @param {string|null} levelKeyBefore - 发分前等级码
@@ -694,13 +699,11 @@ class CoreService {
    */
   static async _detectLevelUpgrade(user_id, levelKeyBefore, options = {}) {
     const { transaction } = options
-    const userAfter = await User.findByPk(user_id, {
-      attributes: ['user_id', 'history_total_points'],
+    const historyPointsAfter = await AssetQueryService.getHistoryTotalPoints(user_id, {
       transaction
     })
-    if (!userAfter) return null
 
-    const levelAfter = await UserGrowthLevel.resolveLevel(userAfter.history_total_points, {
+    const levelAfter = await UserGrowthLevel.resolveLevel(historyPointsAfter, {
       transaction
     })
     if (!levelAfter || levelAfter.level_key === levelKeyBefore) return null
@@ -768,7 +771,6 @@ class CoreService {
         reviewed_at: BeijingTimeHelper.createDatabaseTime(),
         admin_notes: reviewData.admin_notes || null,
         reward_transaction_id: settlement.reward_transaction_id,
-        final_status: 'approved',
         settled_at: BeijingTimeHelper.createDatabaseTime(),
         updated_at: BeijingTimeHelper.createDatabaseTime()
       },
@@ -841,7 +843,7 @@ class CoreService {
 
     return {
       consumption_record: record,
-      points_transaction: settlement.points_transaction,
+      reward_transaction: settlement.reward_transaction,
       points_awarded: settlement.points_awarded,
       level_bonus_points: settlement.level_bonus_points,
       budget_points_allocated: settlement.budget_points_allocated,
@@ -899,7 +901,6 @@ class CoreService {
         reviewed_by: reviewData.reviewer_id,
         reviewed_at: BeijingTimeHelper.createDatabaseTime(),
         admin_notes: reviewData.admin_notes,
-        final_status: 'rejected',
         settled_at: BeijingTimeHelper.createDatabaseTime(),
         updated_at: BeijingTimeHelper.createDatabaseTime()
       },

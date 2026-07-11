@@ -72,6 +72,7 @@ const logger = require('../../utils/logger').logger
 
 const { User } = require('../../models')
 const { getUserRoles } = require('../../middleware/auth')
+const AssetQueryService = require('../asset/QueryService') // 累计积分账本派生（拍板 4）
 
 /**
  * 抽奖用户服务类
@@ -117,8 +118,11 @@ class LotteryUserService {
         throw new BusinessError('用户不存在', 'LOTTERY_NOT_FOUND', 404)
       }
 
-      // 🛡️ 获取用户角色信息
-      const userRoles = await getUserRoles(user_id)
+      // 🛡️ 获取用户角色信息 + 累计积分账本派生（拍板 4：冗余列已删除，响应字段名不变）
+      const [userRoles, historyTotalPoints] = await Promise.all([
+        getUserRoles(user_id),
+        AssetQueryService.getHistoryTotalPoints(user_id)
+      ])
 
       return {
         user_id: user.user_id,
@@ -128,7 +132,7 @@ class LotteryUserService {
         role_level: userRoles.role_level, // 🛡️ 基于角色级别判断权限（>= 100 为管理员）
         roles: userRoles.roles,
         consecutive_fail_count: user.consecutive_fail_count,
-        history_total_points: user.history_total_points,
+        history_total_points: historyTotalPoints,
         created_at: user.created_at,
         updated_at: user.updated_at
       }
@@ -200,8 +204,11 @@ class LotteryUserService {
         throw new BusinessError('用户不存在', 'LOTTERY_NOT_FOUND', 404)
       }
 
-      // 🛡️ 获取用户角色信息
-      const userRoles = await getUserRoles(user_id)
+      // 🛡️ 获取用户角色信息 + 累计积分账本派生（拍板 4）
+      const [userRoles, historyTotalPoints] = await Promise.all([
+        getUserRoles(user_id),
+        AssetQueryService.getHistoryTotalPoints(user_id)
+      ])
 
       return {
         user_id: user.user_id,
@@ -209,7 +216,7 @@ class LotteryUserService {
         nickname: user.nickname,
         role_level: userRoles.role_level, // 🛡️ 基于角色级别判断权限（>= 100 为管理员）
         consecutive_fail_count: user.consecutive_fail_count || 0,
-        history_total_points: user.history_total_points || 0,
+        history_total_points: historyTotalPoints,
         login_count: user.login_count || 0,
         last_login: user.last_login,
         created_at: user.created_at,

@@ -4,7 +4,8 @@
  * 顶层路径：/api/v4/console/diy/materials
  *
  * 接口清单（5 个）：
- * - GET    /       获取材料列表（分页/筛选）
+ * - GET    /       获取材料列表（分页/筛选，完备度快捷筛选：missing_image /
+ *                  missing_copy / zero_price_enabled / missing_physical）
  * - GET    /:id    获取材料详情
  * - POST   /       创建材料
  * - PUT    /:id    更新材料

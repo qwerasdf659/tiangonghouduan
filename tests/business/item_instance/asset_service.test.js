@@ -62,7 +62,7 @@ describe('物品系统 ItemService 测试 - P2优先级', () => {
       _PrizePoolService = getTestService('prize_pool')
     } catch (_err) {
       console.log('⚠️ PrizePoolService 未注册，将直接引入')
-      _PrizePoolService = require('../../../services/PrizePoolService')
+      _PrizePoolService = require('../../../services/prize-pool')
     }
 
     const test_mobile = TEST_DATA.users.testUser.mobile

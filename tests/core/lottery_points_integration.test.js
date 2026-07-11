@@ -36,7 +36,6 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
   let campaignId // 🔴 P0-1修复：从 global.testData 动态获取，不再硬编码
   const baseCost = 30 // 单次抽奖消耗积分（从定价配置动态读取）
   let initialBalance = null
-  let initialUser = null
 
   /**
    * 辅助函数：获取用户 POINTS 余额（使用资产系统）
@@ -86,15 +85,16 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
       console.warn('⚠️ 测试活动不存在，抽奖相关测试将被跳过')
     }
 
-    // 获取初始状态
+    // 获取初始状态（累计积分账本派生，拍板 4：users.history_total_points 冗余列已删除）
     initialBalance = await getPointsBalance(testUserId)
-    initialUser = await User.findByPk(testUserId)
+    const AssetQueryService = require('../../services/asset/QueryService')
+    const initialHistoryPoints = await AssetQueryService.getHistoryTotalPoints(testUserId)
 
     console.log('📊 测试开始前的数据状态：')
     console.log({
       user_id: testUserId,
       available_points: initialBalance,
-      history_total_points: initialUser?.history_total_points
+      history_total_points: initialHistoryPoints
     })
 
     console.log('✅ 抽奖积分集成测试环境初始化完成')
@@ -301,12 +301,13 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
 
   afterAll(async () => {
     const finalBalance = await getPointsBalance(testUserId)
-    const finalUser = await User.findByPk(testUserId)
+    const AssetQueryService = require('../../services/asset/QueryService')
+    const finalHistoryPoints = await AssetQueryService.getHistoryTotalPoints(testUserId)
 
     console.log('\n📊 测试结束后的数据状态：')
     console.log({
       available_points: finalBalance,
-      history_total_points: finalUser?.history_total_points
+      history_total_points: finalHistoryPoints
     })
 
     console.log('\n📈 数据变化：')

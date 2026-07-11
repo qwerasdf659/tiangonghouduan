@@ -3,12 +3,12 @@
  *
  * 测试场景：
  * 1. 批量赠送抽奖次数（B6）- 验证 lottery_campaign_id 正确传递
- * 2. 批量操作日志查询 - 验证 batch_operation_log_id 正确返回
+ * 2. 批量操作日志查询 - 验证 operation_log_id 正确返回
  * 3. 批量操作日志详情 - 验证主键字段名一致性
  * 4. 批量操作配置查询 - 验证配置端点正常
  *
  * 根因修复验证：
- * - 模型主键 batch_operation_log_id 与服务层/路由层引用一致
+ * - 模型主键 operation_log_id 与服务层/路由层引用一致
  * - API 响应字段名符合 {table_name}_id 命名规范
  *
  * 创建时间：2026-02-15
@@ -77,10 +77,10 @@ describe('批量操作功能测试', () => {
       expect(res.body.code).toBe('SUCCESS')
       expect(res.body.data).toBeDefined()
 
-      // 关键验证：batch_operation_log_id 必须有值（非 undefined/null）
-      expect(res.body.data.batch_operation_log_id).toBeDefined()
-      expect(res.body.data.batch_operation_log_id).not.toBeNull()
-      expect(typeof res.body.data.batch_operation_log_id).toBe('number')
+      // 关键验证：operation_log_id 必须有值（非 undefined/null）
+      expect(res.body.data.operation_log_id).toBeDefined()
+      expect(res.body.data.operation_log_id).not.toBeNull()
+      expect(typeof res.body.data.operation_log_id).toBe('number')
 
       // 验证业务结果
       expect(res.body.data.total_count).toBe(1)
@@ -128,7 +128,7 @@ describe('批量操作功能测试', () => {
   // ==================== 批量操作日志查询 ====================
 
   describe('批量操作日志查询', () => {
-    it('日志列表应返回 batch_operation_log_id 字段', async () => {
+    it('日志列表应返回 operation_log_id 字段', async () => {
       if (skipTests) return
 
       const res = await request(app)
@@ -139,11 +139,11 @@ describe('批量操作功能测试', () => {
       expect(res.body.data.logs).toBeDefined()
       expect(Array.isArray(res.body.data.logs)).toBe(true)
 
-      // 验证日志列表中每条记录都有 batch_operation_log_id
+      // 验证日志列表中每条记录都有 operation_log_id
       if (res.body.data.logs.length > 0) {
         const firstLog = res.body.data.logs[0]
-        expect(firstLog.batch_operation_log_id).toBeDefined()
-        expect(firstLog.batch_operation_log_id).not.toBeNull()
+        expect(firstLog.operation_log_id).toBeDefined()
+        expect(firstLog.operation_log_id).not.toBeNull()
         expect(firstLog.operation_type).toBeDefined()
         expect(firstLog.status).toBeDefined()
         expect(firstLog.total_count).toBeDefined()
@@ -154,7 +154,7 @@ describe('批量操作功能测试', () => {
       expect(res.body.data.pagination.total).toBeDefined()
     })
 
-    it('日志详情应返回完整的 batch_operation_log_id', async () => {
+    it('日志详情应返回完整的 operation_log_id', async () => {
       if (skipTests) return
 
       // 先查一条日志
@@ -167,7 +167,7 @@ describe('批量操作功能测试', () => {
         return
       }
 
-      const logId = listRes.body.data.logs[0].batch_operation_log_id
+      const logId = listRes.body.data.logs[0].operation_log_id
       expect(logId).toBeDefined()
 
       const detailRes = await request(app)
@@ -175,7 +175,7 @@ describe('批量操作功能测试', () => {
         .set('Authorization', `Bearer ${adminToken}`)
 
       expect(detailRes.body.success).toBe(true)
-      expect(detailRes.body.data.batch_operation_log_id).toBe(logId)
+      expect(detailRes.body.data.operation_log_id).toBe(logId)
       expect(detailRes.body.data.operation_type_name).toBeDefined()
       expect(detailRes.body.data.status_name).toBeDefined()
     })
@@ -225,7 +225,7 @@ describe('批量操作功能测试', () => {
         })
 
       expect(res.body.success).toBe(true)
-      expect(res.body.data.batch_operation_log_id).toBeDefined()
+      expect(res.body.data.operation_log_id).toBeDefined()
       expect(res.body.data.total_count).toBe(1)
 
       // 如果活动是 pool 模式，应成功；否则记录 fail

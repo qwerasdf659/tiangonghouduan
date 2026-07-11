@@ -136,7 +136,7 @@ module.exports = sequelize => {
       evidence: {
         type: DataTypes.JSON,
         allowNull: true,
-        comment: '证据（截图URL数组、订单快照等，对应旧 dispute_evidence）'
+        comment: '证据（截图URL数组、订单快照等）'
       },
 
       status: {
@@ -175,7 +175,7 @@ module.exports = sequelize => {
       deadline: {
         type: DataTypes.DATE,
         allowNull: true,
-        comment: '处理截止时间（超时升级，对应旧 dispute_deadline）'
+        comment: '处理截止时间（超时自动升级仲裁）'
       },
 
       resolution: {

@@ -39,7 +39,6 @@ const TABLE_FIELD_FIXTURES = {
     'user_level',
     'last_active_at',
     'consecutive_fail_count',
-    'history_total_points',
     'wx_openid',
     'created_at',
     'updated_at'

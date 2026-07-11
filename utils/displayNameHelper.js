@@ -296,8 +296,7 @@ const DICT_TYPES = {
   MERCHANT_OPERATION_TYPE: 'merchant_operation_type', // 商家操作类型
 
   // ==================== 消费相关 ====================
-  CONSUMPTION_STATUS: 'consumption_status', // 消费状态
-  CONSUMPTION_FINAL_STATUS: 'consumption_final_status', // 消费最终状态
+  CONSUMPTION_STATUS: 'consumption_status', // 消费状态（唯一状态机，2026-07-11 final_status 已合并删除）
 
   // ==================== 客服消息相关 ====================
   CS_SESSION_STATUS: 'cs_session_status', // 客服会话状态

@@ -30,7 +30,7 @@ const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
  * 与auditLog中间件的关系：
  * - auditLog中间件：面向路由层，依赖req对象（适用于HTTP请求）
  * - AuditLogService：面向服务层，不依赖req对象（适用于内部调用）
- * - 两者底层都使用AdminOperationLog模型
+ * - 两者底层都使用统一 OperationLog 模型（operation_logs 单表 admin 域，拍板 10 三表合并）
  * - 中间件层建议调用本服务的方法，而非直接操作模型
  *
  * 使用示例：
@@ -75,8 +75,11 @@ const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
  * 最后更新：2026年01月08日（V4.5.0 审计统一入口整合）
  */
 
-const { AdminOperationLog, User } = require('../models')
+const { OperationLog, User } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
+
+/** 管理员域日志视图（operation_logs 单表 + operator_type='admin'，拍板 10 三表合并；读查询自动带域过滤，写入需显式传 operator_type） */
+const AdminOperationLog = OperationLog.scope('admin')
 
 // 引用统一枚举定义（单一真相源 - 2026-01-08 整合）
 const {
@@ -214,13 +217,15 @@ class AuditLogService {
       // 4. 计算变更字段
       const changedFields = AdminOperationLog.compareObjects(before_data, after_data)
 
-      // 5. 创建审计日志（使用规范化后的 target_type）
+      // 5. 创建审计日志（使用规范化后的 target_type；scope 不注入写入值，operator_type/status 显式传入）
       const logData = {
+        operator_type: 'admin', // 管理员域（operation_logs 单表多态标识）
         operator_id,
         operation_type,
         target_type: normalizedTargetType, // P0-5: 使用规范化后的 target_type
         target_id,
         action,
+        status: 'success', // admin 域审计的都是已发生的操作，状态固定 success
         before_data,
         after_data,
         changed_fields: changedFields,
@@ -232,13 +237,14 @@ class AuditLogService {
       }
 
       if (targetTypeRaw) {
-        logData.target_type_raw = targetTypeRaw
+        // 原始 target_type 值（审计追溯用低频字段）归入 detail JSON（拍板 10 字段归属原则）
+        logData.detail = { target_type_raw: targetTypeRaw }
       }
 
-      const auditLog = await AdminOperationLog.create(logData, { transaction })
+      const auditLog = await OperationLog.create(logData, { transaction })
 
       logger.info(
-        `[审计日志] 记录成功: admin_operation_log_id=${auditLog.admin_operation_log_id}, 操作员=${operator_id}, ` +
+        `[审计日志] 记录成功: operation_log_id=${auditLog.operation_log_id}, 操作员=${operator_id}, ` +
           `类型=${operation_type}, 动作=${action}, 关键操作=${isCritical}`
       )
 
@@ -1075,7 +1081,7 @@ class AuditLogService {
           attributes: [
             'operation_type',
             [
-              require('sequelize').fn('COUNT', require('sequelize').col('admin_operation_log_id')),
+              require('sequelize').fn('COUNT', require('sequelize').col('operation_log_id')),
               'count'
             ]
           ],
@@ -1088,7 +1094,7 @@ class AuditLogService {
           attributes: [
             'action',
             [
-              require('sequelize').fn('COUNT', require('sequelize').col('admin_operation_log_id')),
+              require('sequelize').fn('COUNT', require('sequelize').col('operation_log_id')),
               'count'
             ]
           ],
@@ -1122,7 +1128,7 @@ class AuditLogService {
    * @param {string} filters.end_date - 结束日期
    * @returns {Promise<Object>} 增强版统计信息
    *
-   * @note AdminOperationLog模型没有result字段，审计日志是只增不改的操作记录
+   * @note admin 域日志 status 固定 success（审计只增不改），成功率统计恒为 100%
    *       成功/失败统计改为按action字段分类（create/update/delete等）
    */
   static async getAuditStatisticsEnhanced(filters = {}) {
@@ -1180,7 +1186,7 @@ class AuditLogService {
           attributes: [
             'operation_type',
             [
-              require('sequelize').fn('COUNT', require('sequelize').col('admin_operation_log_id')),
+              require('sequelize').fn('COUNT', require('sequelize').col('operation_log_id')),
               'count'
             ]
           ],
@@ -1193,7 +1199,7 @@ class AuditLogService {
           attributes: [
             'action',
             [
-              require('sequelize').fn('COUNT', require('sequelize').col('admin_operation_log_id')),
+              require('sequelize').fn('COUNT', require('sequelize').col('operation_log_id')),
               'count'
             ]
           ],
@@ -1352,7 +1358,7 @@ class AuditLogService {
         // 3.6 按操作类型分组统计
         AdminOperationLog.findAll({
           where: baseWhere,
-          attributes: ['operation_type', [fn('COUNT', col('admin_operation_log_id')), 'count']],
+          attributes: ['operation_type', [fn('COUNT', col('operation_log_id')), 'count']],
           group: ['operation_type'],
           order: [[literal('count'), 'DESC']],
           raw: true
@@ -1361,7 +1367,7 @@ class AuditLogService {
         // 3.7 按目标类型分组统计
         AdminOperationLog.findAll({
           where: baseWhere,
-          attributes: ['target_type', [fn('COUNT', col('admin_operation_log_id')), 'count']],
+          attributes: ['target_type', [fn('COUNT', col('operation_log_id')), 'count']],
           group: ['target_type'],
           order: [[literal('count'), 'DESC']],
           raw: true
@@ -1370,7 +1376,7 @@ class AuditLogService {
         // 3.8 按操作员分组统计（包含操作员信息）
         AdminOperationLog.findAll({
           where: baseWhere,
-          attributes: ['operator_id', [fn('COUNT', col('admin_operation_log_id')), 'count']],
+          attributes: ['operator_id', [fn('COUNT', col('operation_log_id')), 'count']],
           include: [
             {
               model: User,
@@ -1386,7 +1392,7 @@ class AuditLogService {
         // 3.9 按风险等级分组统计
         AdminOperationLog.findAll({
           where: baseWhere,
-          attributes: ['risk_level', [fn('COUNT', col('admin_operation_log_id')), 'count']],
+          attributes: ['risk_level', [fn('COUNT', col('operation_log_id')), 'count']],
           group: ['risk_level'],
           order: [[literal('count'), 'DESC']],
           raw: true
@@ -1397,7 +1403,7 @@ class AuditLogService {
           where: baseWhere,
           attributes: [
             [fn('DATE', col('created_at')), 'date'],
-            [fn('COUNT', col('admin_operation_log_id')), 'count']
+            [fn('COUNT', col('operation_log_id')), 'count']
           ],
           group: [fn('DATE', col('created_at'))],
           order: [[fn('DATE', col('created_at')), 'ASC']],

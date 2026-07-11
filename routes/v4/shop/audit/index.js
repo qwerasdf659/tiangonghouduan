@@ -42,7 +42,7 @@ const BeijingTimeHelper = require('../../../../utils/timeHelper')
  * @query {number} store_id - 门店ID（可选，管理员可不传查全部）
  * @query {number} operator_id - 操作员ID（可选）
  * @query {string} operation_type - 操作类型（可选）
- * @query {string} result - 操作结果（可选：success/failed/blocked）
+ * @query {string} status - 操作结果（可选：success/failed/blocked）
  * @query {string} start_date - 开始日期（可选，格式：YYYY-MM-DD）
  * @query {string} end_date - 结束日期（可选，格式：YYYY-MM-DD）
  * @query {number} page - 页码（默认1）
@@ -59,7 +59,7 @@ router.get(
     const {
       operator_id,
       operation_type,
-      result,
+      status,
       start_date,
       end_date,
       page = 1,
@@ -78,7 +78,7 @@ router.get(
     if (resolved_store_id) filters.store_id = resolved_store_id
     if (operator_id) filters.operator_id = parseInt(operator_id, 10)
     if (operation_type) filters.operation_type = operation_type
-    if (result) filters.result = result
+    if (status) filters.status = status
 
     if (start_date) {
       const startDateTime = BeijingTimeHelper.parseFromDateString(start_date)
@@ -147,7 +147,7 @@ router.get(
  * @query {string} start_date - 开始日期（必填，格式：YYYY-MM-DD）
  * @query {string} end_date - 结束日期（必填，格式：YYYY-MM-DD）
  * @query {string} operation_type - 操作类型（可选）
- * @query {string} result - 操作结果（可选：success/failed/blocked）
+ * @query {string} status - 操作结果（可选：success/failed/blocked）
  * @query {number} page_size - 最大导出条数（可选，默认10000，最大50000）
  *
  * 响应：
@@ -165,7 +165,7 @@ router.get(
   requireMerchantPermission('staff:read', { scope: 'store', storeIdParam: 'query' }),
   resolveStoreContext({ storeIdParam: 'query', required: false }),
   asyncHandler(async (req, res) => {
-    const { start_date, end_date, operation_type, result, page_size = 10000 } = req.query
+    const { start_date, end_date, operation_type, status, page_size = 10000 } = req.query
 
     if (!start_date || !end_date) {
       return res.apiError('导出需要指定开始日期和结束日期', 'MISSING_DATE_RANGE', null, 400)
@@ -214,7 +214,7 @@ router.get(
       start_time: startDateTime,
       end_time: endDateTime,
       operation_type,
-      result,
+      status,
       limit: exportLimit
     })
 
@@ -251,12 +251,12 @@ router.get(
         escapeCSV(log.store?.store_name || ''),
         escapeCSV(log.operation_type || ''),
         escapeCSV(log.action || ''),
-        log.result || '',
-        log.target_user_id || '',
-        log.consumption_amount || '',
+        log.status || '',
+        (log.target_type === 'user' ? log.target_id : '') || '',
+        (log.detail && log.detail.consumption_amount) || '',
         escapeCSV(log.ip_address || ''),
         escapeCSV(log.request_id || ''),
-        escapeCSV(log.error_message || '')
+        escapeCSV((log.detail && log.detail.error_message) || '')
       ]
       res.write(row.join(',') + '\n')
     }

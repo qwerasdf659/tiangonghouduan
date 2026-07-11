@@ -29,11 +29,6 @@ export const DASHBOARD_ENDPOINTS = {
   REVENUE_TREND: `${API_PREFIX}/console/dashboard/revenue/trend`,
   REVENUE_FEE_STATS: `${API_PREFIX}/console/dashboard/revenue/fee-stats`,
 
-  // 市场健康看板（MarketHealthService）
-  MARKET_HEALTH_SUMMARY: `${API_PREFIX}/console/dashboard/market-health`,
-  MARKET_HEALTH_ORDER_TREND: `${API_PREFIX}/console/dashboard/market-health/order-trend`,
-  MARKET_HEALTH_TOP_USERS: `${API_PREFIX}/console/dashboard/market-health/top-users`,
-
   /**
    * 跨域顶线：B2C 兑换 + C2C 市场 + 竞拍（一次请求）
    * 后端: GET /api/v4/console/dashboard/stats?days=7
@@ -143,36 +138,6 @@ export const DashboardAPI = {
    */
   async getRevenueFeeStats() {
     return request({ url: DASHBOARD_ENDPOINTS.REVENUE_FEE_STATS })
-  },
-
-  // ===== 市场健康看板（MarketHealthService） =====
-
-  /**
-   * 获取市场健康摘要
-   * @returns {Promise<Object>} 订单状态趋势 + 平均结算时间 + Top买家/卖家
-   */
-  async getMarketHealthSummary() {
-    return request({ url: DASHBOARD_ENDPOINTS.MARKET_HEALTH_SUMMARY })
-  },
-
-  /**
-   * 获取市场订单趋势
-   * @param {Object} params - 查询参数
-   * @param {number} [params.days=7] - 天数
-   * @returns {Promise<Object>} 订单趋势数据
-   */
-  async getMarketHealthOrderTrend(params = {}) {
-    return request({ url: DASHBOARD_ENDPOINTS.MARKET_HEALTH_ORDER_TREND, params })
-  },
-
-  /**
-   * 获取市场活跃用户排行
-   * @param {Object} params - 查询参数
-   * @param {number} [params.page_size=5] - 排行数量
-   * @returns {Promise<Object>} Top买家/卖家排行
-   */
-  async getMarketHealthTopUsers(params = {}) {
-    return request({ url: DASHBOARD_ENDPOINTS.MARKET_HEALTH_TOP_USERS, params })
   },
 
   /**

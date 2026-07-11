@@ -27,7 +27,7 @@ const { Op, fn, col } = require('sequelize')
 const logger = require('../../utils/logger').logger
 const PiiCrypto = require('../../utils/PiiCrypto')
 const {
-  AdminOperationLog,
+  OperationLog,
   User,
   RedemptionOrder,
   Item,
@@ -40,6 +40,9 @@ const {
   sequelize,
   ReminderRule
 } = require('../../models')
+
+/** 管理员域日志视图（operation_logs 单表 + operator_type='admin'，拍板 10 三表合并；读查询自动带域过滤） */
+const AdminOperationLog = OperationLog.scope('admin')
 
 /**
  * 构建分页和排序选项
@@ -577,7 +580,7 @@ class BusinessRecordQueryService {
   static async _queryAuditLogById(recordId, operationType) {
     const record = await AdminOperationLog.findOne({
       where: {
-        admin_operation_log_id: recordId,
+        operation_log_id: recordId,
         operation_type: operationType
       },
       include: [
@@ -960,7 +963,7 @@ class BusinessRecordQueryService {
       where,
       attributes: [
         'operator_id',
-        [fn('COUNT', col('admin_operation_log_id')), 'total_operations'],
+        [fn('COUNT', col('operation_log_id')), 'total_operations'],
         [fn('COUNT', fn('DISTINCT', col('operation_type'))), 'operation_types']
       ],
       include: [
@@ -971,7 +974,7 @@ class BusinessRecordQueryService {
         }
       ],
       group: ['operator_id', 'operator.user_id', 'operator.nickname'],
-      order: [[fn('COUNT', col('admin_operation_log_id')), 'DESC']],
+      order: [[fn('COUNT', col('operation_log_id')), 'DESC']],
       limit: parseInt(limit, 10) || 10,
       raw: false
     })
@@ -1009,7 +1012,7 @@ class BusinessRecordQueryService {
 
     const stats = await AdminOperationLog.findAll({
       where,
-      attributes: ['risk_level', [fn('COUNT', col('admin_operation_log_id')), 'count']],
+      attributes: ['risk_level', [fn('COUNT', col('operation_log_id')), 'count']],
       group: ['risk_level'],
       raw: true
     })

@@ -1,29 +1,41 @@
 /**
- * 全局错误处理中间件
+ * 全局错误处理中间件（全局错误唯一出口）
  *
- * 架构决策 4：业务异常类 + 统一错误码体系
- * 2026-01-13 消费服务层QR码验证兼容模式清理方案
+ * 2026-07-11 技术债务收口（拍板 2）：
+ * - app.js 原内联全局错误处理已搬入本文件并删除，本中间件是全局错误处理的唯一实现
+ * - app.js 通过 app.use(globalErrorHandler) 挂载（必须在所有路由之后注册）
  *
- * 功能：
- * - 处理 BusinessError 业务异常，返回标准格式
- * - 处理 Sequelize 数据库错误，隐藏内部细节
- * - 处理 JWT 认证错误
- * - 处理未知错误，统一错误码
+ * 错误处理策略（架构决策4，2026-01-13）：
+ * - BusinessError：使用业务错误码，details 仅记录日志，不返回给客户端
+ * - Sequelize 错误：隐藏内部细节，返回通用 DATABASE_ERROR 类错误码
+ * - JWT 错误：INVALID_TOKEN / TOKEN_EXPIRED（401）
+ * - 携带 statusCode 的服务层错误：透传业务错误码与 HTTP 状态码
+ * - 未知错误：开发环境返回详细信息，生产环境返回「服务器内部错误」（INTERNAL_ERROR）
  *
  * @module middleware/errorHandler
  */
 
+const crypto = require('crypto')
 const BusinessError = require('../utils/BusinessError')
 const { logger, sanitize } = require('../utils/logger')
 const ApiResponse = require('../utils/ApiResponse')
 
 /**
- * 获取请求ID
+ * 统一 request_id 获取逻辑（与 ApiResponse.middleware 兼容）
+ *
+ * - /api/*：优先使用 ApiResponse.middleware 注入的 req.id
+ * - 非 /api/*：使用请求头或本地生成
+ *
  * @param {Object} req - Express 请求对象
  * @returns {string} 请求ID
  */
 function getRequestId(req) {
-  return req.id || req.headers['x-request-id'] || 'unknown'
+  return (
+    req.id ||
+    req.headers['x-request-id'] ||
+    req.headers['request-id'] ||
+    `req_${crypto.randomUUID()}`
+  )
 }
 
 /**
@@ -41,45 +53,34 @@ function getRequestId(req) {
 function globalErrorHandler(err, req, res, next) {
   const requestId = getRequestId(req)
 
-  // 记录完整错误到日志（包含 details）
-  logger.error('请求处理失败', {
+  // 记录完整错误到日志（details 仅日志可见，不返回给客户端）
+  logger.error('全局错误处理', {
     request_id: requestId,
     error_code: err.code || 'UNKNOWN',
     error_message: err.message,
     error_name: err.name,
-    error_stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
-    error_details: err.details, // 仅日志可见，不返回给客户端
+    status_code: err.statusCode,
+    error_stack: err.stack,
+    error_details: err.details || null,
     path: req.path,
     method: req.method,
-    // 使用脱敏函数处理请求体
+    // 使用脱敏函数处理请求体（防止密码/token 等敏感字段进日志）
     body: sanitize(req.body)
   })
 
-  // 如果响应已发送，跳过
+  // 如果响应已发送，交给 Express 默认处理器
   if (res.headersSent) {
     return next(err)
   }
 
-  // 业务异常：返回标准格式（架构决策 4）
-  if (err instanceof BusinessError) {
-    const resp = ApiResponse.error(
-      err.message,
-      err.code,
-      null, // ❌ 不返回 details（对外隐藏内部细节）
-      err.statusCode
-    )
+  // 业务异常：返回标准格式（架构决策4：details 不暴露给客户端）
+  if (err instanceof BusinessError || err.name === 'BusinessError') {
+    const resp = ApiResponse.error(err.message, err.code, null, err.statusCode || 400)
     resp.request_id = requestId
     return ApiResponse.send(res, resp)
   }
 
-  // Sequelize 数据库错误：隐藏内部细节
-  if (err.name === 'SequelizeDatabaseError' || err.name === 'SequelizeError') {
-    const resp = ApiResponse.error('数据库操作失败，请稍后重试', 'DATABASE_ERROR', null, 500)
-    resp.request_id = requestId
-    return ApiResponse.send(res, resp)
-  }
-
-  // Sequelize 连接错误
+  // Sequelize 连接错误（503：数据库暂不可用）
   if (err.name === 'SequelizeConnectionError') {
     const resp = ApiResponse.error(
       '数据库连接失败，请稍后重试',
@@ -91,21 +92,28 @@ function globalErrorHandler(err, req, res, next) {
     return ApiResponse.send(res, resp)
   }
 
-  // Sequelize 验证错误
+  // Sequelize 验证错误（400：数据不符合模型约束）
   if (err.name === 'SequelizeValidationError') {
     const resp = ApiResponse.error('数据验证失败', 'VALIDATION_ERROR', null, 400)
     resp.request_id = requestId
     return ApiResponse.send(res, resp)
   }
 
-  // Sequelize 唯一约束错误
+  // Sequelize 唯一约束错误（409：数据已存在）
   if (err.name === 'SequelizeUniqueConstraintError') {
     const resp = ApiResponse.error('数据已存在，违反唯一性约束', 'DUPLICATE_ENTRY', null, 409)
     resp.request_id = requestId
     return ApiResponse.send(res, resp)
   }
 
-  // JWT 错误处理
+  // 其余 Sequelize 错误统一兜底（隐藏数据库内部细节）
+  if (err.name === 'SequelizeError' || err.name?.startsWith('Sequelize')) {
+    const resp = ApiResponse.error('数据库操作失败', 'DATABASE_ERROR', null, 500)
+    resp.request_id = requestId
+    return ApiResponse.send(res, resp)
+  }
+
+  // JWT 错误处理（401）
   if (err.name === 'JsonWebTokenError') {
     const resp = ApiResponse.error('Token无效', 'INVALID_TOKEN', null, 401)
     resp.request_id = requestId
@@ -118,22 +126,26 @@ function globalErrorHandler(err, req, res, next) {
     return ApiResponse.send(res, resp)
   }
 
-  // 验证错误处理
+  // 验证错误处理（Joi 等抛出的 ValidationError）
   if (err.name === 'ValidationError') {
     const resp = ApiResponse.error(err.message, 'VALIDATION_ERROR', null, 400)
     resp.request_id = requestId
     return ApiResponse.send(res, resp)
   }
 
-  // 带自定义 statusCode 的非 BusinessError 错误（如 Service 层抛出的 404 ORDER_NOT_FOUND 等）
+  // 携带 statusCode 的服务层错误（非 BusinessError 但带 HTTP 状态码，如 404 ORDER_NOT_FOUND）
   if (err.statusCode && err.statusCode !== 500) {
-    const errorCode = err.errorCode || err.code || 'SERVICE_ERROR'
-    const resp = ApiResponse.error(err.message, errorCode, null, err.statusCode)
+    const resp = ApiResponse.error(
+      err.message,
+      err.errorCode || err.code || 'SERVICE_ERROR',
+      err.data || null,
+      err.statusCode
+    )
     resp.request_id = requestId
     return ApiResponse.send(res, resp)
   }
 
-  // 未知错误：通用错误码
+  // 未知错误：开发环境返回详细信息，生产环境隐藏
   const errorMessage = process.env.NODE_ENV === 'development' ? err.message : '服务器内部错误'
 
   const resp = ApiResponse.error(errorMessage, 'INTERNAL_ERROR', null, 500)
@@ -141,78 +153,5 @@ function globalErrorHandler(err, req, res, next) {
   return ApiResponse.send(res, resp)
 }
 
-/**
- * 创建路由级错误处理辅助函数
- *
- * 用于路由中捕获并处理 Service 层抛出的 BusinessError
- *
- * @param {Error} error - 错误对象
- * @param {Object} res - Express 响应对象
- * @param {string} defaultMessage - 默认错误消息
- * @returns {Object} Express 响应
- */
-function handleBusinessError(error, res, defaultMessage = '操作失败') {
-  // 如果是 BusinessError，直接使用其属性
-  if (error instanceof BusinessError) {
-    return res.apiError(error.message, error.code, null, error.statusCode)
-  }
-
-  // 处理带有自定义 statusCode 的错误对象（非 BusinessError 实例）
-  if (error.statusCode) {
-    const errorCode = error.errorCode || error.code || 'SERVICE_ERROR'
-    return res.apiError(error.message || defaultMessage, errorCode, null, error.statusCode)
-  }
-
-  // 根据错误消息内容判断错误类型
-  const errorMessage = error.message || defaultMessage
-
-  if (errorMessage.includes('不存在') || errorMessage.includes('未找到')) {
-    return res.apiError(errorMessage, 'NOT_FOUND', null, 404)
-  }
-
-  if (errorMessage.includes('无权限') || errorMessage.includes('权限不足')) {
-    return res.apiError(errorMessage, 'FORBIDDEN', null, 403)
-  }
-
-  if (
-    errorMessage.includes('不能') ||
-    errorMessage.includes('不支持') ||
-    errorMessage.includes('无效') ||
-    errorMessage.includes('不可用') ||
-    errorMessage.includes('过期') ||
-    errorMessage.includes('超出') ||
-    errorMessage.includes('不足') ||
-    errorMessage.includes('未绑定') ||
-    errorMessage.includes('已被禁用') ||
-    errorMessage.includes('已存在') ||
-    errorMessage.includes('已被占用') ||
-    errorMessage.includes('已离职') ||
-    errorMessage.includes('状态异常')
-  ) {
-    return res.apiError(errorMessage, 'BAD_REQUEST', null, 400)
-  }
-
-  // Sequelize 错误
-  if (error.name === 'SequelizeDatabaseError') {
-    return res.apiError('数据库查询失败，请稍后重试', 'DATABASE_ERROR', null, 500)
-  }
-
-  if (error.name === 'SequelizeConnectionError') {
-    return res.apiError('数据库连接失败，请稍后重试', 'SERVICE_UNAVAILABLE', null, 503)
-  }
-
-  if (error.name === 'SequelizeValidationError') {
-    return res.apiError(`数据验证失败: ${errorMessage}`, 'BAD_REQUEST', null, 400)
-  }
-
-  if (error.name === 'SequelizeTimeoutError') {
-    return res.apiError('数据库查询超时，请稍后重试', 'DATABASE_TIMEOUT', null, 504)
-  }
-
-  // 默认服务器错误
-  return res.apiError(defaultMessage + '，请稍后重试', 'INTERNAL_ERROR', null, 500)
-}
-
 module.exports = globalErrorHandler
 module.exports.globalErrorHandler = globalErrorHandler
-module.exports.handleBusinessError = handleBusinessError

@@ -321,7 +321,7 @@ class HierarchyManagementService {
 
     /*
      * 5. 记录操作日志（用于审计追踪）
-     * 根据功能重复检查报告决策：改用 AdminOperationLog
+     * 统一走 AuditLogService（operation_logs admin 域）
      * 2026-01-25: 添加 idempotency_key（关键操作必需）
      * idempotency_key 使用业务主键派生：hierarchy_deactivate_{target}_{operator}_{timestamp}
      */
@@ -432,7 +432,7 @@ class HierarchyManagementService {
 
     /*
      * 5. 记录操作日志
-     * 根据功能重复检查报告决策：改用 AdminOperationLog
+     * 统一走 AuditLogService（operation_logs admin 域）
      * 2026-01-25: 添加 idempotency_key（关键操作必需）
      */
     const activateTimestamp = BeijingTimeHelper.generateIdTimestamp()

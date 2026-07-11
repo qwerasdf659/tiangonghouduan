@@ -126,9 +126,9 @@ describe('用户管理安全修复测试 (风险1、2、3 - V4架构)', () => {
         `\n测试：管理员(level=${testContext.adminMaxLevel}) 修改 用户1(level=${userMaxLevel}) 的角色`
       )
 
-      // 管理员修改低级别用户的角色
+      // 管理员为低级别用户增加角色（多角色并集模型：POST /users/:user_id/roles，只增不删）
       const response = await request(app)
-        .put(`/api/v4/console/user-management/users/${regularUser1.user_id}/role`)
+        .post(`/api/v4/console/user-management/users/${regularUser1.user_id}/roles`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           role_name: 'user',
@@ -264,7 +264,7 @@ describe('用户管理安全修复测试 (风险1、2、3 - V4架构)', () => {
       console.log('\n测试：尝试分配不存在的角色，验证事务回滚')
 
       const response = await request(app)
-        .put(`/api/v4/console/user-management/users/${regularUser1.user_id}/role`)
+        .post(`/api/v4/console/user-management/users/${regularUser1.user_id}/roles`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           role_name: 'nonexistent_role_test_123',
@@ -305,7 +305,7 @@ describe('用户管理安全修复测试 (风险1、2、3 - V4架构)', () => {
       const nonexistentUserId = 99999999
 
       const response = await request(app)
-        .put(`/api/v4/console/user-management/users/${nonexistentUserId}/role`)
+        .post(`/api/v4/console/user-management/users/${nonexistentUserId}/roles`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           role_name: 'user',
@@ -359,7 +359,7 @@ describe('用户管理安全修复测试 (风险1、2、3 - V4架构)', () => {
       // 3. 验证事务回滚
       console.log('  3️⃣ 验证事务回滚机制...')
       const invalidRoleRes = await request(app)
-        .put(`/api/v4/console/user-management/users/${regularUser1.user_id}/role`)
+        .post(`/api/v4/console/user-management/users/${regularUser1.user_id}/roles`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ role_name: 'invalid_role_xyz', reason: '测试' })
 

@@ -85,10 +85,9 @@ describe('兑换市场管理页面 API', () => {
     expect(createRes.body.success).toBe(true)
     const createdSku = createRes.body.data
     expect(createdSku).toHaveProperty('sku_id')
-    // 后端自动生成 sku_code：非空、以 P{pid}_ 开头、长度合规
+    // 后端自动生成 sku_code：ProductCodeGenerator 规范形（'SK' + 12 位 BASE32 随机字符）
     expect(createdSku.sku_code).toBeTruthy()
-    expect(String(createdSku.sku_code).startsWith(`P${exchangeItemId}_`)).toBe(true)
-    expect(String(createdSku.sku_code).length).toBeLessThanOrEqual(100)
+    expect(String(createdSku.sku_code)).toMatch(/^SK[0-9A-Z]{12}$/)
 
     // 清理：删除测试创建的 SKU，避免污染真实库
     const delRes = await request

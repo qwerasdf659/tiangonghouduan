@@ -25,6 +25,7 @@
 const { Op } = require('sequelize')
 const _logger = require('../utils/logger').logger
 const PiiCrypto = require('../utils/PiiCrypto')
+const AssetQueryService = require('./asset/QueryService') // 累计积分账本派生（拍板 4）
 
 /**
  * 构建时间范围查询条件
@@ -74,7 +75,6 @@ class UserDataQueryService {
         'avatar_url',
         'status',
         'user_level',
-        'history_total_points',
         'consecutive_fail_count',
         'last_login',
         'last_active_at',
@@ -86,6 +86,9 @@ class UserDataQueryService {
     if (!user) {
       return null
     }
+
+    // 累计积分账本派生（拍板 4：history_total_points 冗余列已删除，响应字段名不变）
+    const historyTotalPoints = await AssetQueryService.getHistoryTotalPoints(user_id)
 
     // 查询用户账户及余额
     const account = await Account.findOne({
@@ -141,7 +144,7 @@ class UserDataQueryService {
     }
 
     return {
-      user: user.toJSON(),
+      user: { ...user.toJSON(), history_total_points: historyTotalPoints },
       account_id: account?.account_id || null,
       balances
     }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 统一质量门禁入口（health:check / quality:check / system:check）
+ * 统一质量门禁入口（npm run quality:check）
  *
  * 执行顺序：
  * 1. `npm run migration:verify` — 迁移规范与 verify-migrations 工具

@@ -21,7 +21,10 @@
 
 const BusinessError = require('../utils/BusinessError')
 const crypto = require('crypto')
-const { BatchOperationLog, User } = require('../models')
+const { OperationLog, User } = require('../models')
+
+/** 批量任务域日志视图（operation_logs 单表 + operator_type='batch'，拍板 10 三表合并；读查询自动带域过滤，写入走 createBatchOperation） */
+const BatchOperationLog = OperationLog.scope('batch')
 const AdminSystemService = require('./AdminSystemService')
 const logger = require('../utils/logger').logger
 const { getRawClient } = require('../utils/UnifiedRedisClient')
@@ -166,7 +169,7 @@ class BatchOperationService {
       const redisData = await BatchOperationService.getIdempotencyFromRedis(idempotency_key)
       logger.info('幂等检查命中Redis', {
         idempotency_key,
-        batch_operation_log_id: redisData?.batch_operation_log_id
+        operation_log_id: redisData?.operation_log_id
       })
       return {
         exists: true,
@@ -175,18 +178,18 @@ class BatchOperationService {
     }
 
     // 2. 查 MySQL（慢速路径）
-    const existingLog = await BatchOperationLog.checkIdempotencyKey(idempotency_key)
+    const existingLog = await OperationLog.checkIdempotencyKey(idempotency_key)
     if (existingLog) {
       // 将 MySQL 结果写入 Redis 缓存
       await BatchOperationService.setIdempotencyInRedis(idempotency_key, {
-        batch_operation_log_id: existingLog.batch_operation_log_id,
+        operation_log_id: existingLog.operation_log_id,
         status: existingLog.status,
         operation_type: existingLog.operation_type
       })
 
       logger.info('幂等检查命中MySQL', {
         idempotency_key,
-        batch_operation_log_id: existingLog.batch_operation_log_id
+        operation_log_id: existingLog.operation_log_id
       })
       return {
         exists: true,
@@ -215,7 +218,7 @@ class BatchOperationService {
       const { cooldown_seconds } = config
 
       // 查询最近的操作
-      const recentOps = await BatchOperationLog.getRecentOperations(
+      const recentOps = await OperationLog.getRecentOperations(
         operator_id,
         operation_type,
         cooldown_seconds
@@ -264,7 +267,7 @@ class BatchOperationService {
       const { max_concurrent_batches } = globalConfig
 
       // 查询处理中的操作
-      const processingOps = await BatchOperationLog.getProcessingOperations(operator_id)
+      const processingOps = await OperationLog.getProcessingOperations(operator_id)
 
       if (processingOps.length >= max_concurrent_batches) {
         logger.info('并发限制生效', {
@@ -346,7 +349,7 @@ class BatchOperationService {
 
     try {
       // 创建日志记录
-      const log = await BatchOperationLog.createOperation(
+      const log = await OperationLog.createBatchOperation(
         {
           operation_type,
           operator_id,
@@ -359,13 +362,13 @@ class BatchOperationService {
 
       // 在 Redis 中设置幂等键
       await BatchOperationService.setIdempotencyInRedis(key, {
-        batch_operation_log_id: log.batch_operation_log_id,
+        operation_log_id: log.operation_log_id,
         status: log.status,
         operation_type: log.operation_type
       })
 
       logger.info('创建批量操作日志', {
-        batch_operation_log_id: log.batch_operation_log_id,
+        operation_log_id: log.operation_log_id,
         operation_type,
         operator_id,
         total,
@@ -377,7 +380,7 @@ class BatchOperationService {
       // 如果是唯一约束冲突，说明幂等键已存在
       if (error.name === 'SequelizeUniqueConstraintError') {
         logger.warn('幂等键冲突，操作已存在', { idempotency_key: key })
-        const existingLog = await BatchOperationLog.checkIdempotencyKey(key)
+        const existingLog = await OperationLog.checkIdempotencyKey(key)
         return existingLog
       }
 
@@ -389,7 +392,7 @@ class BatchOperationService {
   /**
    * 更新操作进度
    *
-   * @param {number} batch_operation_log_id - 批量日志ID
+   * @param {number} operation_log_id - 批量日志ID
    * @param {Object} progress - 进度数据
    * @param {number} progress.success_count - 成功数量
    * @param {number} progress.fail_count - 失败数量
@@ -397,14 +400,14 @@ class BatchOperationService {
    * @param {Object} [options] - Sequelize 选项
    * @returns {Promise<BatchOperationLog>} 更新后的日志记录
    */
-  static async updateProgress(batch_operation_log_id, progress, options = {}) {
+  static async updateProgress(operation_log_id, progress, options = {}) {
     const { success_count, fail_count, result_summary } = progress
 
     try {
-      const log = await BatchOperationLog.findByPk(batch_operation_log_id, options)
+      const log = await BatchOperationLog.findByPk(operation_log_id, options)
       if (!log) {
         throw new BusinessError(
-          `批量操作日志不存在: batch_operation_log_id=${batch_operation_log_id}`,
+          `批量操作日志不存在: operation_log_id=${operation_log_id}`,
           'SERVICE_NOT_FOUND',
           404
         )
@@ -415,14 +418,14 @@ class BatchOperationService {
       // 更新 Redis 中的状态
       if (log.idempotency_key) {
         await BatchOperationService.setIdempotencyInRedis(log.idempotency_key, {
-          batch_operation_log_id: log.batch_operation_log_id,
+          operation_log_id: log.operation_log_id,
           status: log.status,
           operation_type: log.operation_type
         })
       }
 
       logger.info('更新批量操作进度', {
-        batch_operation_log_id,
+        operation_log_id,
         success_count,
         fail_count,
         status: log.status
@@ -430,7 +433,7 @@ class BatchOperationService {
 
       return log
     } catch (error) {
-      logger.error('更新批量操作进度失败', { batch_operation_log_id, error: error.message })
+      logger.error('更新批量操作进度失败', { operation_log_id, error: error.message })
       throw error
     }
   }
@@ -438,17 +441,17 @@ class BatchOperationService {
   /**
    * 标记操作失败
    *
-   * @param {number} batch_operation_log_id - 批量日志ID
+   * @param {number} operation_log_id - 批量日志ID
    * @param {string} error_message - 错误信息
    * @param {Object} [options] - Sequelize 选项
    * @returns {Promise<BatchOperationLog>} 更新后的日志记录
    */
-  static async markAsFailed(batch_operation_log_id, error_message, options = {}) {
+  static async markAsFailed(operation_log_id, error_message, options = {}) {
     try {
-      const log = await BatchOperationLog.findByPk(batch_operation_log_id, options)
+      const log = await BatchOperationLog.findByPk(operation_log_id, options)
       if (!log) {
         throw new BusinessError(
-          `批量操作日志不存在: batch_operation_log_id=${batch_operation_log_id}`,
+          `批量操作日志不存在: operation_log_id=${operation_log_id}`,
           'SERVICE_NOT_FOUND',
           404
         )
@@ -459,18 +462,18 @@ class BatchOperationService {
       // 更新 Redis 中的状态
       if (log.idempotency_key) {
         await BatchOperationService.setIdempotencyInRedis(log.idempotency_key, {
-          batch_operation_log_id: log.batch_operation_log_id,
+          operation_log_id: log.operation_log_id,
           status: 'failed',
           operation_type: log.operation_type,
           error: error_message
         })
       }
 
-      logger.info('标记批量操作失败', { batch_operation_log_id, error_message })
+      logger.info('标记批量操作失败', { operation_log_id, error_message })
 
       return log
     } catch (error) {
-      logger.error('标记批量操作失败出错', { batch_operation_log_id, error: error.message })
+      logger.error('标记批量操作失败出错', { operation_log_id, error: error.message })
       throw error
     }
   }
@@ -478,12 +481,12 @@ class BatchOperationService {
   /**
    * 获取批量操作日志详情
    *
-   * @param {number} batch_operation_log_id - 批量日志ID
+   * @param {number} operation_log_id - 批量日志ID
    * @returns {Promise<Object|null>} 日志详情
    */
-  static async getOperationDetail(batch_operation_log_id) {
+  static async getOperationDetail(operation_log_id) {
     try {
-      const log = await BatchOperationLog.findByPk(batch_operation_log_id, {
+      const log = await BatchOperationLog.findByPk(operation_log_id, {
         include: [
           {
             model: User,
@@ -505,12 +508,12 @@ class BatchOperationService {
         storedTotal != null && !Number.isNaN(storedTotal) ? storedTotal : successCount + failCount
 
       return {
-        batch_operation_log_id: log.batch_operation_log_id,
+        operation_log_id: log.operation_log_id,
         idempotency_key: log.idempotency_key,
         operation_type: log.operation_type,
-        operation_type_name: log.getOperationTypeName(),
+        operation_type_name: log.getOperationTypeDescription(),
         status: log.status,
-        status_name: log.getStatusDisplayName(),
+        status_name: log.getStatusDescription(),
         total_count: totalCount,
         success_count: log.success_count,
         fail_count: log.fail_count,
@@ -524,7 +527,7 @@ class BatchOperationService {
         updated_at: log.updated_at
       }
     } catch (error) {
-      logger.error('获取批量操作详情失败', { batch_operation_log_id, error: error.message })
+      logger.error('获取批量操作详情失败', { operation_log_id, error: error.message })
       throw error
     }
   }
@@ -578,11 +581,11 @@ class BatchOperationService {
         const totalCount =
           storedTotal != null && !Number.isNaN(storedTotal) ? storedTotal : successCount + failCount
         return {
-          batch_operation_log_id: log.batch_operation_log_id,
+          operation_log_id: log.operation_log_id,
           operation_type: log.operation_type,
-          operation_type_name: log.getOperationTypeName(),
+          operation_type_name: log.getOperationTypeDescription(),
           status: log.status,
-          status_name: log.getStatusDisplayName(),
+          status_name: log.getStatusDescription(),
           total_count: totalCount,
           success_count: log.success_count,
           fail_count: log.fail_count,

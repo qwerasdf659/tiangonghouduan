@@ -465,106 +465,268 @@ async function executeBusinessRecordReconciliation(cutoffDate = null) {
   }
 }
 
+/*
+ * 用户累计积分周对账已删除（2026-07-11）：
+ * 拍板 4 删除 users.history_total_points 冗余列后，累计积分由资产账本实时派生
+ * （AssetQueryService.getHistoryTotalPoints），账本即唯一真相，
+ * "字段值 vs 流水重算值"的双真相比对前提已不存在，无需再对账。
+ */
+
 /**
- * 用户累计积分周对账（拍板⑭-(d)，2026-07-11 落地）
+ * 业务域扣款/发放一致性对账（原 scripts/reconciliation/ 四脚本有效检查项并入，2026-07-11 定案 6.4/8.1）
  *
- * 真相不变量：users.history_total_points ==「用户账户 + points 资产 + 正向入账」流水重算值
- * （排除防复利名单 level_bonus_reward/activity_bonus_reward——加成笔可花不计等级，
- *   与 BalanceService.HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES 同一口径；排除 is_invalid 流水）。
+ * 覆盖三个业务域（原独立脚本的检查项已按当前真实表结构修正：原脚本使用的
+ * er.record_id / cr.record_id 列名早已重命名为 exchange_record_id / consumption_record_id，
+ * 原脚本在当前库上必然报错——正是"有效检查项并入"要过滤的失效部分）：
  *
- * 业务意义：history_total_points 是成长等级派生的单一数据源（发放线九档阶梯的定级依据），
- * 字段被绕过 BalanceService 收口直改（如历史脚本/手工 SQL）会导致"等级凭空错了"的信任事故，
- * 本对账每周比对字段值 vs 流水重算值，不一致即向管理员告警（只告警不自动改——
- * history_total_points 与余额同属互锁数据，修复必须经人工判定走业务接口）。
+ * 1. lottery：按 lottery_session_id 聚合，SUM(lottery_draws.cost_points) == |asset_transactions.delta_amount|
+ *    （business_type='lottery_consume'）；缺 session_id 与孤立流水单独告警
+ * 2. exchange：exchange_records 逐单核对扣款流水（debit_transaction_id 直连或
+ *    idempotency_key='exchange_debit_{key}' 匹配）；金额一致性；孤立扣款流水
+ * 3. consumption：approved 小票核对奖励流水（idempotency_key='consumption_reward:approve:{id}'）；
+ *    金额一致性；孤立奖励流水
+ *
+ * 失败处置（保留 2026-01-05 治理拍板的告警机制）：
+ * - 创建 LotteryAlertService 系统告警（自动 WebSocket 推送管理后台）
+ * - 通知管理员（NotificationService.sendToAdmins）
+ * - 入口冻结保留 lottery 域（AdminSystemService.upsertConfig lottery_entrance_enabled=false）
  *
  * @param {Object} [options] - 选项
- * @param {boolean} [options.standalone=false] - 独立运行模式（结束后关闭连接并 exit）
- * @returns {Promise<Object>} 对账报告 { status, mismatch_count, mismatches, duration_ms }
+ * @param {boolean} [options.standalone=false] - 独立运行模式（结束后 exit）
+ * @param {string} [options.cutoff='2026-01-02 20:24:20'] - 新账本分界线（只检查其后数据）
+ * @returns {Promise<Object>} 对账报告 { status, lottery, exchange, consumption }
  */
-async function executeHistoryPointsReconciliation(options = {}) {
-  const { standalone = false } = options
+async function executeDomainConsistencyReconciliation(options = {}) {
+  const { standalone = false, cutoff = '2026-01-02 20:24:20' } = options
   const { sequelize } = require('../config/database')
   const logger = require('../utils/logger').logger
-  const NotificationService = require('../services/NotificationService')
-  // 防复利排除名单唯一真相源（与 history_total_points 累加口径同源，杜绝两处名单漂移）
-  const { HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES } = require('../services/asset/BalanceService')
-  const start_time = Date.now()
+
+  console.log(`\n=== 业务域一致性对账 [${new Date().toISOString()}]（分界线 ${cutoff}）===\n`)
+  const report = { lottery: null, exchange: null, consumption: null, failed_domains: [] }
+
+  /**
+   * 域级告警（管理员通知通道，与 executeBusinessRecordReconciliation 同模式；失败不阻断对账主流程）
+   *
+   * 注：不走 LotteryAlertService（lottery_alerts.lottery_campaign_id NOT NULL，为活动级告警设计），
+   * 域对账为全局系统级告警，走 NotificationService.sendToAdmins（含 WebSocket 实时推送）。
+   *
+   * @param {string} rule_code - 告警规则码
+   * @param {string} message - 告警内容
+   * @returns {Promise<void>}
+   */
+  async function sendDomainAlert(rule_code, message) {
+    try {
+      const NotificationService = require('../services/NotificationService')
+      await NotificationService.sendToAdmins({
+        type: 'reconciliation_alert',
+        title: '业务域一致性对账告警',
+        content: message,
+        data: { rule_code, timestamp: new Date().toISOString() }
+      })
+    } catch (alertError) {
+      logger.warn('[域对账] 告警推送失败（非致命）', { error: alertError.message })
+    }
+  }
 
   try {
-    logger.info('[累计积分对账] 开始 users.history_total_points vs asset_transactions 重算比对')
-
-    const [mismatches] = await sequelize.query(
-      `SELECT u.user_id,
-              CAST(u.history_total_points AS SIGNED) AS field_value,
-              CAST(COALESCE(t.recalc, 0) AS SIGNED) AS recalc_value,
-              CAST(u.history_total_points - COALESCE(t.recalc, 0) AS SIGNED) AS diff
-       FROM users u
-       LEFT JOIN (
-         SELECT a.user_id, SUM(t.delta_amount) AS recalc
-         FROM asset_transactions t
-         JOIN accounts a ON a.account_id = t.account_id AND a.account_type = 'user'
-         WHERE t.asset_code = 'points'
-           AND t.delta_amount > 0
-           AND (t.is_invalid IS NULL OR t.is_invalid = 0)
-           AND t.business_type NOT IN (:excludedTypes)
-         GROUP BY a.user_id
-       ) t ON t.user_id = u.user_id
-       HAVING diff <> 0
-       ORDER BY ABS(diff) DESC
-       LIMIT 50`,
-      { replacements: { excludedTypes: HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES } }
+    // ========== 1. lottery 域：抽奖扣款一致性 ==========
+    const [lotteryMissingSession] = await sequelize.query(
+      `SELECT COUNT(*) AS cnt FROM lottery_draws
+       WHERE created_at >= ? AND (lottery_session_id IS NULL OR lottery_session_id = '')`,
+      { replacements: [cutoff] }
     )
-
-    const mismatch_count = mismatches.length
-    const report = {
-      status: mismatch_count === 0 ? 'OK' : 'WARNING',
-      mismatch_count,
-      mismatches: mismatches.map(m => ({
-        user_id: Number(m.user_id),
-        field_value: Number(m.field_value),
-        recalc_value: Number(m.recalc_value),
-        diff: Number(m.diff)
-      })),
-      duration_ms: Date.now() - start_time
+    const [lotteryInconsistent] = await sequelize.query(
+      `SELECT ld.lottery_session_id,
+              SUM(ld.cost_points) AS total_cost_in_draws,
+              atx.asset_transaction_id,
+              (SUM(ld.cost_points) + atx.delta_amount) AS diff
+       FROM lottery_draws ld
+       LEFT JOIN asset_transactions atx
+         ON atx.lottery_session_id = ld.lottery_session_id AND atx.business_type = 'lottery_consume'
+       WHERE ld.created_at >= ? AND ld.lottery_session_id IS NOT NULL AND ld.lottery_session_id != ''
+       GROUP BY ld.lottery_session_id, atx.asset_transaction_id, atx.delta_amount
+       HAVING diff != 0 OR atx.asset_transaction_id IS NULL
+       LIMIT 50`,
+      { replacements: [cutoff] }
+    )
+    const [lotteryOrphans] = await sequelize.query(
+      `SELECT atx.asset_transaction_id, atx.lottery_session_id, atx.delta_amount
+       FROM asset_transactions atx
+       LEFT JOIN lottery_draws ld ON ld.lottery_session_id = atx.lottery_session_id
+       WHERE atx.business_type = 'lottery_consume' AND atx.created_at >= ?
+         AND ld.lottery_draw_id IS NULL
+         AND atx.lottery_session_id NOT LIKE '%test_%'
+         AND atx.idempotency_key NOT LIKE '%test_%'
+       LIMIT 20`,
+      { replacements: [cutoff] }
+    )
+    report.lottery = {
+      status:
+        lotteryInconsistent.length === 0 && lotteryOrphans.length === 0 ? 'PASS' : 'FAIL',
+      missing_session_count: Number(lotteryMissingSession[0].cnt),
+      inconsistent_sessions: lotteryInconsistent.length,
+      orphan_transactions: lotteryOrphans.length
+    }
+    console.log(
+      `  抽奖扣款一致：${report.lottery.status}（不一致会话 ${lotteryInconsistent.length}，孤立流水 ${lotteryOrphans.length}，缺session ${report.lottery.missing_session_count}）`
+    )
+    if (report.lottery.status === 'FAIL') {
+      report.failed_domains.push('lottery')
+      await sendDomainAlert(
+        'RECONCILIATION_LOTTERY_CONSISTENCY_ERROR',
+        `抽奖扣款不一致：${lotteryInconsistent.length} 个会话金额不一致 / ${lotteryOrphans.length} 条孤立流水`
+      )
+      // 治理拍板（2026-01-05）：抽奖扣款不一致自动冻结抽奖入口
+      try {
+        const AdminSystemService = require('../services/AdminSystemService')
+        await AdminSystemService.upsertConfig('lottery_entrance_enabled', 'false', {
+          category: 'feature',
+          description: '域对账检测到抽奖扣款不一致，自动冻结入口'
+        })
+        logger.warn('[域对账] 抽奖入口已自动冻结（lottery_entrance_enabled=false）')
+      } catch (freezeError) {
+        logger.error('[域对账] 冻结抽奖入口失败', { error: freezeError.message })
+      }
     }
 
-    console.log(
-      `\n=== 累计积分对账：${report.status}（${mismatch_count} 个用户不一致）===`
+    // ========== 2. exchange 域：兑换扣款一致性 ==========
+    /*
+     * 只核对 pay_amount > 0 的订单：零支付订单（以物易物产物、免费兑换、竞价非资产支付单等
+     * pay_amount=0 / pay_asset_code='none'）业务上本就无扣款流水，不属于"缺扣款"
+     */
+    const [exchangeMissingDebits] = await sequelize.query(
+      `SELECT er.exchange_record_id
+       FROM exchange_records er
+       LEFT JOIN asset_transactions atx1 ON atx1.asset_transaction_id = er.debit_transaction_id
+       LEFT JOIN asset_transactions atx2
+         ON atx2.idempotency_key = CONCAT('exchange_debit_', er.idempotency_key)
+         AND atx2.business_type = 'exchange_debit'
+       WHERE er.created_at >= ? AND er.pay_amount > 0
+         AND atx1.asset_transaction_id IS NULL AND atx2.asset_transaction_id IS NULL
+       LIMIT 50`,
+      { replacements: [cutoff] }
     )
-    for (const m of report.mismatches.slice(0, 10)) {
-      console.log(
-        `  ⚠️ user_id=${m.user_id}: 字段=${m.field_value} 重算=${m.recalc_value} 差=${m.diff > 0 ? '+' : ''}${m.diff}`
+    const [exchangeAmountMismatch] = await sequelize.query(
+      `SELECT er.exchange_record_id,
+              er.pay_amount AS expected_cost,
+              -COALESCE(atx1.delta_amount, atx2.delta_amount) AS actual_cost
+       FROM exchange_records er
+       LEFT JOIN asset_transactions atx1 ON atx1.asset_transaction_id = er.debit_transaction_id
+       LEFT JOIN asset_transactions atx2
+         ON atx2.idempotency_key = CONCAT('exchange_debit_', er.idempotency_key)
+         AND atx2.business_type = 'exchange_debit'
+       WHERE er.created_at >= ?
+         AND (atx1.asset_transaction_id IS NOT NULL OR atx2.asset_transaction_id IS NOT NULL)
+         AND er.pay_amount != -COALESCE(atx1.delta_amount, atx2.delta_amount)
+       LIMIT 50`,
+      { replacements: [cutoff] }
+    )
+    const [exchangeOrphanDebits] = await sequelize.query(
+      `SELECT atx.asset_transaction_id
+       FROM asset_transactions atx
+       LEFT JOIN exchange_records er1 ON er1.debit_transaction_id = atx.asset_transaction_id
+       LEFT JOIN exchange_records er2
+         ON atx.idempotency_key = CONCAT('exchange_debit_', er2.idempotency_key)
+       WHERE atx.business_type = 'exchange_debit' AND atx.created_at >= ?
+         AND er1.exchange_record_id IS NULL AND er2.exchange_record_id IS NULL
+         AND COALESCE(atx.is_test_data, 0) = 0
+         AND atx.idempotency_key NOT LIKE '%test_%'
+       LIMIT 20`,
+      { replacements: [cutoff] }
+    )
+    report.exchange = {
+      status:
+        exchangeMissingDebits.length === 0 &&
+        exchangeAmountMismatch.length === 0 &&
+        exchangeOrphanDebits.length === 0
+          ? 'PASS'
+          : 'FAIL',
+      missing_debits: exchangeMissingDebits.length,
+      amount_mismatch: exchangeAmountMismatch.length,
+      orphan_debits: exchangeOrphanDebits.length
+    }
+    console.log(
+      `  兑换扣款一致：${report.exchange.status}（缺扣款 ${exchangeMissingDebits.length}，金额不符 ${exchangeAmountMismatch.length}，孤立流水 ${exchangeOrphanDebits.length}）`
+    )
+    if (report.exchange.status === 'FAIL') {
+      report.failed_domains.push('exchange')
+      await sendDomainAlert(
+        'RECONCILIATION_EXCHANGE_CONSISTENCY_ERROR',
+        `兑换扣款不一致：缺扣款 ${exchangeMissingDebits.length} / 金额不符 ${exchangeAmountMismatch.length} / 孤立流水 ${exchangeOrphanDebits.length}`
       )
     }
 
-    if (mismatch_count > 0) {
-      logger.warn('[累计积分对账] 发现字段值与流水重算值不一致', report)
-      try {
-        await NotificationService.sendToAdmins({
-          type: 'history_points_reconciliation_alert',
-          title: '⚠️ 用户累计积分对账告警',
-          content: `发现 ${mismatch_count} 个用户的 history_total_points 与积分流水重算值不一致（影响成长等级派生），请人工核查处理`,
-          data: {
-            mismatch_count,
-            sample: report.mismatches.slice(0, 10),
-            excluded_business_types: HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES,
-            timestamp: new Date().toISOString()
-          }
-        })
-      } catch (notifyError) {
-        logger.error('[累计积分对账] 发送告警失败', { error: notifyError.message })
-      }
-    } else {
-      logger.info('[累计积分对账] 全部一致', report)
+    // ========== 3. consumption 域：消费奖励一致性 ==========
+    const [consumptionMissingRewards] = await sequelize.query(
+      `SELECT cr.consumption_record_id
+       FROM consumption_records cr
+       LEFT JOIN asset_transactions atx
+         ON atx.idempotency_key = CONCAT('consumption_reward:approve:', cr.consumption_record_id)
+         AND atx.business_type = 'consumption_reward'
+       WHERE cr.status = 'approved' AND cr.created_at >= ? AND atx.asset_transaction_id IS NULL
+       LIMIT 50`,
+      { replacements: [cutoff] }
+    )
+    const [consumptionAmountMismatch] = await sequelize.query(
+      `SELECT cr.consumption_record_id,
+              cr.points_to_award AS expected_points,
+              atx.delta_amount AS actual_points
+       FROM consumption_records cr
+       INNER JOIN asset_transactions atx
+         ON atx.idempotency_key = CONCAT('consumption_reward:approve:', cr.consumption_record_id)
+         AND atx.business_type = 'consumption_reward'
+       WHERE cr.status = 'approved' AND cr.created_at >= ?
+         AND cr.points_to_award != atx.delta_amount
+       LIMIT 50`,
+      { replacements: [cutoff] }
+    )
+    const [consumptionOrphanRewards] = await sequelize.query(
+      `SELECT atx.asset_transaction_id
+       FROM asset_transactions atx
+       LEFT JOIN consumption_records cr
+         ON atx.idempotency_key = CONCAT('consumption_reward:approve:', cr.consumption_record_id)
+       WHERE atx.business_type = 'consumption_reward' AND atx.created_at >= ?
+         AND cr.consumption_record_id IS NULL
+         AND atx.idempotency_key NOT LIKE '%test_%'
+       LIMIT 20`,
+      { replacements: [cutoff] }
+    )
+    report.consumption = {
+      status:
+        consumptionMissingRewards.length === 0 &&
+        consumptionAmountMismatch.length === 0 &&
+        consumptionOrphanRewards.length === 0
+          ? 'PASS'
+          : 'FAIL',
+      missing_rewards: consumptionMissingRewards.length,
+      amount_mismatch: consumptionAmountMismatch.length,
+      orphan_rewards: consumptionOrphanRewards.length
     }
+    console.log(
+      `  消费奖励一致：${report.consumption.status}（缺奖励 ${consumptionMissingRewards.length}，金额不符 ${consumptionAmountMismatch.length}，孤立流水 ${consumptionOrphanRewards.length}）`
+    )
+    if (report.consumption.status === 'FAIL') {
+      report.failed_domains.push('consumption')
+      await sendDomainAlert(
+        'RECONCILIATION_CONSUMPTION_CONSISTENCY_ERROR',
+        `消费奖励不一致：缺奖励 ${consumptionMissingRewards.length} / 金额不符 ${consumptionAmountMismatch.length} / 孤立流水 ${consumptionOrphanRewards.length}`
+      )
+    }
+
+    report.status = report.failed_domains.length === 0 ? 'PASS' : 'FAIL'
+    console.log(`\n业务域一致性对账：${report.status}${report.failed_domains.length > 0 ? `（失败域：${report.failed_domains.join('/')}）` : ''}\n`)
+    logger.info('[域对账] 完成', {
+      status: report.status,
+      failed_domains: report.failed_domains
+    })
 
     if (standalone) {
       await sequelize.close()
-      process.exit(mismatch_count === 0 ? 0 : 1)
+      process.exit(report.status === 'PASS' ? 0 : 1)
     }
     return report
   } catch (error) {
-    logger.error('[累计积分对账] 执行失败', { error_message: error.message })
+    logger.error('[域对账] 执行失败', { error_message: error.message })
     if (standalone) {
       process.exit(1)
     }
@@ -576,13 +738,30 @@ module.exports = {
   executeReconciliation,
   executeBusinessRecordReconciliation,
   executeSpuSummaryReconciliation,
-  executeHistoryPointsReconciliation
+  executeDomainConsistencyReconciliation
 }
 
-// 独立运行模式
+/*
+ * 独立运行模式（子命令）：
+ * - node scripts/reconcile-items.js               物品+资产守恒对账（默认）
+ * - node scripts/reconcile-items.js --auto-fix    守恒对账 + 自动修复
+ * - node scripts/reconcile-items.js --check=domains  业务域一致性对账（lottery/exchange/consumption）
+ * - node scripts/reconcile-items.js --check=spu      SPU 物化列对账
+ */
 if (require.main === module) {
   const autoFix = process.argv.includes('--auto-fix')
-  executeReconciliation({ standalone: true, autoFix }).catch(err => {
+  const checkArg = (process.argv.find(a => a.startsWith('--check=')) || '').split('=')[1]
+
+  let runner
+  if (checkArg === 'domains') {
+    runner = executeDomainConsistencyReconciliation({ standalone: true })
+  } else if (checkArg === 'spu') {
+    runner = executeSpuSummaryReconciliation({ standalone: true })
+  } else {
+    runner = executeReconciliation({ standalone: true, autoFix })
+  }
+
+  runner.catch(err => {
     console.error('对账脚本执行失败:', err)
     process.exit(1)
   })
@@ -599,7 +778,7 @@ if (require.main === module) {
  *
  * 本函数全量重算所有 SPU（含 inactive 商品）的 5 个物化列：先检测差异（diff），
  * 有差异再统一回写对齐并记录差异日志。SQL 口径与迁移
- * 20260611083214 / 三处 _updateSpuSummary 完全一致。
+ * 20260611083214 / ExchangeItemService.syncSpuSummary（唯一权威口径）完全一致。
  *
  * @param {Object} [options] - 选项
  * @param {boolean} [options.standalone=false] - 独立运行模式（结束后关闭连接并 exit）

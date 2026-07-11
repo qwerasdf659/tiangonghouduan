@@ -5,7 +5,7 @@
  *
  * 业务定位（2026-06-04 合规改造 P1=乙）：
  * - 独立的成长等级体系，区别于 users.user_level enum('normal','vip','merchant')（身份类型）
- * - 成长等级由用户累计积分（users.history_total_points）实时派生（单一数据源，无 per-user 同步债）
+ * - 成长等级由用户累计积分（资产账本实时派生，拍板 4）实时派生（单一数据源，无 per-user 同步债）
  * - 配置实体：低频变更、语义稳定、数量有限 → 业务码 level_key 作为稳定标识
  * - 抽奖等多功能只读复用：抽奖通过 level_key 在 lottery_strategy_config.level_probability 取倍数
  *
@@ -70,7 +70,7 @@ module.exports = (sequelize, DataTypes) => {
      * 派生规则：取 min_history_points <= history_points 中阈值最大的启用等级
      * （阈值为 0 的最低档保证任何用户都有归属）
      *
-     * @param {number} history_points - 用户累计积分（users.history_total_points）
+     * @param {number} history_points - 用户累计积分（资产账本派生值，拍板 4）
      * @param {Object} [options={}] - 查询选项（可含 transaction）
      * @returns {Promise<UserGrowthLevel|null>} 命中的等级记录（无启用等级时返回 null）
      */
@@ -89,7 +89,7 @@ module.exports = (sequelize, DataTypes) => {
     /**
      * 根据累计积分派生成长等级码
      *
-     * @param {number} history_points - 用户累计积分（users.history_total_points）
+     * @param {number} history_points - 用户累计积分（资产账本派生值，拍板 4）
      * @param {Object} [options={}] - 查询选项（可含 transaction）
      * @returns {Promise<string|null>} 命中的 level_key（无启用等级时返回 null）
      */
@@ -127,7 +127,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: '达到该等级所需的累计积分下限（比对 users.history_total_points，含本值）'
+        comment: '达到该等级所需的累计积分下限（比对账本派生的累计积分，含本值）'
       },
       sort_order: {
         type: DataTypes.INTEGER,

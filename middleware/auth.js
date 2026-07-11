@@ -196,7 +196,7 @@ async function invalidateUserPermissions(
 
   /*
    * 🔒 审计日志（不阻塞主流程）
-   * 说明：AdminOperationLog.operation_type 是 ENUM，这里复用 system_config 类型，避免引入新枚举值导致迁移成本上升
+   * 说明：operation_type 取值以 constants/AuditOperationTypes.js 为准，这里复用 system_config 类型
    */
   if (operator_id) {
     try {

@@ -142,7 +142,7 @@ describe('WebSocket连接生命周期集成测试（P1-4.1）', () => {
           user_type: 'admin',
           user_id: testUserId,
           login_ip: '127.0.0.1',
-          login_platform: 'test',
+          login_platform: 'web',
           expires_in_minutes: 10080
         })
         adminToken = createTestToken({

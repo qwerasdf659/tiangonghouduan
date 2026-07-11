@@ -3,8 +3,9 @@
  *
  * 验证 P1 修复的核心逻辑（不依赖复杂的测试数据）
  *
- * V2.1 更新（2026-01-26）：
- * - P1-1 现已支持跨组转换 + 终点货币限制 + 全局套利检测
+ * 2026-07-11 技术债务清理：
+ * - P1-1 风控校验改为验证生产实际在用的 AssetConversionRuleService._riskValidation
+ *   （utils/materialConversionValidator.js 从未被生产代码引用，已删除）
  *
  * P1-9 J2-RepoWide 改造：
  * - 通过 ServiceManager 统一获取服务
@@ -18,12 +19,12 @@ const { sequelize } = require('../../../models')
 describe('P1 修复简化验证', () => {
   // 🔴 P1-9：ServiceManager 在 jest.setup.js 中已全局初始化
 
-  describe('P1-1：材料转换风控校验（V2.1 全局套利检测 + 终点货币限制）', () => {
-    test('MaterialConversionValidator 应该有 validate 方法', () => {
-      const MaterialConversionValidator = require('../../../utils/materialConversionValidator')
-      expect(MaterialConversionValidator).toBeDefined()
-      expect(typeof MaterialConversionValidator.validate).toBe('function')
-      console.log('✅ P1-1：MaterialConversionValidator.validate 方法存在')
+  describe('P1-1：资产转换风控校验（AssetConversionRuleService 内联图算法）', () => {
+    test('AssetConversionRuleService 应该有 _riskValidation 方法', () => {
+      const AssetConversionRuleService = require('../../../services/AssetConversionRuleService')
+      expect(AssetConversionRuleService).toBeDefined()
+      expect(typeof AssetConversionRuleService._riskValidation).toBe('function')
+      console.log('✅ P1-1：AssetConversionRuleService._riskValidation 方法存在')
     })
 
     test('AssetConversionRule 模型应该有 fromAssetType 和 toAssetType 关联', () => {

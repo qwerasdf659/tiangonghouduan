@@ -54,28 +54,28 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
   let testUserId = null
 
   /*
-   * 敏感操作接口列表（基于项目实际路由）
-   * POST /api/v4/marketplace/list - 上架商品（需要会话验证）
-   * POST /api/v4/marketplace/listings/:market_listing_id/withdraw - 撤回商品（需要会话验证）
-   * POST /api/v4/marketplace/listings/:market_listing_id/purchase - 购买商品（需要会话验证）
+   * 敏感操作接口列表（当前 B2C 实际路由，2026-07-11 随 C2C marketplace 下线更新）
+   * POST /api/v4/exchange - B2C 兑换下单（资产扣款，需要会话验证）
+   * POST /api/v4/exchange/barter - 以物易物（物品流转，需要会话验证）
+   * POST /api/v4/exchange/unlock-premium - 臻选空间解锁（资产扣款，需要会话验证）
    */
   const sensitiveEndpoints = [
     {
       method: 'POST',
-      path: '/api/v4/marketplace/list',
-      description: '市场挂牌',
-      body: { item_id: 1, price_points: 100 }
+      path: '/api/v4/exchange',
+      description: 'B2C 兑换下单',
+      body: { exchange_item_id: 1, sku_id: 1, quantity: 1 }
     },
     {
       method: 'POST',
-      path: '/api/v4/marketplace/listings/1/withdraw',
-      description: '市场撤回',
-      body: {}
+      path: '/api/v4/exchange/barter',
+      description: '以物易物',
+      body: { old_item_ids: [1], recipe_key: 'test' }
     },
     {
       method: 'POST',
-      path: '/api/v4/marketplace/listings/1/purchase',
-      description: '市场购买',
+      path: '/api/v4/exchange/unlock-premium',
+      description: '臻选空间解锁',
       body: {}
     }
   ]
@@ -87,7 +87,7 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
   const normalEndpoints = [
     { method: 'GET', path: '/api/v4/user/me', description: '查看用户信息' },
     { method: 'GET', path: '/api/v4/backpack', description: '查看背包' },
-    { method: 'GET', path: '/api/v4/marketplace/listings', description: '浏览市场' },
+    { method: 'GET', path: '/api/v4/exchange/items', description: '浏览兑换商城' },
     { method: 'GET', path: '/api/v4/lottery/history/campaigns', description: '查看活动' }
   ]
 
@@ -206,9 +206,9 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
 
       // 尝试用已失效Token访问敏感操作
       const sensitiveResponse = await request(app)
-        .post('/api/v4/marketplace/list')
+        .post('/api/v4/exchange')
         .set('Authorization', `Bearer ${freshToken}`)
-        .send({ item_id: 1, price_points: 100 })
+        .send({ exchange_item_id: 1, sku_id: 1, quantity: 1 })
 
       /*
        * 会话失效后的预期行为（设备级多会话）：
@@ -466,9 +466,9 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
       })
 
       const noSessionResponse = await request(app)
-        .post('/api/v4/marketplace/list')
+        .post('/api/v4/exchange')
         .set('Authorization', `Bearer ${tokenNoSession}`)
-        .send({ item_id: 1, price_points: 100 })
+        .send({ exchange_item_id: 1, sku_id: 1, quantity: 1 })
 
       // 记录实际响应（用于验证中间件行为）
       console.log(

@@ -24,7 +24,7 @@
     <div x-cloak class="space-y-6">
 
       <!-- P0 数据完备度卡片（点击带筛选过滤，运营录数工作清单，拍板决议 11.6-4） -->
-      <div x-show="completeness" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div x-show="completeness" class="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div class="bg-white rounded-xl shadow p-4">
           <div class="text-xs text-gray-500">素材总数</div>
           <div class="text-2xl font-bold text-blue-600 mt-1" x-text="completeness?.total ?? total"></div>
@@ -53,6 +53,15 @@
           <div class="text-2xl font-bold mt-1" :class="(completeness?.zero_price_enabled_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
                x-text="completeness?.zero_price_enabled_count ?? '-'"></div>
           <div class="text-xs text-gray-400 mt-1">异常价，需先定价</div>
+        </button>
+        <!-- 手围驱动方案 §11.7-A1：沿绳占用无法派生的启用素材（管珠缺长边/药片缺短边/圆珠缺直径） -->
+        <button @click="toggleCompletenessFilter('missing_physical')"
+                class="text-left bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-red-300 transition"
+                :class="filterCompleteness === 'missing_physical' ? 'ring-2 ring-red-400' : ''">
+          <div class="text-xs text-gray-500">缺物理数据 ▸ 点击筛选</div>
+          <div class="text-2xl font-bold mt-1" :class="(completeness?.missing_physical_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
+               x-text="completeness?.missing_physical_count ?? '-'"></div>
+          <div class="text-xs text-gray-400 mt-1">长度联动/校验将不可用，禁止发布</div>
         </button>
       </div>
 

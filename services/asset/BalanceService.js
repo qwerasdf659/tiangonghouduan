@@ -68,7 +68,7 @@ const BALANCE_SAFETY_LIMIT = 1_000_000_000
  * history_total_points 累加排除的业务类型名单（防等级复利，拍板②-(d)/§2.4-3）
  *
  * 语义：名单内业务类型的积分入账"可花不计等级"——照常增加可用余额，
- * 但不累计 users.history_total_points（成长等级派生的单一数据源）。
+ * 但不计入累计积分派生口径（history_total_points，成长等级派生的单一数据源，拍板 4：账本实时派生）。
  *
  * - level_bonus_reward：消费审核发放的等级加成笔（发放线九档阶梯）
  * - activity_bonus_reward：未来活动加成笔（拍板⑮-(b) 加法叠加，预留同名单）
@@ -269,7 +269,7 @@ class BalanceService {
       logger.info('✅ 创建新资产余额记录', {
         service: 'BalanceService',
         method: 'getOrCreateBalance',
-        balance_id: balance.balance_id,
+        account_asset_balance_id: balance.account_asset_balance_id,
         account_id,
         asset_code,
         lottery_campaign_id: lottery_campaign_id || null
@@ -491,17 +491,16 @@ class BalanceService {
       await BalanceService.finalizeAssetTransactionNo(transaction_record, transaction)
 
       /*
-       * 历史累计获得积分维护（臻选空间解锁 / 成长等级派生的单一数据源）
+       * 历史累计获得积分缓存失效（拍板 4，2026-07-11：消灭双真相）
        *
-       * 口径：仅对「用户账户 + points 资产 + 正向入账」累加 users.history_total_points。
-       * - 该字段语义为"用户在平台累计获得过多少积分"（单调只增，消费不扣减）。
-       * - 与本笔流水在同一事务内原子完成；位于幂等早返回之后，重试不会重复累加。
-       * - changeBalance 是积分变动的唯一写收口，故此处维护即可保证账本一致、无同步债。
+       * users.history_total_points 冗余字段已删除，累计积分改为账本实时派生
+       * （asset/QueryService.getHistoryTotalPoints：SUM 正向 points 流水 + Redis 缓存）。
+       * 此处只需在「计入等级」的积分入账事务提交后失效派生缓存，下次读取自动重算——
+       * 账本即唯一真相，不再存在字段与流水漂移的可能。
        *
        * 防等级复利排除名单（拍板②-(d)"定级/奖励分离"，§2.4-3，2026-07-10）：
-       * - 等级/活动加成笔"可花不计等级"——加成积分照常入账可消费，但不累计
-       *   history_total_points，杜绝"高等级→加成多→更快升级"的复利循环。
-       * - 等级永远由"基础分≈真实消费"驱动（航空业"定级里程/奖励里程分离"同款）。
+       * - 等级/活动加成笔"可花不计等级"——加成积分照常入账可消费，但不计入派生口径，
+       *   杜绝"高等级→加成多→更快升级"的复利循环（口径见 HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES）。
        */
       if (
         asset_code === AssetCode.POINTS &&
@@ -509,10 +508,15 @@ class BalanceService {
         delta_amount > 0 &&
         !HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES.includes(business_type)
       ) {
-        await User.increment('history_total_points', {
-          by: delta_amount,
-          where: { user_id: account.user_id },
-          transaction
+        const affectedUserId = account.user_id
+        transaction.afterCommit(() => {
+          const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
+          BusinessCacheHelper.invalidateHistoryPoints(affectedUserId, 'points_awarded').catch(err =>
+            logger.warn('累计积分派生缓存失效失败（下次 TTL 到期自动重算）', {
+              user_id: affectedUserId,
+              error: err.message
+            })
+          )
         })
       }
 

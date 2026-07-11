@@ -3,7 +3,10 @@ const logger = require('../utils/logger').logger
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 
-const { AdminOperationLog, User } = require('../models')
+const { OperationLog, User } = require('../models')
+
+/** 管理员域日志视图（operation_logs 单表 + operator_type='admin'，拍板 10 三表合并；读查询自动带域过滤） */
+const AdminOperationLog = OperationLog.scope('admin')
 
 const { normalizeTargetType } = require('../constants/AuditTargetTypes')
 const { Op, fn, col, literal } = require('sequelize')
@@ -304,7 +307,7 @@ class AuditLogQueryService {
           attributes: [
             'operation_type',
             [
-              require('sequelize').fn('COUNT', require('sequelize').col('admin_operation_log_id')),
+              require('sequelize').fn('COUNT', require('sequelize').col('operation_log_id')),
               'count'
             ]
           ],
@@ -317,7 +320,7 @@ class AuditLogQueryService {
           attributes: [
             'action',
             [
-              require('sequelize').fn('COUNT', require('sequelize').col('admin_operation_log_id')),
+              require('sequelize').fn('COUNT', require('sequelize').col('operation_log_id')),
               'count'
             ]
           ],
@@ -351,7 +354,7 @@ class AuditLogQueryService {
    * @param {string} filters.end_date - 结束日期
    * @returns {Promise<Object>} 增强版统计信息
    *
-   * @note AdminOperationLog模型没有result字段，审计日志是只增不改的操作记录
+   * @note admin 域日志 status 固定 success（审计只增不改），成功率统计恒为 100%
    *       成功/失败统计改为按action字段分类（create/update/delete等）
    */
   static async getAuditStatisticsEnhanced(filters = {}) {
@@ -409,7 +412,7 @@ class AuditLogQueryService {
           attributes: [
             'operation_type',
             [
-              require('sequelize').fn('COUNT', require('sequelize').col('admin_operation_log_id')),
+              require('sequelize').fn('COUNT', require('sequelize').col('operation_log_id')),
               'count'
             ]
           ],
@@ -422,7 +425,7 @@ class AuditLogQueryService {
           attributes: [
             'action',
             [
-              require('sequelize').fn('COUNT', require('sequelize').col('admin_operation_log_id')),
+              require('sequelize').fn('COUNT', require('sequelize').col('operation_log_id')),
               'count'
             ]
           ],
@@ -581,7 +584,7 @@ class AuditLogQueryService {
         // 3.6 按操作类型分组统计
         AdminOperationLog.findAll({
           where: baseWhere,
-          attributes: ['operation_type', [fn('COUNT', col('admin_operation_log_id')), 'count']],
+          attributes: ['operation_type', [fn('COUNT', col('operation_log_id')), 'count']],
           group: ['operation_type'],
           order: [[literal('count'), 'DESC']],
           raw: true
@@ -590,7 +593,7 @@ class AuditLogQueryService {
         // 3.7 按目标类型分组统计
         AdminOperationLog.findAll({
           where: baseWhere,
-          attributes: ['target_type', [fn('COUNT', col('admin_operation_log_id')), 'count']],
+          attributes: ['target_type', [fn('COUNT', col('operation_log_id')), 'count']],
           group: ['target_type'],
           order: [[literal('count'), 'DESC']],
           raw: true
@@ -599,7 +602,7 @@ class AuditLogQueryService {
         // 3.8 按操作员分组统计（包含操作员信息）
         AdminOperationLog.findAll({
           where: baseWhere,
-          attributes: ['operator_id', [fn('COUNT', col('admin_operation_log_id')), 'count']],
+          attributes: ['operator_id', [fn('COUNT', col('operation_log_id')), 'count']],
           include: [
             {
               model: User,
@@ -615,7 +618,7 @@ class AuditLogQueryService {
         // 3.9 按风险等级分组统计
         AdminOperationLog.findAll({
           where: baseWhere,
-          attributes: ['risk_level', [fn('COUNT', col('admin_operation_log_id')), 'count']],
+          attributes: ['risk_level', [fn('COUNT', col('operation_log_id')), 'count']],
           group: ['risk_level'],
           order: [[literal('count'), 'DESC']],
           raw: true
@@ -626,7 +629,7 @@ class AuditLogQueryService {
           where: baseWhere,
           attributes: [
             [fn('DATE', col('created_at')), 'date'],
-            [fn('COUNT', col('admin_operation_log_id')), 'count']
+            [fn('COUNT', col('operation_log_id')), 'count']
           ],
           group: [fn('DATE', col('created_at'))],
           order: [[fn('DATE', col('created_at')), 'ASC']],

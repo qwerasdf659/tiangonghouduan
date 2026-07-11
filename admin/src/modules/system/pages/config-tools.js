@@ -1056,7 +1056,7 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('operationLogsTable', () => {
     const table = dataTable({
       columns: [
-        { key: 'id', label: '日志ID', sortable: true },
+        { key: 'operation_log_id', label: '日志ID', sortable: true },
         {
           key: 'operator_name',
           label: '操作人',
@@ -1092,7 +1092,7 @@ document.addEventListener('alpine:init', () => {
           total: res.data?.pagination?.total || res.data?.total || 0
         }
       },
-      primaryKey: 'id',
+      primaryKey: 'operation_log_id',
       sortable: true,
       page_size: 20
     })

@@ -518,12 +518,12 @@ describe('API契约测试 - 策略效果模拟分析', () => {
         }
 
         const rollbackTarget = historyRes.body.data.records.find(
-          r => r.before_data && r.admin_operation_log_id
+          r => r.before_data && r.operation_log_id
         )
         if (!rollbackTarget) return
 
         const res = await request(app)
-          .post(`${API_PREFIX}/rollback/${rollbackTarget.admin_operation_log_id}`)
+          .post(`${API_PREFIX}/rollback/${rollbackTarget.operation_log_id}`)
           .set(authHeader())
 
         expect(res.status).toBe(200)

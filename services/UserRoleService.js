@@ -43,6 +43,7 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const PiiCrypto = require('../utils/PiiCrypto')
 const logger = require('../utils/logger')
 const AuditLogService = require('./AuditLogService')
+const AssetQueryService = require('./asset/QueryService') // 累计积分账本派生（拍板 4：users.history_total_points 冗余列已删除）
 
 /**
  * 中文显示名称助手（2026-01-22 中文化显示名称系统）
@@ -84,10 +85,10 @@ class UserRoleService {
     })
 
     if (!user) {
-      throw new BusinessError('用户不存在', 'ROLE_NOT_FOUND', 404)
+      throw new BusinessError('用户不存在', 'USER_NOT_FOUND', 404)
     }
 
-    // 整合用户信息和权限
+    // 整合用户信息和权限（累计积分账本派生，拍板 4：响应字段名不变）
     return {
       // 用户基本信息
       user_id: user.user_id,
@@ -95,7 +96,7 @@ class UserRoleService {
       nickname: user.nickname,
       status: user.status,
       consecutive_fail_count: user.consecutive_fail_count,
-      history_total_points: user.history_total_points,
+      history_total_points: await AssetQueryService.getHistoryTotalPoints(user_id),
 
       // 角色权限信息
       roles:
@@ -211,7 +212,7 @@ class UserRoleService {
     // 验证目标用户
     const targetUser = await User.findByPk(user_id, { transaction })
     if (!targetUser) {
-      throw new BusinessError('用户不存在', 'ROLE_NOT_FOUND', 404)
+      throw new BusinessError('用户不存在', 'USER_NOT_FOUND', 404)
     }
 
     // 验证操作者权限级别（防止低级别管理员修改高级别管理员）
@@ -329,7 +330,7 @@ class UserRoleService {
 
     const targetUser = await User.findByPk(user_id, { transaction })
     if (!targetUser) {
-      throw new BusinessError('用户不存在', 'ROLE_NOT_FOUND', 404)
+      throw new BusinessError('用户不存在', 'USER_NOT_FOUND', 404)
     }
 
     const targetRole = await Role.findOne({ where: { role_name, is_active: true }, transaction })
@@ -449,7 +450,7 @@ class UserRoleService {
 
     const targetUser = await User.findByPk(user_id, { transaction })
     if (!targetUser) {
-      throw new BusinessError('用户不存在', 'ROLE_NOT_FOUND', 404)
+      throw new BusinessError('用户不存在', 'USER_NOT_FOUND', 404)
     }
 
     const targetRole = await Role.findOne({ where: { role_name }, transaction })
@@ -479,7 +480,7 @@ class UserRoleService {
       transaction
     })
     if (!existing) {
-      throw new BusinessError('用户未拥有该角色', 'ROLE_NOT_FOUND', 404)
+      throw new BusinessError('用户未拥有该角色', 'USER_ROLE_NOT_FOUND', 404)
     }
 
     const oldRoles = targetUserRoles.roles.map(r => r.role_name).join(', ') || '无角色'
@@ -593,7 +594,7 @@ class UserRoleService {
     // 查找用户
     const user = await User.findByPk(user_id, { transaction })
     if (!user) {
-      throw new BusinessError('用户不存在', 'ROLE_NOT_FOUND', 404)
+      throw new BusinessError('用户不存在', 'USER_NOT_FOUND', 404)
     }
 
     const oldStatus = user.status
@@ -665,15 +666,7 @@ class UserRoleService {
     // 基础查询
     const userQuery = {
       where: whereClause,
-      attributes: [
-        'user_id',
-        'mobile',
-        'nickname',
-        'history_total_points',
-        'status',
-        'last_login',
-        'created_at'
-      ],
+      attributes: ['user_id', 'mobile', 'nickname', 'status', 'last_login', 'created_at'],
       limit: finalLimit,
       offset: (parseInt(page) - 1) * finalLimit,
       order: [['created_at', 'DESC']],
@@ -696,6 +689,11 @@ class UserRoleService {
 
     // 查询用户数据
     const { count, rows: users } = await User.findAndCountAll(userQuery)
+
+    // 累计积分账本批量派生（拍板 4：单条 GROUP BY 避免 N+1，响应字段名 history_total_points 不变）
+    const historyPointsMap = await AssetQueryService.getHistoryTotalPointsByUserIds(
+      users.map(u => u.user_id)
+    )
 
     // 角色中文显示名映射
     const ROLE_DISPLAY_MAP = {
@@ -722,7 +720,7 @@ class UserRoleService {
         user_id: user.user_id,
         mobile: user.mobile,
         nickname: user.nickname,
-        history_total_points: user.history_total_points,
+        history_total_points: historyPointsMap.get(user.user_id) || 0,
         status: user.status,
         role_name: roleName,
         role_display: ROLE_DISPLAY_MAP[roleName] || roleName,
@@ -811,7 +809,7 @@ class UserRoleService {
     })
 
     if (!user) {
-      throw new BusinessError('用户不存在', 'ROLE_NOT_FOUND', 404)
+      throw new BusinessError('用户不存在', 'USER_NOT_FOUND', 404)
     }
 
     // 计算用户权限级别
@@ -820,13 +818,13 @@ class UserRoleService {
 
     logger.info('获取用户详情成功', { user_id })
 
-    // 构建用户详情对象
+    // 构建用户详情对象（累计积分账本派生，拍板 4：响应字段名不变）
     const userDetail = {
       user_id: user.user_id,
       mobile: user.mobile,
       nickname: user.nickname,
       status: user.status,
-      history_total_points: user.history_total_points,
+      history_total_points: await AssetQueryService.getHistoryTotalPoints(user_id),
       consecutive_fail_count: user.consecutive_fail_count,
       role_level: max_role_level,
       roles: user.roles.map(role => ({

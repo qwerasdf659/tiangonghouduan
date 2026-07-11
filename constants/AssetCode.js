@@ -102,35 +102,6 @@ const AssetCode = Object.freeze({
 })
 
 /**
- * 旧 asset_code → 新 asset_code 映射表
- *
- * 用途：
- * - 数据库迁移脚本中批量 UPDATE
- * - 验证脚本中检查是否有旧 code 残留
- *
- * @readonly
- * @type {Object<string, string>}
- */
-const ASSET_CODE_MIGRATION_MAP = Object.freeze({
-  DIAMOND: 'star_stone',
-  DIAMOND_QUOTA: 'star_stone_quota',
-  POINTS: 'points',
-  BUDGET_POINTS: 'budget_points',
-  red_shard: 'red_core_shard',
-  red_crystal: 'red_core_gem',
-  orange_shard: 'orange_core_shard',
-  orange_crystal: 'orange_core_gem',
-  yellow_shard: 'yellow_core_shard',
-  yellow_crystal: 'yellow_core_gem',
-  green_shard: 'green_core_shard',
-  green_crystal: 'green_core_gem',
-  blue_shard: 'blue_core_shard',
-  blue_crystal: 'blue_core_gem',
-  purple_shard: 'purple_core_shard',
-  purple_crystal: 'purple_core_gem'
-})
-
-/**
  * 资产形态枚举（form ENUM）
  *
  * @readonly
@@ -149,6 +120,5 @@ const AssetForm = Object.freeze({
 
 module.exports = {
   AssetCode,
-  ASSET_CODE_MIGRATION_MAP,
   AssetForm
 }

@@ -29,7 +29,7 @@
       </div>
 
       <!-- P0 数据完备度卡片（点击带筛选过滤，运营录数工作清单，拍板决议 11.6-4） -->
-      <div x-show="completeness" class="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div x-show="completeness" class="grid grid-cols-2 md:grid-cols-6 gap-4">
         <div class="bg-white rounded-xl shadow p-4">
           <div class="text-xs text-gray-500">模板总数</div>
           <div class="text-2xl font-bold text-blue-600 mt-1" x-text="completeness?.total ?? stats.templates?.total ?? '-'"></div>
@@ -64,6 +64,13 @@
           <div class="text-2xl font-bold mt-1" :class="(completeness?.published_without_materials_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
                x-text="completeness?.published_without_materials_count ?? '-'"></div>
           <div class="text-xs text-gray-400 mt-1">用户进入设计台会无珠可选</div>
+        </div>
+        <!-- 手围驱动方案 §11.7-A2：存量 published 模板缺档位毫米数据的兜底暴露口（发布护栏只拦新发布动作） -->
+        <div class="bg-white rounded-xl shadow p-4">
+          <div class="text-xs text-gray-500">已发布缺档位数据</div>
+          <div class="text-2xl font-bold mt-1" :class="(completeness?.published_missing_sizing_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
+               x-text="completeness?.published_missing_sizing_count ?? '-'"></div>
+          <div class="text-xs text-gray-400 mt-1">手围联动/长度校验将不可用</div>
         </div>
       </div>
 
@@ -268,6 +275,60 @@
                     <label class="block text-xs text-gray-500 mb-1">间距 (px)</label>
                     <input type="number" x-model.number="form.bead_rules.margin" class="input-field w-full" min="0">
                   </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- 尺寸档位（串珠模式，手围驱动方案 §11.6-1：档位毫米数据为发布必填） -->
+            <template x-if="!isSlotMode && form.sizing_rules">
+              <div class="border-t pt-4">
+                <div class="flex justify-between items-center mb-2">
+                  <h4 class="text-sm font-semibold">尺寸档位（手围驱动）</h4>
+                  <button @click="addSizeOption()" class="text-xs text-blue-600 hover:underline">+ 添加档位</button>
+                </div>
+                <p class="text-xs text-gray-400 mb-2">
+                  手链档位需填「手围 + 目标周长」；项链等无手围概念的品类只填「目标周长」（即佩戴长度）。
+                  发布时后端校验每档至少含一项毫米数据，缺失将拒绝发布。
+                </p>
+                <div class="mb-3 w-52">
+                  <label class="block text-xs text-gray-500 mb-1">弹力/工艺余量 (mm)</label>
+                  <input type="number" x-model.number="form.sizing_rules.elastic_margin_mm" class="input-field w-full" min="0" step="1">
+                  <p class="text-xs text-gray-400 mt-1">目标周长 = 手围 + 余量（默认 15mm）</p>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-xs border rounded">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th class="px-2 py-2 text-left">档位</th>
+                        <th class="px-2 py-2 text-left">展示文案</th>
+                        <th class="px-2 py-2 text-left">手围 (mm)</th>
+                        <th class="px-2 py-2 text-left">目标周长 (mm)</th>
+                        <th class="px-2 py-2 text-left">兜底颗数</th>
+                        <th class="px-2 py-2 text-left">半径X (px)</th>
+                        <th class="px-2 py-2 text-left">半径Y (px)</th>
+                        <th class="px-2 py-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="(option, index) in form.sizing_rules.size_options" :key="index">
+                        <tr class="border-t">
+                          <td class="px-2 py-1"><input type="text" x-model="option.label" placeholder="S" class="input-field w-12 text-xs"></td>
+                          <td class="px-2 py-1"><input type="text" x-model="option.display" placeholder="小号 (约15cm)" class="input-field w-28 text-xs"></td>
+                          <td class="px-2 py-1"><input type="number" x-model.number="option.wrist_size_mm" placeholder="项链留空" class="input-field w-20 text-xs" min="0"></td>
+                          <td class="px-2 py-1"><input type="number" x-model.number="option.target_length_mm" placeholder="155" class="input-field w-20 text-xs" min="0"></td>
+                          <td class="px-2 py-1"><input type="number" x-model.number="option.bead_count" class="input-field w-16 text-xs" min="1"></td>
+                          <td class="px-2 py-1"><input type="number" x-model.number="option.radius_x" class="input-field w-16 text-xs" min="1"></td>
+                          <td class="px-2 py-1"><input type="number" x-model.number="option.radius_y" class="input-field w-16 text-xs" min="1"></td>
+                          <td class="px-2 py-1 text-center">
+                            <button @click="removeSizeOption(index)" class="text-red-500 hover:underline text-xs">删除</button>
+                          </td>
+                        </tr>
+                      </template>
+                      <tr x-show="!form.sizing_rules.size_options?.length">
+                        <td colspan="8" class="px-2 py-3 text-center text-gray-400">暂无档位，点击右上角"添加档位"</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </template>

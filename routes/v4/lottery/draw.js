@@ -101,6 +101,11 @@ router.post(
         return res.apiError('缺少必需参数: campaign_code', 'MISSING_PARAMETER', {}, 400)
       }
 
+      // 类型校验（系统边界）：campaign_code 必须为非空字符串，非法类型直接 400 而非透传到查询层炸 500
+      if (typeof campaign_code !== 'string' || campaign_code.trim() === '') {
+        return res.apiError('campaign_code 必须为非空字符串', 'INVALID_PARAMETER', {}, 400)
+      }
+
       /*
        * 🔴 P0 修复：draw_count 参数边界值验证
        * 规则：

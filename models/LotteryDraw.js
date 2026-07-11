@@ -188,7 +188,7 @@ module.exports = sequelize => {
        */
       business_id: {
         type: DataTypes.STRING(150),
-        allowNull: false, // 业务唯一键必填（历史数据已回填完成 - 2026-01-05）
+        allowNull: false, // 业务唯一键必填
         unique: true,
         comment: '业务唯一键（格式：lottery_draw_{user_id}_{session_id}_{draw_index}）- 必填'
       },

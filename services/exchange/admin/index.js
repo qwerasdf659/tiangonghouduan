@@ -11,7 +11,7 @@
  * - ItemManagementService: 商品运营操作（pinItem/recommendItem/batchUpdateSort）
  * - BatchOperationService: 批量操作（batchBindImages/batchUpdateSpace/batchUpdateStatus/batchUpdatePrice/batchSetIndividualPrices/batchUpdateCategory/batchUpdateRarity/getMissingImageItems）
  * - MarketQueryService: 市场查询/统计（checkTimeoutAndAlert/getAdminMarketItems/getMarketItemStatistics/getExchangeTopline/getItemDashboard/getSpaceDistribution）
- * - SkuService: SKU 管理（listSkus/createSku/updateSku/deleteSku/_updateSpuSummary）
+ * - SkuService: SKU 管理（listSkus/createSku/updateSku/deleteSku；SPU 汇总回填统一走 ExchangeItemService.syncSpuSummary）
  *
  * @module services/exchange/admin
  */
@@ -58,7 +58,6 @@ class ExchangeAdminFacade {
   createSku(...args) { return this._sku.createSku(...args) }
   updateSku(...args) { return this._sku.updateSku(...args) }
   deleteSku(...args) { return this._sku.deleteSku(...args) }
-  _updateSpuSummary(...args) { return this._sku._updateSpuSummary(...args) }
 }
 
 module.exports = ExchangeAdminFacade

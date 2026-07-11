@@ -109,8 +109,12 @@ module.exports = sequelize => {
       /**
        * 核心设计数据（JSON）
        *
-       * 串珠模式示例：{ mode: 'beading', beads: [{ position: 0, asset_code: 'red_core_shard', diameter: 10 }, ...] }
-       * 镶嵌模式示例：{ mode: 'slots', fillings: { slot_center: { asset_code: 'blue_core_gem' }, ... } }
+       * 串珠模式示例：{ mode: 'beading', size: { label: 'M', wrist_size_mm: 155 },
+       *   beads: [{ position: 0, material_code: 'DM26033100001749' }, ...] }
+       * 镶嵌模式示例：{ mode: 'slots', fillings: { slot_center: { material_code: 'DM26...' }, ... } }
+       *
+       * size 为手围档位（手围驱动方案 §11.4 契约）：confirm 时后端据此做成品长度硬校验；
+       * 缺 size.wrist_size_mm 时跳过长度校验、仅按 capacity_rules 做颗数兜底。
        */
       design_data: {
         type: DataTypes.JSON,

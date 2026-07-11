@@ -46,7 +46,7 @@ const MODEL_PRIMARY_KEYS = {
   ItemTemplate: 'item_template_id',
 
   // 资产相关
-  AccountAssetBalance: 'balance_id',
+  AccountAssetBalance: 'account_asset_balance_id',
   AssetTransaction: 'transaction_id',
   Account: 'account_id',
 

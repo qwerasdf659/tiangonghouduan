@@ -13,7 +13,7 @@
  *
  * P1 任务对应：
  * - B-14：抽奖健康度计算服务 LotteryHealthService
- * - B-15：健康度接口 GET /api/v4/admin/lottery/health/:id
+ * - B-15：健康度接口 GET /api/v4/console/lottery-health/:id
  * - B-16：档位分布
  * - B-17：问题诊断
  * - B-18：预算消耗速度
@@ -65,7 +65,7 @@ function parseAndValidateCampaignId(id) {
 }
 
 /**
- * @api {get} /api/v4/admin/lottery/health/:id 获取活动健康度报告
+ * @api {get} /api/v4/console/lottery-health/:id 获取活动健康度报告
  * @apiName GetCampaignHealthReport
  * @apiGroup LotteryHealth
  * @apiVersion 1.0.0
@@ -129,7 +129,7 @@ router.get(
 )
 
 /**
- * @api {get} /api/v4/admin/lottery/health/:id/tier-distribution 获取档位分布
+ * @api {get} /api/v4/console/lottery-health/:id/tier-distribution 获取档位分布
  * @apiName GetCampaignTierDistribution
  * @apiGroup LotteryHealth
  * @apiVersion 1.0.0
@@ -191,7 +191,7 @@ router.get(
 )
 
 /**
- * @api {get} /api/v4/admin/lottery/health/:id/diagnose 获取问题诊断
+ * @api {get} /api/v4/console/lottery-health/:id/diagnose 获取问题诊断
  * @apiName GetCampaignDiagnosis
  * @apiGroup LotteryHealth
  * @apiVersion 1.0.0
@@ -279,7 +279,7 @@ router.get(
 )
 
 /**
- * @api {get} /api/v4/admin/lottery/health/:id/budget-rate 获取预算消耗速度
+ * @api {get} /api/v4/console/lottery-health/:id/budget-rate 获取预算消耗速度
  * @apiName GetCampaignBudgetRate
  * @apiGroup LotteryHealth
  * @apiVersion 1.0.0

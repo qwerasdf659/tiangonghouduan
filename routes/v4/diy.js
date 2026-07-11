@@ -3,10 +3,11 @@
  *
  * 顶层路径：/api/v4/diy
  *
- * 接口清单（12 个）：
+ * 接口清单（13 个）：
  * - GET    /templates                获取模板列表（按分类分组，仅已发布+已启用）
  * - GET    /templates/:id            获取模板详情
  * - GET    /templates/:id/beads      获取模板可用珠子素材（查 diy_materials）
+ * - GET    /templates/:id/estimate   手围算珠估算（后端权威换算，手围驱动方案 Q2 方案甲）
  * - GET    /templates/:id/payment-assets  获取用户可用支付资产余额（钱包）
  * - GET    /material-groups          获取材料分组列表（用于前端 Tab）
  * - GET    /works                    获取用户作品列表
@@ -64,6 +65,23 @@ router.get(
     const DIYService = req.app.locals.services.getService('diy')
     const materials = await DIYService.getUserMaterials(Number(req.params.id), req.query)
     return res.apiSuccess(materials, '获取珠子素材成功')
+  })
+)
+
+/**
+ * 手围算珠估算（后端权威换算，手围驱动方案拍板 Q2 方案甲）
+ *
+ * 查询参数：wrist_size_mm 手围毫米（必填）/ diameter 主珠直径毫米（必填）
+ * 返回：{ wrist_size_mm, diameter, elastic_margin_mm, target_length_mm,
+ *   recommend_bead_count, min_length_mm, max_length_mm, matched_size_label }
+ * 换算规则收敛在后端（TemplateService.estimateBeadCount），前端只展示不计算
+ */
+router.get(
+  '/templates/:id/estimate',
+  asyncHandler(async (req, res) => {
+    const DIYService = req.app.locals.services.getService('diy')
+    const result = await DIYService.estimateBeadCount(Number(req.params.id), req.query)
+    return res.apiSuccess(result, '手围估算成功')
   })
 )
 

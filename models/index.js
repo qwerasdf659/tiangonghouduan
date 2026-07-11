@@ -60,7 +60,6 @@ models.UserRiskProfile = require('./UserRiskProfile')(sequelize, DataTypes)
 
 // 🔴 抽奖系统核心模型
 models.LotteryCampaign = require('./LotteryCampaign')(sequelize, DataTypes)
-// models.LotteryPrize 已废弃 — 由 PrizeDefinition + LotteryCampaignPrize 替代（2026-05-26）
 models.LotteryDraw = require('./LotteryDraw')(sequelize, DataTypes)
 models.LotteryPreset = require('./LotteryPreset')(sequelize, DataTypes)
 
@@ -596,7 +595,7 @@ models.AccountAssetBalance = require('./AccountAssetBalance')(sequelize, DataTyp
  * ✅ AccountAssetBalance：账户资产余额表（可用余额 + 冻结余额）
  *    - 用途：管理每个账户的每种资产余额（支持冻结模型）
  *    - 特点：available_amount（可用余额）+ frozen_amount（冻结余额），交易市场必须走冻结链路
- *    - 表名：account_asset_balances，主键：balance_id，外键：account_id，唯一约束：(account_id, asset_code)
+ *    - 表名：account_asset_balances，主键：account_asset_balance_id，外键：account_id，唯一约束：(account_id, asset_code)
  *    - 业务场景：下单冻结买家star_stone → 成交从冻结扣减 → 取消解冻；挂牌冻结卖家标的 → 成交扣减 → 撤单解冻
  *    - 冻结操作：freeze（可用→冻结）、unfreeze（冻结→可用）、deductFromFrozen（从冻结扣减）
  */
@@ -620,18 +619,18 @@ models.ContentReviewRecord = require('./ContentReviewRecord')(sequelize, DataTyp
  *    - 表名：content_review_records，主键：content_review_record_id
  *    - 业务场景：用户提交兑换申请 → 进入待审核状态 → 管理员审核 → 通过/拒绝
  *    - 字段特点：audit_status（状态）、auditor_id（审核员）、audit_reason（审核意见）
- *    - ⚠️ 与AdminOperationLog的区别：ContentReviewRecord是业务审核，AdminOperationLog是操作追溯
+ *    - ⚠️ 与OperationLog的区别：ContentReviewRecord是业务审核流程，OperationLog是操作追溯
  */
 
-models.AdminOperationLog = require('./AdminOperationLog')(sequelize, DataTypes)
+models.OperationLog = require('./OperationLog')(sequelize, DataTypes)
 /*
- * ✅ AdminOperationLog：操作审计日志（管理员操作历史追溯）
- *    - 用途：记录所有敏感操作的审计日志，用于安全审计和责任追溯
- *    - 特点：只记录不修改，不可删除，记录操作前后数据对比
- *    - 表名：admin_operation_logs，主键：log_id
- *    - 业务场景：管理员修改积分 → 记录谁/何时/改了什么 → 用于追溯和审计
- *    - 字段特点：operator_id（操作员）、operation_type（操作类型）、before_data/after_data（前后数据）
- *    - ⚠️ 与ContentReviewRecord的区别：AdminOperationLog是操作追溯，ContentReviewRecord是业务审核
+ * ✅ OperationLog：统一操作日志（拍板 10，2026-07-11 三表合并）
+ *    - 用途：admin（管理员单笔操作审计）/ merchant（商家员工操作）/ batch（管理员批量任务）三域统一日志
+ *    - 特点：operator_type 多态字段区分域；admin/merchant 域只增不改，batch 域有任务状态流转
+ *    - 表名：operation_logs，主键：operation_log_id
+ *    - 业务场景：管理员改积分审计 / 商家员工扫码提交消费 / 批量赠送抽奖次数任务追踪
+ *    - 字段特点：公共脊柱列 + admin 审计列（前后数据/风险/回滚）+ batch 计数列 + detail JSON（域专有低频字段）
+ *    - ⚠️ 与ContentReviewRecord的区别：OperationLog是操作追溯，ContentReviewRecord是业务审核流程
  */
 
 models.Merchant = require('./Merchant')(sequelize, DataTypes)
@@ -641,16 +640,6 @@ models.Merchant = require('./Merchant')(sequelize, DataTypes)
  *    - 特点：merchant_type 通过字典表校验，支持运营自助扩展
  *    - 表名：merchants，主键：merchant_id
  *    - 关联：stores(门店)、items(物品)、lottery_prizes(奖品)、material_asset_types(资产类型)
- */
-
-models.MerchantOperationLog = require('./MerchantOperationLog')(sequelize, DataTypes)
-/*
- * ✅ MerchantOperationLog：商家操作审计日志（2026-01-12 商家员工域权限体系升级）
- *    - 用途：独立的商家域审计日志，与 AdminOperationLog 分离
- *    - 特点：记录商家员工的扫码/消费提交等敏感操作，支持门店维度筛选
- *    - 表名：merchant_operation_logs，主键：merchant_log_id
- *    - 业务场景：扫码获取用户信息 → 提交消费记录 → 门店/员工/时间范围筛选
- *    - 字段特点：operator_id、store_id、target_user_id、consumption_amount、result
  */
 
 // 🔴 层级化角色权限管理系统（2025年11月07日新增）
@@ -756,14 +745,6 @@ models.AssetConversionRule = require('./AssetConversionRule')(sequelize, DataTyp
  *    - 转换公式：gross = FLOOR(from_amount × rate_numerator ÷ rate_denominator)
  */
 
-/*
- * ⚠️ 旧模型已删除（2026-04-05 暴力重构）
- * - ExchangeRate → 已合并到 AssetConversionRule，旧表 _bak_exchange_rates 保留 30 天后 DROP
- * - MaterialConversionRule → 已合并到 AssetConversionRule，旧表 _bak_material_conversion_rules 保留 30 天后 DROP
- */
-
-// 注：C2C 交易市场模型（MarketListing/TradeOrder/MarketPriceSnapshot）已随 C2C 下线删除（2026-06-05 阶段五）
-
 // 🔴 V4.2 背包双轨架构模型（Phase 1 - 核销码系统）
 models.RedemptionOrder = require('./RedemptionOrder')(sequelize, DataTypes)
 /*
@@ -813,17 +794,6 @@ models.SegmentRuleConfig = require('./SegmentRuleConfig')(sequelize)
  *    - 设计决策来源：需求文档决策6（职责分离，便于独立演进）
  */
 
-// 🔴 V4.8 批量操作基础设施（阶段C核心组件 - 2026-01-30）
-models.BatchOperationLog = require('./BatchOperationLog').initModel(sequelize)
-/*
- * ✅ BatchOperationLog：批量操作日志表（幂等性控制与操作审计）
- *    - 用途：记录所有批量操作的执行状态和结果，提供幂等性保障
- *    - 特点：idempotency_key唯一约束（美团幂等性方案）、部分成功模式、操作审计
- *    - 表名：batch_operation_logs，主键：batch_operation_log_id
- *    - 业务场景：批量赠送配额、批量设置干预规则、批量核销、批量状态切换、批量预算调整
- *    - 设计决策来源：需求文档阶段C技术决策（美团独立幂等表 + Redis/MySQL双重校验）
- */
-
 models.LotteryDailyMetrics = require('./LotteryDailyMetrics')(sequelize, DataTypes)
 /*
  * ✅ LotteryDailyMetrics：抽奖日报统计表（按日聚合）
@@ -846,7 +816,7 @@ models.LotteryStrategyConfig = require('./LotteryStrategyConfig')(sequelize, Dat
 models.UserGrowthLevel = require('./UserGrowthLevel')(sequelize, DataTypes)
 /*
  * ✅ UserGrowthLevel：用户成长等级定义表（2026-06-04 合规改造 P1=乙）
- *    - 用途：独立成长等级体系，累计积分（users.history_total_points）→ 成长等级
+ *    - 用途：独立成长等级体系，累计积分（资产账本派生，拍板 4）→ 成长等级
  *    - 区别：不同于 users.user_level（身份类型 normal/vip/merchant），成长等级是消费成长维度
  *    - 特点：配置实体，业务码 level_key 稳定标识；用户当前等级由 Service 实时派生（无 per-user 同步债）
  *    - 表名：user_growth_levels，主键：user_growth_level_id，唯一：level_key

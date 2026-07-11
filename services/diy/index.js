@@ -60,6 +60,10 @@ class DiyServiceFacade {
     return DiyTemplateService.getUserTemplateDetail(...args)
   }
 
+  static estimateBeadCount(...args) {
+    return DiyTemplateService.estimateBeadCount(...args)
+  }
+
   // ── 作品域（委托 WorkService）──
   static getWorkList(...args) {
     return DiyWorkService.getWorkList(...args)

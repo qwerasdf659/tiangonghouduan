@@ -13,6 +13,8 @@
  * - fulfillment: { pending_shipment_count, missing_address_count }  P1 履约
  * - material_ranking: [{ material_code, display_name, use_count, total_amount }]  P2 热度
  * - five_elements_distribution: { metal, wood, water, fire, earth, unset }  P2 五行
+ * - size_distribution: { options:[{label,wrist_size_mm,count}], unset_count }  手围档位分布（§11.7-B4）
+ * - length_deviation: { within_5mm, within_10mm, over_10mm, unmeasurable }  长度偏差分布（§11.7-B5）
  */
 
 import { logger } from '@/utils/logger.js'
@@ -46,11 +48,14 @@ function diyDashboard() {
     fulfillment: null,
     materialRanking: [],
     fiveElementsDistribution: null,
+    sizeDistribution: null,
+    lengthDeviation: null,
 
     // ECharts 实例（resize / 重绘复用）
     funnelChart: null,
     gmvChart: null,
     fiveElementsChart: null,
+    sizeDistributionChart: null,
 
     async init() {
       logger.info('[DIY-Dashboard] 数据看板初始化')
@@ -74,6 +79,8 @@ function diyDashboard() {
           this.fulfillment = d.fulfillment || null
           this.materialRanking = d.material_ranking || []
           this.fiveElementsDistribution = d.five_elements_distribution || null
+          this.sizeDistribution = d.size_distribution || null
+          this.lengthDeviation = d.length_deviation || null
           logger.info('[DIY-Dashboard] 统计数据加载成功')
           await this.renderCharts()
         } else {
@@ -98,6 +105,7 @@ function diyDashboard() {
       this._renderFunnel(echarts)
       this._renderGmv(echarts)
       this._renderFiveElements(echarts)
+      this._renderSizeDistribution(echarts)
     },
 
     /** 转化漏斗图（draft → frozen → completed） */
@@ -179,10 +187,39 @@ function diyDashboard() {
       })
     },
 
+    /** 手围档位分布柱状图（冻结/完成作品按档位聚合，配货备料参考，§11.7-B4） */
+    _renderSizeDistribution(echarts) {
+      const el = this.$refs.sizeDistributionChart
+      if (!el || !this.sizeDistribution) return
+      if (!this.sizeDistributionChart) this.sizeDistributionChart = echarts.init(el)
+
+      const options = this.sizeDistribution.options || []
+      /* 类目名：档位 label + 手围 cm（如 "S · 14.0cm"），mm→cm 由前端展示层换算 */
+      const categories = options.map(
+        opt => `${opt.label} · ${(opt.wrist_size_mm / 10).toFixed(1)}cm`
+      )
+
+      this.sizeDistributionChart.setOption({
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+        xAxis: { type: 'category', data: categories.length ? categories : ['暂无数据'] },
+        yAxis: { type: 'value', minInterval: 1 },
+        series: [
+          {
+            name: '作品数',
+            type: 'bar',
+            barMaxWidth: 48,
+            data: options.length ? options.map(opt => opt.count) : [0]
+          }
+        ]
+      })
+    },
+
     resizeCharts() {
       this.funnelChart?.resize()
       this.gmvChart?.resize()
       this.fiveElementsChart?.resize()
+      this.sizeDistributionChart?.resize()
     }
   }
 }

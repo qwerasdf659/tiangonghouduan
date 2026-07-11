@@ -25,11 +25,11 @@ class SimulationApplyService {
    * @param {number} lottery_simulation_record_id - 模拟记录ID
    * @param {number} operator_id - 操作者用户ID
    * @param {Object} options - { transaction }
-   * @returns {Promise<Object>} { applied: true, changes, admin_operation_log_id }
+   * @returns {Promise<Object>} { applied: true, changes, operation_log_id }
    */
   async applySimulation(lottery_simulation_record_id, operator_id, options = {}) {
     const { transaction } = options
-    const { LotterySimulationRecord, AdminOperationLog } = this.models
+    const { LotterySimulationRecord, OperationLog: AdminOperationLog } = this.models
 
     const record = await LotterySimulationRecord.findByPk(lottery_simulation_record_id, {
       transaction
@@ -124,6 +124,7 @@ class SimulationApplyService {
 
     const logEntry = await AdminOperationLog.create(
       {
+        operator_type: 'admin', // 管理员域（operation_logs 单表多态标识）
         operator_id,
         operation_type: OPERATION_TYPES.SIMULATION_APPLY,
         target_type: 'lottery_simulation_record',
@@ -145,7 +146,7 @@ class SimulationApplyService {
     return {
       applied: true,
       changes,
-      admin_operation_log_id: logEntry.admin_operation_log_id
+      operation_log_id: logEntry.operation_log_id
     }
   }
 
@@ -165,7 +166,11 @@ class SimulationApplyService {
     options = {}
   ) {
     const { transaction } = options
-    const { LotterySimulationRecord, LotteryStrategyConfig, AdminOperationLog } = this.models
+    const {
+      LotterySimulationRecord,
+      LotteryStrategyConfig,
+      OperationLog: AdminOperationLog
+    } = this.models
 
     const record = await LotterySimulationRecord.findByPk(lottery_simulation_record_id, {
       transaction
@@ -242,6 +247,7 @@ class SimulationApplyService {
 
     await AdminOperationLog.create(
       {
+        operator_type: 'admin', // 管理员域（operation_logs 单表多态标识）
         operator_id,
         operation_type: OPERATION_TYPES.SIMULATION_APPLY,
         target_type: 'lottery_simulation_record',
@@ -317,7 +323,7 @@ class SimulationApplyService {
    * @returns {Promise<Object>} { records, total }
    */
   async getConfigVersionHistory(lottery_campaign_id, options = {}) {
-    const { AdminOperationLog } = this.models
+    const { OperationLog: AdminOperationLog } = this.models
     const page_size = options.page_size ?? options.limit ?? 50
     const { offset = 0 } = options
 
@@ -331,6 +337,7 @@ class SimulationApplyService {
 
     const result = await AdminOperationLog.findAndCountAll({
       where: {
+        operator_type: 'admin', // 管理员域（operation_logs 单表多态过滤）
         operation_type: { [Op.in]: relevantTypes },
         [Op.or]: [
           { reason: { [Op.like]: `%活动 #${lottery_campaign_id}%` } },
@@ -347,7 +354,7 @@ class SimulationApplyService {
 
     return {
       records: result.rows.map(log => ({
-        log_id: log.admin_operation_log_id || log.log_id,
+        log_id: log.operation_log_id || log.log_id,
         operation_type: log.operation_type,
         operator_id: log.operator_id,
         before_data: log.before_data,
@@ -370,7 +377,7 @@ class SimulationApplyService {
    */
   async rollbackConfig(log_id, operator_id, options = {}) {
     const { transaction } = options
-    const { AdminOperationLog } = this.models
+    const { OperationLog: AdminOperationLog } = this.models
 
     const logEntry = await AdminOperationLog.findByPk(log_id, { transaction })
     if (!logEntry) {
@@ -416,9 +423,10 @@ class SimulationApplyService {
 
     await AdminOperationLog.create(
       {
+        operator_type: 'admin', // 管理员域（operation_logs 单表多态标识）
         operator_id,
         operation_type: OPERATION_TYPES.CONFIG_ROLLBACK,
-        target_type: 'admin_operation_log',
+        target_type: 'operation_log',
         target_id: log_id,
         action: 'rollback',
         before_data: afterData,

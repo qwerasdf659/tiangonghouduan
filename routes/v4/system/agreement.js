@@ -10,7 +10,7 @@
  *
  * 业务背景（拍板点⑤，后端权威）：
  * - 协议正文属法务文本，前端不硬编码、不编造，统一由后端下发。
- * - 复用现有配置中心 system_settings（category='agreement'）+ SystemConfigService 读写，不新建表。
+ * - 复用现有配置中心 system_settings（category='agreement'）+ AdminSystemService（服务键 admin_system）读写，不新建表。
  * - JSON 内预留 version 字段（未来需"协议重大变更强制重新同意/审计"时再升级专表）。
  *
  * 存储约定（system_settings）：

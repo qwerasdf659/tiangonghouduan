@@ -66,12 +66,10 @@ function getSharedComponents(serviceManager = null) {
   const {
     UnifiedLotteryEngine
   } = require('../../../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
-  const DrawOrchestrator = require('../../../../services/UnifiedLotteryEngine/pipeline/DrawOrchestrator')
   const PerformanceMonitor = require('../../../../services/UnifiedLotteryEngine/utils/PerformanceMonitor')
 
   _sharedComponents = {
     lotteryEngine: new UnifiedLotteryEngine(),
-    drawOrchestrator: new DrawOrchestrator(),
     performanceMonitor: new PerformanceMonitor(),
     logger
   }
@@ -90,16 +88,6 @@ const sharedComponents = {
    */
   get lotteryEngine() {
     return getSharedComponents().lotteryEngine
-  },
-  /**
-   * V4.6 管线编排器（2026-01-19）
-   *
-   * 获取管线编排器实例（抽奖执行入口）
-   *
-   * @returns {Object} 管线编排器实例
-   */
-  get drawOrchestrator() {
-    return getSharedComponents().drawOrchestrator
   },
   /**
    * 获取性能监控器实例

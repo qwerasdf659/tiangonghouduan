@@ -15,6 +15,7 @@ const { User, Role } = require('../models')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const logger = require('../utils/logger')
 const AuditLogService = require('./AuditLogService')
+const AssetQueryService = require('./asset/QueryService') // 累计积分账本派生（拍板 4）
 const displayNameHelper = require('../utils/displayNameHelper')
 const PiiCrypto = require('../utils/PiiCrypto')
 const { Op } = require('sequelize')
@@ -118,15 +119,7 @@ class UserManagementService {
 
     const userQuery = {
       where: whereClause,
-      attributes: [
-        'user_id',
-        'mobile',
-        'nickname',
-        'history_total_points',
-        'status',
-        'last_login',
-        'created_at'
-      ],
+      attributes: ['user_id', 'mobile', 'nickname', 'status', 'last_login', 'created_at'],
       limit: finalLimit,
       offset: (parseInt(page) - 1) * finalLimit,
       order: [['created_at', 'DESC']],
@@ -147,6 +140,11 @@ class UserManagementService {
     }
 
     const { count, rows: users } = await User.findAndCountAll(userQuery)
+
+    // 累计积分账本批量派生（拍板 4：history_total_points 冗余列已删除，单条 GROUP BY 避免 N+1）
+    const historyPointsMap = await AssetQueryService.getHistoryTotalPointsByUserIds(
+      users.map(u => u.user_id)
+    )
 
     const ROLE_DISPLAY_MAP = {
       admin: '管理员',
@@ -171,7 +169,7 @@ class UserManagementService {
         user_id: user.user_id,
         mobile: user.mobile,
         nickname: user.nickname,
-        history_total_points: user.history_total_points,
+        history_total_points: historyPointsMap.get(user.user_id) || 0,
         status: user.status,
         role_name: roleName,
         role_display: ROLE_DISPLAY_MAP[roleName] || roleName,
@@ -260,7 +258,8 @@ class UserManagementService {
       mobile: user.mobile,
       nickname: user.nickname,
       status: user.status,
-      history_total_points: user.history_total_points,
+      // 累计积分账本派生（拍板 4：冗余列已删除，响应字段名不变）
+      history_total_points: await AssetQueryService.getHistoryTotalPoints(user.user_id),
       consecutive_fail_count: user.consecutive_fail_count,
       role_level: max_role_level,
       roles: user.roles.map(role => ({

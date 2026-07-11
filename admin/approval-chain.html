@@ -512,7 +512,7 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            <template x-for="h in history_rows" :key="h.log_id || h.admin_operation_log_id">
+            <template x-for="h in history_rows" :key="h.operation_log_id">
               <tr class="hover:bg-gray-50">
                 <td class="px-4 py-2 text-gray-600" x-text="formatDateTime(h.created_at)"></td>
                 <td class="px-4 py-2" x-text="h.operator_nickname || h.operator_name || ('用户' + (h.operator_id ?? '-'))"></td>

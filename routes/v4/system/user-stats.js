@@ -1,12 +1,10 @@
 /**
- * 天工商户营销平台 V4.0 - 用户统计和管理员概览API路由
+ * 天工商户营销平台 V4.0 - 用户统计API路由
  *
  * 功能：
  * - 获取用户个人统计数据
- * - 获取管理员系统概览
  *
  * 路由前缀：/api/v4/system
- *
  */
 
 const express = require('express')
@@ -71,38 +69,9 @@ router.get(
   })
 )
 
-/**
- * @route GET /api/v4/system/admin/overview
- * @desc 获取管理员系统概览
- * @access Admin Only
- *
- * @returns {Object} 系统概览数据
- *
- * 权限验证：
- * - 仅管理员可访问
+/*
+ * 注：管理员系统概览已迁至 GET /api/v4/console/dashboard/overview
+ * （2026-07-11 技术债务方案 四.6：管理员功能统一挂 console 域，不再错挂 system 域）
  */
-router.get(
-  '/admin/overview',
-  authenticateToken,
-  dataAccessControl,
-  asyncHandler(async (req, res) => {
-    if (req.role_level < 100) {
-      return res.apiError('需要管理员权限', 'FORBIDDEN', null, 403)
-    }
-
-    // 🔄 通过 ServiceManager 获取 StatsService（V4.7.0 服务拆分）
-    const StatsService = req.app.locals.services.getService('reporting_stats')
-
-    // ✅ 使用 StatsService 获取系统概览
-    const overview = await StatsService.getSystemOverview()
-
-    return res.apiSuccess(
-      {
-        overview
-      },
-      '获取系统概览成功'
-    )
-  })
-)
 
 module.exports = router

@@ -15,14 +15,14 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   // [已合并] 公告管理 → ad-campaigns?category=system
 
   // 系统通知（数据源：admin_notifications 表）
-  NOTIFICATION_LIST: `${API_PREFIX}/system/notifications`,
-  NOTIFICATION_DETAIL: `${API_PREFIX}/system/notifications/:id`,
-  NOTIFICATION_READ: `${API_PREFIX}/system/notifications/:id/read`,
-  NOTIFICATION_READ_ALL: `${API_PREFIX}/system/notifications/read-all`,
-  NOTIFICATION_CLEAR: `${API_PREFIX}/system/notifications/clear`,
-  NOTIFICATION_SEND: `${API_PREFIX}/system/notifications/send`,
-  NOTIFICATION_DELETE: `${API_PREFIX}/system/notifications/:id`,
-  NOTIFICATION_UNREAD_COUNT: `${API_PREFIX}/system/notifications/unread-count`,
+  NOTIFICATION_LIST: `${API_PREFIX}/console/notifications`,
+  NOTIFICATION_DETAIL: `${API_PREFIX}/console/notifications/:id`,
+  NOTIFICATION_READ: `${API_PREFIX}/console/notifications/:id/read`,
+  NOTIFICATION_READ_ALL: `${API_PREFIX}/console/notifications/read-all`,
+  NOTIFICATION_CLEAR: `${API_PREFIX}/console/notifications/clear`,
+  NOTIFICATION_SEND: `${API_PREFIX}/console/notifications/send`,
+  NOTIFICATION_DELETE: `${API_PREFIX}/console/notifications/:id`,
+  NOTIFICATION_UNREAD_COUNT: `${API_PREFIX}/console/notifications/unread-count`,
 
   // 广告活动管理（统一内容投放管理，支持 commercial/operational/system 三种类型）
   AD_CAMPAIGN_LIST: `${API_PREFIX}/console/ad-campaigns`,

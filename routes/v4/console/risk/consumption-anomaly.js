@@ -65,7 +65,7 @@ function getModels(req) {
 }
 
 /**
- * @api {get} /api/v4/admin/consumption-anomaly/summary 获取异常汇总统计
+ * @api {get} /api/v4/console/consumption-anomaly/summary 获取异常汇总统计
  * @apiName GetAnomalySummary
  * @apiGroup ConsumptionAnomaly
  * @apiVersion 1.0.0
@@ -121,7 +121,7 @@ router.get(
 )
 
 /**
- * @api {get} /api/v4/admin/consumption-anomaly/high-risk 获取高风险记录列表
+ * @api {get} /api/v4/console/consumption-anomaly/high-risk 获取高风险记录列表
  * @apiName GetHighRiskRecords
  * @apiGroup ConsumptionAnomaly
  * @apiVersion 1.0.0
@@ -175,7 +175,7 @@ router.get(
 )
 
 /**
- * @api {post} /api/v4/admin/consumption-anomaly/detect/:id 检测单条记录异常
+ * @api {post} /api/v4/console/consumption-anomaly/detect/:id 检测单条记录异常
  * @apiName DetectRecordAnomaly
  * @apiGroup ConsumptionAnomaly
  * @apiVersion 1.0.0
@@ -239,7 +239,7 @@ router.post(
 )
 
 /**
- * @api {post} /api/v4/admin/consumption-anomaly/batch-detect 批量检测异常
+ * @api {post} /api/v4/console/consumption-anomaly/batch-detect 批量检测异常
  * @apiName BatchDetectAnomaly
  * @apiGroup ConsumptionAnomaly
  * @apiVersion 1.0.0
@@ -313,7 +313,7 @@ router.post(
 )
 
 /**
- * @api {put} /api/v4/admin/consumption-anomaly/:id/mark 手动标记异常
+ * @api {put} /api/v4/console/consumption-anomaly/:id/mark 手动标记异常
  * @apiName MarkAnomaly
  * @apiGroup ConsumptionAnomaly
  * @apiVersion 1.0.0
@@ -385,7 +385,7 @@ router.put(
 )
 
 /**
- * @api {get} /api/v4/admin/consumption-anomaly/rules 获取异常规则配置
+ * @api {get} /api/v4/console/consumption-anomaly/rules 获取异常规则配置
  * @apiName GetAnomalyRules
  * @apiGroup ConsumptionAnomaly
  * @apiVersion 1.0.0

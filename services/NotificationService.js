@@ -486,6 +486,8 @@ class NotificationService {
           if (ChatWebSocketService.pushNotificationToAdmin(adminId, payload)) {
             broadcastedCount++
           }
+          // 拍板 8：通知新增后推送最新未读数（红点徽标实时刷新，失败不阻断）
+          await NotificationService._pushAdminBadgeUpdate(adminId)
         }
       } else {
         broadcastedCount = ChatWebSocketService.broadcastNotificationToAllAdmins(basePayload)
@@ -1399,6 +1401,29 @@ class NotificationService {
   }
 
   /**
+   * 推送红点徽标更新（badge_update WebSocket 事件）
+   *
+   * 业务场景（拍板 8，2026-07-11）：管理员通知的未读数发生变化
+   * （新增通知/单条已读/全部已读/删除未读）后，服务端主动推送最新未读数，
+   * admin 前端 message-center / notification-center 监听 badge_update 实时刷新红点
+   *
+   * @param {number} adminId - 管理员ID
+   * @returns {Promise<void>} 推送失败仅记日志，不抛错（红点刷新是尽力而为的增强）
+   * @private
+   */
+  static async _pushAdminBadgeUpdate(adminId) {
+    try {
+      const counts = await NotificationService.getAdminUnreadCounts(adminId)
+      ChatWebSocketService.pushBadgeUpdateToAdmin(adminId, counts)
+    } catch (error) {
+      logger.warn('[通知] badge_update 推送失败（不影响主流程）', {
+        admin_id: adminId,
+        error: error.message
+      })
+    }
+  }
+
+  /**
    * 管理员通知中心 - 获取通知详情
    *
    * @param {number} adminId - 管理员ID
@@ -1422,6 +1447,8 @@ class NotificationService {
     const notification = await this.getAdminNotificationDetail(adminId, notificationId)
     if (!notification) return null
     await notification.markAsRead()
+    // 拍板 8：未读数变化后推送红点徽标更新
+    await NotificationService._pushAdminBadgeUpdate(adminId)
     return {
       admin_notification_id: notification.admin_notification_id,
       is_read: notification.is_read,
@@ -1436,7 +1463,10 @@ class NotificationService {
    * @returns {Promise<number>} 更新数量
    */
   static async markAllAdminNotificationsAsRead(adminId) {
-    return AdminNotification.markAllAsRead(adminId)
+    const updatedCount = await AdminNotification.markAllAsRead(adminId)
+    // 拍板 8：未读数变化后推送红点徽标更新
+    await NotificationService._pushAdminBadgeUpdate(adminId)
+    return updatedCount
   }
 
   /**
@@ -1459,9 +1489,14 @@ class NotificationService {
    * @returns {Promise<number>} 删除数量（0=不存在或无权）
    */
   static async deleteAdminNotification(adminId, notificationId) {
-    return AdminNotification.destroy({
+    const deletedCount = await AdminNotification.destroy({
       where: { admin_notification_id: notificationId, admin_id: adminId }
     })
+    // 拍板 8：被删通知可能是未读，推送红点徽标更新保持一致
+    if (deletedCount > 0) {
+      await NotificationService._pushAdminBadgeUpdate(adminId)
+    }
+    return deletedCount
   }
 }
 

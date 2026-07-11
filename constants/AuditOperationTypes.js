@@ -175,7 +175,7 @@ const OPERATION_TYPES = Object.freeze({
 
   /**
    * 配置版本回滚
-   * @description 从 AdminOperationLog 的 before_data 恢复历史配置
+   * @description 从 operation_logs（admin 域）的 before_data 恢复历史配置
    */
   CONFIG_ROLLBACK: 'config_rollback',
 
@@ -233,6 +233,12 @@ const OPERATION_TYPES = Object.freeze({
    * @description 管理员分配或转移客服会话
    */
   SESSION_ASSIGN: 'session_assign',
+
+  /**
+   * 客服补偿发放
+   * @description 客服/管理员向用户补偿发放资产或物品（补偿原因与明细入审计）
+   */
+  CS_COMPENSATION: 'cs_compensation',
 
   // ==================== 兑换订单操作类（2026-03-13 细分类型补充）====================
   /**
@@ -469,6 +475,7 @@ const OPERATION_TYPE_DESCRIPTIONS = Object.freeze({
   // 系统配置类
   [OPERATION_TYPES.SYSTEM_CONFIG]: '系统配置',
   [OPERATION_TYPES.SESSION_ASSIGN]: '客服会话分配',
+  [OPERATION_TYPES.CS_COMPENSATION]: '客服补偿发放',
 
   // 兑换订单操作类（2026-03-13 细分类型补充）
   [OPERATION_TYPES.EXCHANGE_CANCEL]: '兑换订单取消',

@@ -50,7 +50,7 @@ function getMerchantOperationLogService(req) {
  * @query {number} [target_user_id] - 目标用户ID
  * @query {string} [operation_type] - 操作类型（scan_user/submit_consumption/等）
  * @query {string} [action] - 操作动作（create/read/scan/update）
- * @query {string} [result] - 操作结果（success/failed/blocked）
+ * @query {string} [status] - 操作结果（success/failed/blocked）
  * @query {string} [start_time] - 开始时间（北京时间，格式：YYYY-MM-DD HH:mm:ss）
  * @query {string} [end_time] - 结束时间（北京时间，格式：YYYY-MM-DD HH:mm:ss）
  * @query {string} [request_id] - 请求ID（用于全链路追踪）
@@ -70,7 +70,7 @@ router.get(
 
 /**
  * GET /api/v4/console/audit-logs/operation-types
- * @desc 获取所有支持的操作类型列表（定义在通配参数路由之前，避免被 /:merchant_log_id 拦截）
+ * @desc 获取所有支持的操作类型列表（定义在通配参数路由之前，避免被 /:operation_log_id 拦截）
  * @access Admin only (role_level >= 100)
  * @returns {Object} { operation_types: Array<{code, name, key}> }
  */
@@ -88,25 +88,25 @@ router.get(
 )
 
 /**
- * GET /api/v4/console/audit-logs/:merchant_log_id
+ * GET /api/v4/console/audit-logs/:operation_log_id
  * @desc 获取商家操作审计日志详情
  * @access Admin only (role_level >= 100)
  *
- * @param {number} merchant_log_id - 审计日志ID（事务实体，数字ID）
+ * @param {number} operation_log_id - 审计日志ID（事务实体，数字ID）
  */
 router.get(
-  '/:merchant_log_id',
+  '/:operation_log_id',
   authenticateToken,
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
-    const { merchant_log_id } = req.params
+    const { operation_log_id } = req.params
 
-    if (!merchant_log_id || isNaN(parseInt(merchant_log_id))) {
+    if (!operation_log_id || isNaN(parseInt(operation_log_id))) {
       return res.apiError('无效的审计日志ID', 'INVALID_LOG_ID', null, 400)
     }
 
     const logDetail = await getMerchantOperationLogService(req).getLogDetail(
-      parseInt(merchant_log_id)
+      parseInt(operation_log_id)
     )
 
     if (!logDetail) {

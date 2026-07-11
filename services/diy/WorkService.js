@@ -26,6 +26,9 @@ const {
 const BalanceService = require('../asset/BalanceService')
 const ItemService = require('../asset/ItemService')
 const UserAddressService = require('../UserAddressService')
+const { deriveCordOccupyMm } = require('./MaterialService')
+/* 手围驱动方案共享常量（唯一定义在 TemplateService，estimate/confirm 校验同口径） */
+const { DEFAULT_ELASTIC_MARGIN_MM, BEADING_SHAPES } = require('./TemplateService')
 
 /** DIY 作品管理服务 */
 class DiyWorkService {
@@ -376,17 +379,8 @@ class DiyWorkService {
       throw error
     }
 
-    // 提取所有槽位使用的 material_code（兼容多种 design_data 格式）
-    let usedMaterialCodes = []
-    if (designData.slots && Array.isArray(designData.slots)) {
-      usedMaterialCodes = designData.slots.map(s => s.material_code).filter(Boolean)
-    } else if (designData.mode === 'beading' && Array.isArray(designData.beads)) {
-      usedMaterialCodes = designData.beads.map(b => b.material_code).filter(Boolean)
-    } else if (designData.mode === 'slots' && designData.fillings) {
-      usedMaterialCodes = Object.values(designData.fillings)
-        .map(f => f.material_code)
-        .filter(Boolean)
-    }
+    // 提取所有槽位/珠位使用的 material_code（逐颗，含重复）
+    const usedMaterialCodes = DiyWorkService.extractUsedMaterialCodes(designData)
 
     if (usedMaterialCodes.length === 0) {
       const error = new Error('作品未放置任何珠子，无法确认')
@@ -394,12 +388,37 @@ class DiyWorkService {
       throw error
     }
 
-    // 查 diy_materials 获取每颗珠子的真实价格
+    /*
+     * 查 diy_materials 获取每颗珠子的真实价格 + 物理尺寸
+     * 物理尺寸 4 列（bore_orientation/diameter/size_length_mm/size_width_mm）供
+     * 成品长度硬校验派生沿绳占用使用，一次查询复用，不加第二次查询
+     */
     const materialRows = await DiyMaterial.findAll({
       where: { material_code: { [Op.in]: [...new Set(usedMaterialCodes)] } },
-      attributes: ['material_code', 'price', 'price_asset_code']
+      attributes: [
+        'material_code',
+        'price',
+        'price_asset_code',
+        'bore_orientation',
+        'diameter',
+        'size_length_mm',
+        'size_width_mm'
+      ]
     })
     const materialPriceMap = new Map(materialRows.map(m => [m.material_code, m]))
+
+    /*
+     * ========== 前置硬校验：颗数 + 成品长度（手围驱动方案 §11.4，拍板 Q4 硬校验） ==========
+     * 必须在冻结资产之前拦截，校验失败整个事务回滚、不产生任何资产变动
+     */
+    const template = await DiyTemplate.findByPk(work.diy_template_id, { transaction })
+    DiyWorkService._validateDesignConstraints(
+      template,
+      designData,
+      usedMaterialCodes,
+      materialPriceMap,
+      workId
+    )
 
     /*
      * 按 price_asset_code 分组汇总应付金额
@@ -546,9 +565,8 @@ class DiyWorkService {
       throw error
     }
 
-    const totalCost = work.total_cost
-    // 兼容新格式 { price_snapshot, payments } 和旧格式 [{ asset_code, amount }]
-    const payments = Array.isArray(totalCost) ? totalCost : totalCost?.payments || []
+    // total_cost 唯一格式：{ price_snapshot, payments }（2026-07-11 删除旧数组格式兼容分支，diy_works 无存量旧格式数据）
+    const payments = work.total_cost?.payments || []
     if (!payments || payments.length === 0) {
       const error = new Error('作品材料消耗明细为空')
       error.statusCode = 400
@@ -785,6 +803,184 @@ class DiyWorkService {
   }
 
   /**
+   * 从设计数据中提取逐颗素材编码（含重复，数组长度即珠子颗数）
+   *
+   * 统一支持 3 种 design_data 结构（confirm 计价 / 保存校验 / 管理端长度统计共用）：
+   * - { slots: [{ material_code }] }              旧版槽位数组
+   * - { mode: 'beading', beads: [{ material_code }] }  串珠模式
+   * - { mode: 'slots', fillings: { slot_id: { material_code } } }  镶嵌模式
+   *
+   * @param {Object} designData - 作品设计数据
+   * @returns {string[]} 逐颗素材编码数组（空设计返回空数组）
+   */
+  static extractUsedMaterialCodes(designData) {
+    if (!designData) return []
+    if (designData.slots && Array.isArray(designData.slots)) {
+      return designData.slots.map(s => s.material_code).filter(Boolean)
+    }
+    if (designData.mode === 'beading' && Array.isArray(designData.beads)) {
+      return designData.beads.map(b => b.material_code).filter(Boolean)
+    }
+    if (designData.mode === 'slots' && designData.fillings) {
+      return Object.values(designData.fillings)
+        .map(f => f.material_code)
+        .filter(Boolean)
+    }
+    return []
+  }
+
+  /**
+   * 确认前设计约束校验 — 颗数兜底 + 成品长度硬校验（手围驱动方案 §11.4，拍板 Q4）
+   *
+   * 仅对串珠模板生效（镶嵌模板的填充数量由 slot_definitions 自身约束，无颗数/长度概念）：
+   * 1. 颗数兜底防呆：珠子颗数必须在 capacity_rules.min_beads ~ max_beads 范围内
+   *    （拍板① 保留口径：长度为主、颗数退为兜底）
+   * 2. 成品长度硬校验：design_data.size.wrist_size_mm 存在时，
+   *    按 deriveCordOccupyMm 累加沿绳长度，与手围可制作范围比对：
+   *    - 可戴下限 = 手围本身（短于手围戴不上）
+   *    - 可制作上限 = 目标周长 + 弹力余量（与 estimateBeadCount 同一套规则）
+   *    design_data.size 缺失时跳过长度校验（未选手围的存量草稿只做颗数兜底）
+   *
+   * 错误码约定（响应顶层 code 字段，前端据此引导用户调整）：
+   * - DIY_BEAD_COUNT_OUT_OF_RANGE  颗数超出容量规则
+   * - DIY_MATERIAL_SIZE_MISSING    所用素材缺沿绳尺寸，无法精确校验
+   * - DIY_LENGTH_BELOW_MIN         成品长度低于可戴下限（提示加珠或换小手围）
+   * - DIY_LENGTH_EXCEED_LIMIT      成品长度超出可制作上限（提示减珠或换大手围）
+   *
+   * @param {DiyTemplate} template - 款式模板（含 layout/capacity_rules/sizing_rules）
+   * @param {Object} designData - 作品设计数据（含 size: { label, wrist_size_mm }）
+   * @param {string[]} usedMaterialCodes - 逐颗素材编码（含重复，长度即颗数）
+   * @param {Map<string, DiyMaterial>} materialMap - material_code → 素材实例（含物理尺寸列）
+   * @param {number} workId - diy_work_id（拦截日志用）
+   * @returns {void} 校验不通过时抛错（statusCode=400 + errorCode + data 毫米明细）
+   * @private
+   */
+  static _validateDesignConstraints(template, designData, usedMaterialCodes, materialMap, workId) {
+    if (!template || !BEADING_SHAPES.includes(template.layout?.shape)) {
+      return
+    }
+
+    // ---- 校验 1：颗数兜底防呆（capacity_rules，修复原 confirm 无颗数校验的缺口） ----
+    const beadCount = usedMaterialCodes.length
+    const capacityRules = template.capacity_rules || {}
+    const minBeads = Number(capacityRules.min_beads) || null
+    const maxBeads = Number(capacityRules.max_beads) || null
+    if ((minBeads && beadCount < minBeads) || (maxBeads && beadCount > maxBeads)) {
+      logger.warn('[DIYService] 确认拦截：颗数超出容量规则', {
+        diy_work_id: workId,
+        error_code: 'DIY_BEAD_COUNT_OUT_OF_RANGE',
+        bead_count: beadCount,
+        min_beads: minBeads,
+        max_beads: maxBeads
+      })
+      const error = new Error(
+        `珠子颗数 ${beadCount} 超出该款式允许范围 ${minBeads ?? '不限'}~${maxBeads ?? '不限'} 颗`
+      )
+      error.statusCode = 400
+      error.errorCode = 'DIY_BEAD_COUNT_OUT_OF_RANGE'
+      error.data = { bead_count: beadCount, min_beads: minBeads, max_beads: maxBeads }
+      throw error
+    }
+
+    // ---- 校验 2：成品长度硬校验（design_data.size 缺手围时跳过，仅颗数兜底） ----
+    const wristSizeMm = Number(designData?.size?.wrist_size_mm)
+    if (!Number.isFinite(wristSizeMm) || wristSizeMm <= 0) {
+      return
+    }
+
+    /*
+     * 目标周长与可制作范围：与 TemplateService.estimateBeadCount 同一套规则，保证前后口径一致
+     * 档位匹配双字段命中：手链按 wrist_size_mm，项链（无手围概念）按 target_length_mm 佩戴长度
+     */
+    const sizing = template.sizing_rules || {}
+    const elasticMarginMm = Number(sizing.elastic_margin_mm) || DEFAULT_ELASTIC_MARGIN_MM
+    const matched = Array.isArray(sizing.size_options)
+      ? sizing.size_options.find(
+          opt =>
+            Number(opt.wrist_size_mm) === wristSizeMm ||
+            Number(opt.target_length_mm) === wristSizeMm
+        )
+      : null
+    const targetLengthMm =
+      matched && Number.isFinite(Number(matched.target_length_mm))
+        ? Number(matched.target_length_mm)
+        : wristSizeMm + elasticMarginMm
+    const minLengthMm = wristSizeMm
+    const maxLengthMm = targetLengthMm + elasticMarginMm
+
+    /* 逐颗累加沿绳占用（与 beads 接口下发的 cord_occupy_mm 同一派生函数） */
+    const missingSizeCodes = []
+    let currentLengthMm = 0
+    for (const code of usedMaterialCodes) {
+      const material = materialMap.get(code)
+      if (!material) continue // 不存在的素材由后续计价环节抛"不存在或已下架"
+      const occupyMm = deriveCordOccupyMm(material.get({ plain: true }))
+      if (occupyMm === null) {
+        missingSizeCodes.push(code)
+      } else {
+        currentLengthMm += occupyMm
+      }
+    }
+    currentLengthMm = Math.round(currentLengthMm * 10) / 10
+
+    if (missingSizeCodes.length > 0) {
+      const uniqueCodes = [...new Set(missingSizeCodes)]
+      logger.warn('[DIYService] 确认拦截：素材缺沿绳尺寸', {
+        diy_work_id: workId,
+        error_code: 'DIY_MATERIAL_SIZE_MISSING',
+        material_codes: uniqueCodes
+      })
+      const error = new Error('部分素材尺寸信息完善中，暂无法精确校验成品长度')
+      error.statusCode = 400
+      error.errorCode = 'DIY_MATERIAL_SIZE_MISSING'
+      error.data = { material_codes: uniqueCodes }
+      throw error
+    }
+
+    if (currentLengthMm < minLengthMm) {
+      logger.warn('[DIYService] 确认拦截：成品长度低于可戴下限', {
+        diy_work_id: workId,
+        error_code: 'DIY_LENGTH_BELOW_MIN',
+        current_length_mm: currentLengthMm,
+        min_length_mm: minLengthMm,
+        wrist_size_mm: wristSizeMm
+      })
+      const error = new Error(
+        `成品长度约 ${(currentLengthMm / 10).toFixed(1)}cm 低于手围 ${(minLengthMm / 10).toFixed(1)}cm，建议加珠或换小手围`
+      )
+      error.statusCode = 400
+      error.errorCode = 'DIY_LENGTH_BELOW_MIN'
+      error.data = {
+        current_length_mm: currentLengthMm,
+        min_length_mm: minLengthMm,
+        target_length_mm: targetLengthMm
+      }
+      throw error
+    }
+
+    if (currentLengthMm > maxLengthMm) {
+      logger.warn('[DIYService] 确认拦截：成品长度超出可制作上限', {
+        diy_work_id: workId,
+        error_code: 'DIY_LENGTH_EXCEED_LIMIT',
+        current_length_mm: currentLengthMm,
+        max_length_mm: maxLengthMm,
+        wrist_size_mm: wristSizeMm
+      })
+      const error = new Error(
+        `成品长度约 ${(currentLengthMm / 10).toFixed(1)}cm 超出可制作上限 ${(maxLengthMm / 10).toFixed(1)}cm，建议减珠或换大手围`
+      )
+      error.statusCode = 400
+      error.errorCode = 'DIY_LENGTH_EXCEED_LIMIT'
+      error.data = {
+        current_length_mm: currentLengthMm,
+        max_length_mm: maxLengthMm,
+        target_length_mm: targetLengthMm
+      }
+      throw error
+    }
+  }
+
+  /**
    * 校验设计数据中的材料是否合法
    *
    * 两层校验：
@@ -798,16 +994,7 @@ class DiyWorkService {
    */
   static async _validateDesignMaterials(template, designData) {
     // 提取设计数据中使用的 material_code
-    let usedCodes = []
-    if (designData.slots && Array.isArray(designData.slots)) {
-      usedCodes = designData.slots.map(s => s.material_code).filter(Boolean)
-    } else if (designData.mode === 'beading' && Array.isArray(designData.beads)) {
-      usedCodes = designData.beads.map(b => b.material_code).filter(Boolean)
-    } else if (designData.mode === 'slots' && designData.fillings) {
-      usedCodes = Object.values(designData.fillings)
-        .map(f => f.material_code)
-        .filter(Boolean)
-    }
+    const usedCodes = DiyWorkService.extractUsedMaterialCodes(designData)
 
     // 没有使用任何材料，跳过校验（空设计允许保存草稿）
     if (usedCodes.length === 0) return

@@ -138,7 +138,7 @@ router.get(
         request_id: req.id || null,
         ip_address: req.ip,
         user_agent: req.headers['user-agent'],
-        result: 'success',
+        status: 'success',
         extra_data: {
           user_uuid: userInfo.user_uuid
         }

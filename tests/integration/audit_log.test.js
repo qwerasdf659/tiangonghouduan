@@ -11,12 +11,15 @@
 
 const request = require('supertest')
 const app = require('../../app')
-const { sequelize, AdminOperationLog } = require('../../models')
+const { sequelize, OperationLog } = require('../../models')
+
+/** 管理员域日志视图（operation_logs 单表 + operator_type='admin'，拍板 10 三表合并） */
+const AdminOperationLog = OperationLog.scope('admin')
 
 describe('审计日志功能测试', () => {
   let adminToken
   let adminUserId
-  let testAdminOperationLogId
+  let testOperationLogId
   let skipTests = false // 标记是否跳过测试
 
   // 测试前准备
@@ -64,7 +67,7 @@ describe('审计日志功能测试', () => {
   })
 
   describe('审计日志查询API', () => {
-    test('GET /api/v4/audit-management/audit-logs - 应该返回审计日志列表', async () => {
+    test('GET /api/v4/console/admin-audit-logs - 应该返回审计日志列表', async () => {
       if (skipTests) {
         console.warn('⚠️ 跳过测试：环境未准备好')
         expect(true).toBe(true)
@@ -72,7 +75,7 @@ describe('审计日志功能测试', () => {
       }
 
       const res = await request(app)
-        .get('/api/v4/audit-management/audit-logs')
+        .get('/api/v4/console/admin-audit-logs')
         .set('Authorization', `Bearer ${adminToken}`)
         .query({
           limit: 20,
@@ -89,10 +92,10 @@ describe('审计日志功能测试', () => {
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
       expect(res.body.data.logs).toBeInstanceOf(Array)
-      expect(res.body.data.count).toBeGreaterThanOrEqual(0)
+      expect(res.body.data.pagination.total).toBeGreaterThanOrEqual(0)
     })
 
-    test('GET /api/v4/audit-management/audit-logs - 应该支持按操作类型筛选', async () => {
+    test('GET /api/v4/console/admin-audit-logs - 应该支持按操作类型筛选', async () => {
       if (skipTests) {
         console.warn('⚠️ 跳过测试：环境未准备好')
         expect(true).toBe(true)
@@ -100,7 +103,7 @@ describe('审计日志功能测试', () => {
       }
 
       const res = await request(app)
-        .get('/api/v4/audit-management/audit-logs')
+        .get('/api/v4/console/admin-audit-logs')
         .set('Authorization', `Bearer ${adminToken}`)
         .query({
           operation_type: 'exchange_audit',
@@ -123,7 +126,7 @@ describe('审计日志功能测试', () => {
       }
     })
 
-    test('GET /api/v4/audit-management/audit-logs - 应该支持按操作员筛选', async () => {
+    test('GET /api/v4/console/admin-audit-logs - 应该支持按操作员筛选', async () => {
       if (skipTests) {
         console.warn('⚠️ 跳过测试：环境未准备好')
         expect(true).toBe(true)
@@ -131,7 +134,7 @@ describe('审计日志功能测试', () => {
       }
 
       const res = await request(app)
-        .get('/api/v4/audit-management/audit-logs')
+        .get('/api/v4/console/admin-audit-logs')
         .set('Authorization', `Bearer ${adminToken}`)
         .query({
           operator_id: adminUserId,
@@ -154,15 +157,15 @@ describe('审计日志功能测试', () => {
       }
     })
 
-    test('GET /api/v4/audit-management/audit-logs/:log_id - 应该返回审计日志详情', async () => {
-      if (skipTests || !testAdminOperationLogId) {
+    test('GET /api/v4/console/admin-audit-logs/:log_id - 应该返回审计日志详情', async () => {
+      if (skipTests || !testOperationLogId) {
         console.warn('⚠️ 跳过测试：没有测试审计日志ID')
         expect(true).toBe(true)
         return
       }
 
       const res = await request(app)
-        .get(`/api/v4/audit-management/audit-logs/${testAdminOperationLogId}`)
+        .get(`/api/v4/console/admin-audit-logs/${testOperationLogId}`)
         .set('Authorization', `Bearer ${adminToken}`)
 
       if (res.status === 404) {
@@ -173,14 +176,14 @@ describe('审计日志功能测试', () => {
 
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
-      expect(res.body.data.log_id).toBe(testAdminOperationLogId)
+      expect(Number(res.body.data.operation_log_id)).toBe(Number(testOperationLogId))
       expect(res.body.data.operator).toBeTruthy()
       expect(res.body.data.operator.user_id).toBe(adminUserId)
     })
   })
 
   describe('审计日志统计API', () => {
-    test('GET /api/v4/audit-management/audit-logs/statistics - 应该返回统计信息', async () => {
+    test('GET /api/v4/console/admin-audit-logs/statistics - 应该返回统计信息', async () => {
       if (skipTests) {
         console.warn('⚠️ 跳过测试：环境未准备好')
         expect(true).toBe(true)
@@ -188,7 +191,7 @@ describe('审计日志功能测试', () => {
       }
 
       const res = await request(app)
-        .get('/api/v4/audit-management/audit-logs/statistics')
+        .get('/api/v4/console/admin-audit-logs/statistics')
         .set('Authorization', `Bearer ${adminToken}`)
 
       if (res.status === 404) {
@@ -204,7 +207,7 @@ describe('审计日志功能测试', () => {
       expect(res.body.data.by_action).toBeInstanceOf(Array)
     })
 
-    test('GET /api/v4/audit-management/audit-logs/statistics - 应该支持按操作员统计', async () => {
+    test('GET /api/v4/console/admin-audit-logs/statistics - 应该支持按操作员统计', async () => {
       if (skipTests) {
         console.warn('⚠️ 跳过测试：环境未准备好')
         expect(true).toBe(true)
@@ -212,7 +215,7 @@ describe('审计日志功能测试', () => {
       }
 
       const res = await request(app)
-        .get('/api/v4/audit-management/audit-logs/statistics')
+        .get('/api/v4/console/admin-audit-logs/statistics')
         .set('Authorization', `Bearer ${adminToken}`)
         .query({
           operator_id: adminUserId
@@ -248,7 +251,7 @@ describe('审计日志功能测试', () => {
         const userToken = userLoginRes.body.data.access_token
 
         const res = await request(app)
-          .get('/api/v4/audit-management/audit-logs')
+          .get('/api/v4/console/admin-audit-logs')
           .set('Authorization', `Bearer ${userToken}`)
 
         // 应该返回403或401或404
@@ -268,7 +271,7 @@ describe('审计日志功能测试', () => {
       })
 
       if (log) {
-        expect(log.admin_operation_log_id).toBeTruthy()
+        expect(log.operation_log_id).toBeTruthy()
         expect(log.operator_id).toBeTruthy()
         expect(log.operation_type).toBeTruthy()
         expect(log.target_type).toBeTruthy()

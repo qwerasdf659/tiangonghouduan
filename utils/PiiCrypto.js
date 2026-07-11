@@ -88,24 +88,30 @@ class PiiCrypto {
   }
 
   /**
-   * AES-256-GCM 解密
+   * AES-256-GCM 解密（fail-fast：只接受 v1: 密文格式）
    *
-   * @param {string} cipherText - encrypt() 产出的密文。空值或非本格式原样返回（兼容回填过渡期明文）。
-   * @returns {string|null} 明文，或空值/非密文格式时返回原值
-   * @throws {Error} 密文被篡改（authTag 校验失败）时抛出
+   * 2026-07-11 技术债务收口：PII 加密回填已全量完成
+   * （users.mobile_encrypted / user_addresses 加密列 100% 覆盖，明文 0 条），
+   * 原「非 v1: 格式原样返回」的明文兜底分支已删除——
+   * 遇到非法格式说明数据被篡改或回填遗漏，必须立刻暴露而不是静默放行。
+   *
+   * @param {string} cipherText - encrypt() 产出的密文。空值原样返回。
+   * @returns {string|null} 明文，或空值时返回原值
+   * @throws {Error} 密文格式非法或被篡改（authTag 校验失败）时抛出
    */
   static decrypt(cipherText) {
     if (cipherText === null || cipherText === undefined || cipherText === '') {
       return cipherText
     }
     const text = String(cipherText)
-    // 非本格式（如过渡期残留明文）原样返回，避免误伤
     if (!text.startsWith(`${CIPHER_VERSION}:`)) {
-      return cipherText
+      throw new Error(
+        `PII 密文格式非法（期望 ${CIPHER_VERSION}: 前缀）：数据可能被篡改或加密回填遗漏，拒绝解密`
+      )
     }
     const parts = text.split(':')
     if (parts.length !== 4) {
-      return cipherText
+      throw new Error('PII 密文结构非法（期望 v1:{iv}:{tag}:{cipher} 四段格式），拒绝解密')
     }
     const [, ivHex, tagHex, dataHex] = parts
     const key = getAesKey()

@@ -48,7 +48,6 @@
     "maintenance:analyze": "node scripts/maintenance/business_toolkit.js analyze",
     "prestart": "npm run migration:verify",
     "deploy:check": "npm run lint && npm run test",
-    "health:check": "node scripts/system/final_quality_check.js",
     "check:validators": "node scripts/check_validators.js",
     "check:prevention": "npm run check:validators && npm run check:fields && npm run check:api-contract",
     "check:fields": "node scripts/validation/check_field_blacklist.js",
@@ -65,7 +64,6 @@
     "security:html": "node scripts/check_html_security.js",
     "security:full": "npm run security:html",
     "test:timezone": "node scripts/toolkit/timezone_toolkit.js --check",
-    "test:database": "node scripts/database/database_toolkit.js --action=check",
     "test:db-fix": "node scripts/database/database_toolkit.js --action=fix-foreign-keys --dry-run",
     "test:system": "./scripts/system/process_manager.sh status",
     "test:contracts": "TZ=Asia/Shanghai jest tests/api-contracts --config jest.config.js",
@@ -88,7 +86,6 @@
     "frontend:verify:websocket": "bash scripts/frontend/verify_websocket_events.sh",
     "frontend:audit": "bash scripts/frontend/full_audit.sh",
     "backend:audit:websocket": "bash scripts/backend/audit_websocket.sh",
-    "system:check": "node scripts/system/final_quality_check.js",
     "system:process": "./scripts/system/process_manager.sh status",
     "system:env": "node scripts/check_environment.js",
     "toolkit:timezone": "node scripts/toolkit/timezone_toolkit.js",
@@ -100,8 +97,7 @@
     "sealos:setup": "bash scripts/sealos/setup_sealos.sh",
     "check:env": "node -e \"require('./config/environment').validateConfig()\"",
     "check:config": "npm run check:env",
-    "cleanup:idempotency": "node scripts/maintenance/cleanup_expired_idempotency.js",
-    "lint:mappings": "node scripts/validation/check_field_blacklist.js"
+    "cleanup:idempotency": "node scripts/maintenance/cleanup_expired_idempotency.js"
   },
   "dependencies": {
     "@socket.io/redis-adapter": "^8.3.0",
@@ -172,46 +168,13 @@
     "url": "https://github.com/your-org/restaurant-lottery-system-v4/issues"
   },
   "homepage": "https://github.com/your-org/restaurant-lottery-system-v4#readme",
-  "eslintConfig": {
-    "env": {
-      "node": true,
-      "es2021": true,
-      "jest": true
-    },
-    "extends": [
-      "standard"
-    ],
-    "parserOptions": {
-      "ecmaVersion": 12,
-      "sourceType": "module"
-    },
-    "rules": {
-      "no-console": "off",
-      "camelcase": "off",
-      "no-unused-vars": [
-        "error",
-        {
-          "argsIgnorePattern": "^_"
-        }
-      ]
-    }
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "lint-staged",
-      "pre-push": "npm test",
-      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
-    }
-  },
   "lint-staged": {
     "*.js": [
       "eslint --fix",
-      "prettier --write",
-      "git add"
+      "prettier --write"
     ],
     "*.{json,md}": [
-      "prettier --write",
-      "git add"
+      "prettier --write"
     ]
   },
   "architecture": {

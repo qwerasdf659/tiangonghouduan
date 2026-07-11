@@ -31,6 +31,7 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const { User, UserPremiumStatus } = require('../models')
 // V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('./asset/BalanceService')
+const AssetQueryService = require('./asset/QueryService') // 累计积分账本派生（拍板 4：users.history_total_points 冗余列已删除）
 const AdminSystemService = require('./AdminSystemService')
 const { AssetCode } = require('../constants/AssetCode')
 const logger = require('../utils/logger')
@@ -154,9 +155,10 @@ class PremiumService {
     /*
      * ========================================
      * 步骤3: 验证解锁条件1 - 历史累计积分门槛
+     * （拍板 4：累计积分由资产账本实时派生，事务内直查账本保证一致性）
      * ========================================
      */
-    const historyPoints = user.history_total_points || 0
+    const historyPoints = await AssetQueryService.getHistoryTotalPoints(user_id, { transaction })
     const historyPointsSatisfied = historyPoints >= rules.history_points_threshold
 
     if (!historyPointsSatisfied) {
@@ -469,7 +471,8 @@ class PremiumService {
         asset_code: AssetCode.POINTS
       })
 
-      const historyPoints = user.history_total_points || 0
+      // 累计积分账本派生（拍板 4：users.history_total_points 冗余列已删除，走 Redis 缓存）
+      const historyPoints = await AssetQueryService.getHistoryTotalPoints(user_id)
       const availablePoints = Number(pointsBalance?.available_amount) || 0
 
       // 如果未解锁或已过期，返回解锁条件进度
@@ -582,7 +585,7 @@ class PremiumService {
         {
           model: User,
           as: 'user',
-          attributes: ['user_id', 'nickname', 'mobile', 'history_total_points']
+          attributes: ['user_id', 'nickname', 'mobile']
         }
       ],
       order: [['updated_at', 'DESC']],
@@ -590,10 +593,17 @@ class PremiumService {
       offset
     })
 
+    // 累计积分账本批量派生（拍板 4：单条 GROUP BY 避免 N+1，响应字段名 history_total_points 不变）
+    const userIds = rows.map(row => row.user_id)
+    const historyPointsMap = await AssetQueryService.getHistoryTotalPointsByUserIds(userIds)
+
     // 添加计算字段
     const statuses = rows.map(row => {
       const plain = row.get({ plain: true })
       const now = new Date()
+      if (plain.user) {
+        plain.user.history_total_points = historyPointsMap.get(plain.user_id) || 0
+      }
       return {
         ...plain,
         is_valid: plain.is_unlocked && plain.expires_at && new Date(plain.expires_at) > now,
@@ -625,7 +635,7 @@ class PremiumService {
         {
           model: User,
           as: 'user',
-          attributes: ['user_id', 'nickname', 'mobile', 'history_total_points']
+          attributes: ['user_id', 'nickname', 'mobile']
         }
       ]
     })
@@ -633,6 +643,10 @@ class PremiumService {
     if (!status) return null
 
     const plain = status.get({ plain: true })
+    // 累计积分账本派生（拍板 4：响应字段名 history_total_points 不变）
+    if (plain.user) {
+      plain.user.history_total_points = await AssetQueryService.getHistoryTotalPoints(user_id)
+    }
     const now = new Date()
 
     return {

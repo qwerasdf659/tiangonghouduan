@@ -1,91 +1,21 @@
 /**
  * P1 修复验证测试
  *
- * 验证三项 P1 修复：
- * 1. P1-1：材料转换风控校验（V2.1：全局套利检测 + 终点货币限制）
- * 2. P1-2：交易下单幂等冲突校验强制 star_stone-only
- * 3. P1-3：asset_transactions.user_id 重复外键清理（已通过迁移验证）
+ * 验证 P1 修复：
+ * 1. P1-1：资产转换风控校验（AssetConversionRuleService._riskValidation：
+ *    终点货币禁止流出 + 全局循环检测（DFS）+ 套利负环检测（Bellman-Ford））
+ * 2. P1-3：asset_transactions.user_id 重复外键清理（已通过迁移验证）
  *
- * V2.1 更新（2026-01-26）：
- * - 移除跨组限制，允许不同 group_code 之间的转换
- * - 新增终点货币（star_stone）禁止流出检查
- * - 套利检测范围从"组内"扩大到"全局"
- *
- * P1-9 J2-RepoWide 改造：
- * - 通过 ServiceManager 统一获取服务
- * - 服务 key 使用 snake_case（E2-Strict）
+ * 2026-07-11 技术债务清理：
+ * - utils/materialConversionValidator.js（从未被生产代码引用）已删除
+ * - 本测试改为直接验证生产实际在用的 AssetConversionRuleService._riskValidation
  */
 
-const MaterialConversionValidator = require('../../../utils/materialConversionValidator')
-const { MaterialAssetType } = require('../../../models')
+const AssetConversionRuleService = require('../../../services/AssetConversionRuleService')
 const { sequelize } = require('../../../models')
 
 describe('P1 修复验证测试', () => {
   let transaction
-  let testDataCreated = false
-
-  beforeAll(async () => {
-    // 🔴 P1-9: ServiceManager 已在 jest.setup.js 中初始化
-
-    // 准备测试材料数据（使用 upsert 确保数据存在）
-    const testMaterials = [
-      {
-        asset_code: 'test_red_shard',
-        display_name: '测试红源晶碎片',
-        group_code: 'red',
-        form: 'shard',
-        tier: 1,
-        visible_value_points: 20,
-        budget_value_points: 20,
-        sort_order: 1,
-        is_enabled: true
-      },
-      {
-        asset_code: 'test_orange_shard',
-        display_name: '测试橙色碎片',
-        group_code: 'orange',
-        form: 'shard',
-        tier: 2,
-        visible_value_points: 50,
-        budget_value_points: 50,
-        sort_order: 1,
-        is_enabled: true
-      },
-      {
-        asset_code: 'test_red_crystal',
-        display_name: '测试红源晶',
-        group_code: 'red',
-        form: 'crystal',
-        tier: 1,
-        visible_value_points: 200,
-        budget_value_points: 200,
-        sort_order: 2,
-        is_enabled: true
-      }
-    ]
-
-    try {
-      // 使用 upsert 确保数据存在，避免 MySQL ignoreDuplicates 问题
-      for (const material of testMaterials) {
-        await MaterialAssetType.upsert(material)
-      }
-      testDataCreated = true
-      console.log('✅ P1-1 测试数据创建成功')
-    } catch (error) {
-      console.log('测试数据创建失败:', error.message)
-    }
-  })
-
-  afterAll(async () => {
-    // 清理测试数据
-    if (testDataCreated) {
-      await MaterialAssetType.destroy({
-        where: {
-          asset_code: ['test_red_shard', 'test_orange_shard', 'test_red_crystal']
-        }
-      })
-    }
-  })
 
   beforeEach(async () => {
     transaction = await sequelize.transaction()
@@ -97,97 +27,76 @@ describe('P1 修复验证测试', () => {
     }
   })
 
-  describe('P1-1：材料转换风控校验（V2.1 全局套利检测 + 终点货币限制）', () => {
-    test('V2.1：应该允许跨组转换规则（red组 → orange组）', async () => {
+  describe('P1-1：资产转换风控校验（终点货币限制 + 全局循环/套利检测）', () => {
+    test('应该允许普通跨组转换规则（无环、无套利、非终点货币）', async () => {
       /*
-       * V2.1 业务变更：移除跨组限制，允许不同 group_code 之间的转换
-       * 准备测试数据：红组材料 → 橙组材料（跨组转换）
+       * 使用不存在于现有规则图中的测试资产码，
+       * 保证不会与真实规则形成环路或负环
        */
       const newRule = {
-        from_asset_code: 'test_red_shard',
-        to_asset_code: 'test_orange_shard',
-        from_amount: 10,
-        to_amount: 1,
-        is_enabled: true,
-        effective_at: new Date()
+        from_asset_code: 'test_p1_red_shard',
+        to_asset_code: 'test_p1_orange_shard',
+        rate_numerator: 1,
+        rate_denominator: 10
       }
 
-      // 执行风控校验
-      const result = await MaterialConversionValidator.validate(newRule, { transaction })
-
-      // 验证：V2.1 现在允许跨组转换（除非有环路/套利/终点货币问题）
-      expect(result.valid).toBe(true)
-      expect(result.errors).toHaveLength(0)
+      // 校验通过时无返回值、不抛错
+      await expect(
+        AssetConversionRuleService._riskValidation(newRule, null, transaction)
+      ).resolves.toBeUndefined()
     })
 
-    test('V2.1：应该拒绝终点货币（star_stone）作为转换源', async () => {
+    test('应该拒绝终点货币（star_stone）作为转换源', async () => {
       /*
-       * V2.1 新增硬约束：终点货币（star_stone）禁止流出
-       * 业务规则：星石是系统「终点货币」，只进不出
+       * 业务硬约束：星石是系统「终点货币」，只进不出，
+       * 允许流出会打穿整个资产经济闭环
        */
       const newRule = {
         from_asset_code: 'star_stone',
-        to_asset_code: 'test_red_shard',
-        from_amount: 20,
-        to_amount: 1,
-        is_enabled: true,
-        effective_at: new Date()
+        to_asset_code: 'test_p1_red_shard',
+        rate_numerator: 1,
+        rate_denominator: 20
       }
 
-      // 执行风控校验
-      const result = await MaterialConversionValidator.validate(newRule, { transaction })
-
-      // 验证：应该拒绝 star_stone 作为转换源
-      expect(result.valid).toBe(false)
-      expect(result.errors.length).toBeGreaterThan(0)
-      expect(result.errors[0]).toMatch(/终点货币/)
-      expect(result.errors[0]).toMatch(/star_stone/)
+      await expect(
+        AssetConversionRuleService._riskValidation(newRule, null, transaction)
+      ).rejects.toMatchObject({
+        code: 'TERMINAL_ASSET_OUTFLOW'
+      })
     })
 
-    test('应该允许组内转换规则（red组内：test_red_shard → test_red_crystal）', async () => {
-      // 准备测试数据：红组内转换
+    test('应该拒绝终点货币（points）作为转换源', async () => {
       const newRule = {
-        from_asset_code: 'test_red_shard',
-        to_asset_code: 'test_red_crystal',
-        from_amount: 10,
-        to_amount: 1,
-        is_enabled: true,
-        effective_at: new Date()
+        from_asset_code: 'points',
+        to_asset_code: 'test_p1_red_shard',
+        rate_numerator: 1,
+        rate_denominator: 100
       }
 
-      // 执行风控校验（假设无环路）
-      const result = await MaterialConversionValidator.validate(newRule, { transaction })
-
-      /*
-       * 验证：转换规则应该通过基本校验（除非有环路）
-       * 注意：如果实际存在环路，这个测试会失败，这是正常的
-       */
-      if (!result.valid) {
-        // 如果失败，错误信息应该是环路相关，而不是跨组拒绝
-        expect(result.errors[0]).not.toMatch(/跨组转换规则被拒绝/)
-      }
+      await expect(
+        AssetConversionRuleService._riskValidation(newRule, null, transaction)
+      ).rejects.toMatchObject({
+        code: 'TERMINAL_ASSET_OUTFLOW'
+      })
     })
 
-    test('V2.1：环路检测应该在全局范围进行', async () => {
+    test('循环检测应该在全局范围进行（自环立即拦截）', async () => {
       /*
-       * V2.1 变更：环路检测范围从"组内"扩大到"全局"
-       * 准备测试数据：可能形成环路的规则
+       * 自环是最小的循环转换路径（A → A），
+       * 无论现有规则图如何都必须被 DFS 循环检测拦截
        */
-      const newRule = {
-        from_asset_code: 'test_red_shard',
-        to_asset_code: 'test_red_crystal',
-        from_amount: 10,
-        to_amount: 1,
-        is_enabled: true,
-        effective_at: new Date()
+      const selfLoopRule = {
+        from_asset_code: 'test_p1_cycle_asset',
+        to_asset_code: 'test_p1_cycle_asset',
+        rate_numerator: 1,
+        rate_denominator: 1
       }
 
-      const result = await MaterialConversionValidator.validate(newRule, { transaction })
-
-      // 如果检测到环路，错误信息应该包含"全局"标识
-      if (!result.valid && result.errors.some(e => e.includes('循环转换路径'))) {
-        expect(result.errors[0]).toMatch(/全局/)
-      }
+      await expect(
+        AssetConversionRuleService._riskValidation(selfLoopRule, null, transaction)
+      ).rejects.toMatchObject({
+        code: 'CYCLE_DETECTED'
+      })
     })
   })
 

@@ -641,7 +641,7 @@ class AssetConversionRuleService {
   /**
    * 风控校验（循环拦截 + 套利检测）
    *
-   * 复用 materialConversionValidator 的图算法
+   * 内联实现的图算法（DFS 循环检测 + 汇率乘积套利检测）
    *
    * @param {Object} ruleData - 待验证的规则数据
    * @param {number|null} excludeRuleId - 排除的规则ID（更新时排除自身）

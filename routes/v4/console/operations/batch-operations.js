@@ -45,7 +45,7 @@ const { asyncHandler } = require('../../../../middleware/validation')
 
 /*
  * Phase 3 收口：通过 ServiceManager 获取 models，避免直连 models
- * sequelize 和 BatchOperationLog 在各路由中通过 req.app.locals.models 获取
+ * sequelize 和 OperationLog（batch 域常量）在各路由中通过 req.app.locals.models 获取
  */
 
 // ==================== 辅助函数 ====================
@@ -125,7 +125,7 @@ function getActivityService(req) {
  *
  * 响应：
  * {
- *   batch_operation_log_id: number,     // 批处理日志ID
+ *   operation_log_id: number,     // 批处理日志ID
  *   status: string,           // 处理状态
  *   total: number,      // 总处理数量
  *   success_count: number,    // 成功数量
@@ -144,8 +144,8 @@ router.post(
   asyncHandler(async (req, res) => {
     const operator_id = req.user.user_id
     // 通过 ServiceManager 获取 models（Phase 3 收口）
-    const { BatchOperationLog } = req.app.locals.models
-    const operation_type = BatchOperationLog.OPERATION_TYPES.QUOTA_GRANT_BATCH
+    const { OperationLog } = req.app.locals.models
+    const operation_type = OperationLog.BATCH_OPERATION_TYPES.QUOTA_GRANT_BATCH
 
     try {
       const { lottery_campaign_id, user_ids, bonus_count, reason } = req.body
@@ -193,7 +193,7 @@ router.post(
             '操作已提交或正在处理中，请勿重复提交',
             'IDEMPOTENCY_CONFLICT',
             {
-              existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
+              existing_operation_log_id: firstError.existing_log?.operation_log_id
             },
             409
           )
@@ -252,7 +252,7 @@ router.post(
           })
 
           logger.warn('批量赠送单用户失败', {
-            batch_operation_log_id: batchLog.batch_operation_log_id,
+            operation_log_id: batchLog.operation_log_id,
             user_id,
             error: error.message
           })
@@ -260,7 +260,7 @@ router.post(
       }
 
       // ========== 更新批量操作日志 ==========
-      await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
+      await getBatchOperationService(req).updateProgress(batchLog.operation_log_id, {
         success_count: successItems.length,
         fail_count: failedItems.length,
         result_summary: {
@@ -274,11 +274,11 @@ router.post(
 
       // 重新获取更新后的日志
       const finalLog = await getBatchOperationService(req).getOperationDetail(
-        batchLog.batch_operation_log_id
+        batchLog.operation_log_id
       )
 
       logger.info('批量赠送抽奖次数完成', {
-        batch_operation_log_id: batchLog.batch_operation_log_id,
+        operation_log_id: batchLog.operation_log_id,
         operator_id,
         lottery_campaign_id,
         total: user_ids.length,
@@ -288,7 +288,7 @@ router.post(
 
       return res.apiSuccess(
         {
-          batch_operation_log_id: finalLog.batch_operation_log_id,
+          operation_log_id: finalLog.operation_log_id,
           status: finalLog.status,
           status_name: finalLog.status_name,
           total_count: finalLog.total_count,
@@ -338,8 +338,8 @@ router.post(
   asyncHandler(async (req, res) => {
     const operator_id = req.user.user_id
     // 通过 ServiceManager 获取 models（Phase 3 收口）
-    const { BatchOperationLog } = req.app.locals.models
-    const operation_type = BatchOperationLog.OPERATION_TYPES.CAMPAIGN_STATUS_BATCH
+    const { OperationLog } = req.app.locals.models
+    const operation_type = OperationLog.BATCH_OPERATION_TYPES.CAMPAIGN_STATUS_BATCH
 
     try {
       const { lottery_campaign_ids, target_status, reason } = req.body
@@ -383,7 +383,7 @@ router.post(
             '操作已提交或正在处理中',
             'IDEMPOTENCY_CONFLICT',
             {
-              existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
+              existing_operation_log_id: firstError.existing_log?.operation_log_id
             },
             409
           )
@@ -441,7 +441,7 @@ router.post(
           })
 
           logger.warn('批量切换单活动状态失败', {
-            batch_operation_log_id: batchLog.batch_operation_log_id,
+            operation_log_id: batchLog.operation_log_id,
             lottery_campaign_id,
             error: error.message
           })
@@ -449,7 +449,7 @@ router.post(
       }
 
       // ========== 更新批量操作日志 ==========
-      await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
+      await getBatchOperationService(req).updateProgress(batchLog.operation_log_id, {
         success_count: successItems.length,
         fail_count: failedItems.length,
         result_summary: {
@@ -461,11 +461,11 @@ router.post(
       })
 
       const finalLog = await getBatchOperationService(req).getOperationDetail(
-        batchLog.batch_operation_log_id
+        batchLog.operation_log_id
       )
 
       logger.info('批量活动状态切换完成', {
-        batch_operation_log_id: batchLog.batch_operation_log_id,
+        operation_log_id: batchLog.operation_log_id,
         operator_id,
         target_status,
         total: lottery_campaign_ids.length,
@@ -475,7 +475,7 @@ router.post(
 
       return res.apiSuccess(
         {
-          batch_operation_log_id: finalLog.batch_operation_log_id,
+          operation_log_id: finalLog.operation_log_id,
           status: finalLog.status,
           status_name: finalLog.status_name,
           total_count: finalLog.total_count,
@@ -536,8 +536,8 @@ router.post(
   asyncHandler(async (req, res) => {
     const operator_id = req.user.user_id
     // 通过 ServiceManager 获取 models（Phase 3 收口）
-    const { BatchOperationLog } = req.app.locals.models
-    const operation_type = BatchOperationLog.OPERATION_TYPES.PRESET_BATCH
+    const { OperationLog } = req.app.locals.models
+    const operation_type = OperationLog.BATCH_OPERATION_TYPES.PRESET_BATCH
 
     try {
       const { rules, reason } = req.body
@@ -584,7 +584,7 @@ router.post(
             '操作已提交或正在处理中',
             'IDEMPOTENCY_CONFLICT',
             {
-              existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
+              existing_operation_log_id: firstError.existing_log?.operation_log_id
             },
             409
           )
@@ -647,7 +647,7 @@ router.post(
           })
 
           logger.warn('批量创建单条预设规则失败', {
-            batch_operation_log_id: batchLog.batch_operation_log_id,
+            operation_log_id: batchLog.operation_log_id,
             rule_index: i,
             error: error.message
           })
@@ -655,7 +655,7 @@ router.post(
       }
 
       // ========== 更新批量操作日志 ==========
-      await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
+      await getBatchOperationService(req).updateProgress(batchLog.operation_log_id, {
         success_count: successItems.length,
         fail_count: failedItems.length,
         result_summary: {
@@ -666,11 +666,11 @@ router.post(
       })
 
       const finalLog = await getBatchOperationService(req).getOperationDetail(
-        batchLog.batch_operation_log_id
+        batchLog.operation_log_id
       )
 
       logger.info('批量设置干预规则完成', {
-        batch_operation_log_id: batchLog.batch_operation_log_id,
+        operation_log_id: batchLog.operation_log_id,
         operator_id,
         total: rules.length,
         success_count: successItems.length,
@@ -679,7 +679,7 @@ router.post(
 
       return res.apiSuccess(
         {
-          batch_operation_log_id: finalLog.batch_operation_log_id,
+          operation_log_id: finalLog.operation_log_id,
           status: finalLog.status,
           status_name: finalLog.status_name,
           total_count: finalLog.total_count,
@@ -728,8 +728,8 @@ router.post(
   asyncHandler(async (req, res) => {
     const operator_id = req.user.user_id
     // 通过 ServiceManager 获取 models（Phase 3 收口）
-    const { BatchOperationLog } = req.app.locals.models
-    const operation_type = BatchOperationLog.OPERATION_TYPES.REDEMPTION_VERIFY_BATCH
+    const { OperationLog } = req.app.locals.models
+    const operation_type = OperationLog.BATCH_OPERATION_TYPES.REDEMPTION_VERIFY_BATCH
 
     try {
       const { order_ids, reason } = req.body
@@ -758,7 +758,7 @@ router.post(
             '操作已提交或正在处理中',
             'IDEMPOTENCY_CONFLICT',
             {
-              existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
+              existing_operation_log_id: firstError.existing_log?.operation_log_id
             },
             409
           )
@@ -812,7 +812,7 @@ router.post(
           })
 
           logger.warn('批量核销单订单失败', {
-            batch_operation_log_id: batchLog.batch_operation_log_id,
+            operation_log_id: batchLog.operation_log_id,
             order_id,
             error: error.message
           })
@@ -820,7 +820,7 @@ router.post(
       }
 
       // ========== 更新批量操作日志 ==========
-      await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
+      await getBatchOperationService(req).updateProgress(batchLog.operation_log_id, {
         success_count: successItems.length,
         fail_count: failedItems.length,
         result_summary: {
@@ -831,11 +831,11 @@ router.post(
       })
 
       const finalLog = await getBatchOperationService(req).getOperationDetail(
-        batchLog.batch_operation_log_id
+        batchLog.operation_log_id
       )
 
       logger.info('批量核销确认完成', {
-        batch_operation_log_id: batchLog.batch_operation_log_id,
+        operation_log_id: batchLog.operation_log_id,
         operator_id,
         total: order_ids.length,
         success_count: successItems.length,
@@ -844,7 +844,7 @@ router.post(
 
       return res.apiSuccess(
         {
-          batch_operation_log_id: finalLog.batch_operation_log_id,
+          operation_log_id: finalLog.operation_log_id,
           status: finalLog.status,
           status_name: finalLog.status_name,
           total_count: finalLog.total_count,
@@ -902,8 +902,8 @@ router.post(
   asyncHandler(async (req, res) => {
     const operator_id = req.user.user_id
     // 通过 ServiceManager 获取 models（Phase 3 收口）
-    const { BatchOperationLog } = req.app.locals.models
-    const operation_type = BatchOperationLog.OPERATION_TYPES.BUDGET_ADJUST_BATCH
+    const { OperationLog } = req.app.locals.models
+    const operation_type = OperationLog.BATCH_OPERATION_TYPES.BUDGET_ADJUST_BATCH
 
     try {
       const { adjustments, reason } = req.body
@@ -954,7 +954,7 @@ router.post(
             '操作已提交或正在处理中',
             'IDEMPOTENCY_CONFLICT',
             {
-              existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
+              existing_operation_log_id: firstError.existing_log?.operation_log_id
             },
             409
           )
@@ -1020,7 +1020,7 @@ router.post(
           })
 
           logger.warn('批量调整单活动预算失败', {
-            batch_operation_log_id: batchLog.batch_operation_log_id,
+            operation_log_id: batchLog.operation_log_id,
             lottery_campaign_id: adj.lottery_campaign_id,
             error: error.message
           })
@@ -1028,7 +1028,7 @@ router.post(
       }
 
       // ========== 更新批量操作日志 ==========
-      await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
+      await getBatchOperationService(req).updateProgress(batchLog.operation_log_id, {
         success_count: successItems.length,
         fail_count: failedItems.length,
         result_summary: {
@@ -1039,11 +1039,11 @@ router.post(
       })
 
       const finalLog = await getBatchOperationService(req).getOperationDetail(
-        batchLog.batch_operation_log_id
+        batchLog.operation_log_id
       )
 
       logger.info('批量预算调整完成', {
-        batch_operation_log_id: batchLog.batch_operation_log_id,
+        operation_log_id: batchLog.operation_log_id,
         operator_id,
         total: adjustments.length,
         success_count: successItems.length,
@@ -1052,7 +1052,7 @@ router.post(
 
       return res.apiSuccess(
         {
-          batch_operation_log_id: finalLog.batch_operation_log_id,
+          operation_log_id: finalLog.operation_log_id,
           status: finalLog.status,
           status_name: finalLog.status_name,
           total_count: finalLog.total_count,
@@ -1134,13 +1134,13 @@ router.get(
   authenticateToken,
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
-    const batch_operation_log_id = parseInt(req.params.id, 10)
+    const operation_log_id = parseInt(req.params.id, 10)
 
-    if (isNaN(batch_operation_log_id) || batch_operation_log_id <= 0) {
+    if (isNaN(operation_log_id) || operation_log_id <= 0) {
       return res.apiError('无效的日志ID', 'INVALID_LOG_ID', null, 400)
     }
 
-    const detail = await getBatchOperationService(req).getOperationDetail(batch_operation_log_id)
+    const detail = await getBatchOperationService(req).getOperationDetail(operation_log_id)
 
     if (!detail) {
       return res.apiError('批量操作日志不存在', 'LOG_NOT_FOUND', null, 404)
@@ -1160,14 +1160,14 @@ router.get(
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     // 通过 ServiceManager 获取 models（Phase 3 收口）
-    const { BatchOperationLog } = req.app.locals.models
+    const { OperationLog } = req.app.locals.models
     const configs = await getAdminSystemService(req).getAllBatchConfigs()
 
     return res.apiSuccess(
       {
         configs,
-        operation_types: BatchOperationLog.OPERATION_TYPE_NAMES,
-        statuses: BatchOperationLog.STATUS_NAMES
+        operation_types: OperationLog.BATCH_OPERATION_TYPE_NAMES,
+        statuses: OperationLog.BATCH_STATUS_NAMES
       },
       '获取批量操作配置成功'
     )

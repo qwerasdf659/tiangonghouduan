@@ -1058,7 +1058,7 @@ function auditLogsPage() {
      */
     viewLogDetail(log) {
       this.selectedLog = log
-      logger.debug('[AuditLogs] 查看日志详情:', log.admin_operation_log_id)
+      logger.debug('[AuditLogs] 查看日志详情:', log.operation_log_id)
     },
 
     /**

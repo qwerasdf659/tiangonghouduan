@@ -16,11 +16,43 @@ const { Category, DiyMaterial, DiyTemplate, MediaFile } = require('../../models'
 const TransactionManager = require('../../utils/TransactionManager')
 
 /**
+ * 计算单颗素材的沿绳占用长度（毫米）— 手围驱动方案唯一派生口径
+ *
+ * 派生规则（唯一事实来源是 bore_orientation + 实物尺寸字段，刻意不落库避免双份事实）：
+ * - along_length（管珠，绳穿长轴）→ size_length_mm
+ * - along_width（药片，绳穿短边）→ size_width_mm
+ * - none（圆珠）→ diameter
+ * 所需尺寸缺失时返回 null（前端展示"信息完善中"且不计入长度累加；
+ * confirm 硬校验遇 null 抛 DIY_MATERIAL_SIZE_MISSING）
+ *
+ * 复用方：toUserMaterialJSON（beads 接口下发）、WorkService 确认校验、
+ * AdminQueryService 成品长度/长度偏差统计 —— 三处必须同口径，只此一个实现。
+ *
+ * @param {Object} plain - 素材 plain 对象（含 bore_orientation/diameter/size_length_mm/size_width_mm）
+ * @returns {number|null} 沿绳占用毫米数（缺数据返回 null）
+ */
+function deriveCordOccupyMm(plain) {
+  if (plain.bore_orientation === 'along_length') {
+    return plain.size_length_mm !== null && plain.size_length_mm !== undefined
+      ? Number(plain.size_length_mm)
+      : null
+  }
+  if (plain.bore_orientation === 'along_width') {
+    return plain.size_width_mm !== null && plain.size_width_mm !== undefined
+      ? Number(plain.size_width_mm)
+      : null
+  }
+  return plain.diameter !== null && plain.diameter !== undefined ? Number(plain.diameter) : null
+}
+
+/**
  * 用户端素材序列化（数据最小化 + 库存掩码，拍板决议 11.5-D）
  *
  * - image_media 用 MediaFile.toSafeJSON() 输出（隐藏 object_key/uploaded_by/thumbnail_keys，
  *   补齐 public_url + thumbnails.w375/w750/w1080 衍生图 URL）
  * - stock 掩码（拍板 ③）：-1=无限 / 0=售罄 原样，正数一律压成 1（不暴露精确库存）
+ * - cord_occupy_mm 为派生字段（手围驱动方案 Q3 决议）：前端直接累加即为已排长度，
+ *   不在前端按形状分支推算
  * - 只输出小程序渲染/展示需要的字段，不下发 meta/is_stackable 等后台字段
  *
  * @param {DiyMaterial} material - 素材模型实例（含 image_media 关联）
@@ -47,6 +79,8 @@ function toUserMaterialJSON(material) {
     size_length_mm: plain.size_length_mm,
     size_width_mm: plain.size_width_mm,
     bore_orientation: plain.bore_orientation,
+    /* 单颗沿绳占用毫米（后端预计算派生，前端累加即为已排长度；null=物理数据不完整） */
+    cord_occupy_mm: deriveCordOccupyMm(plain),
     price: plain.price,
     price_asset_code: plain.price_asset_code,
     stock: plain.stock > 0 ? 1 : plain.stock,
@@ -83,9 +117,10 @@ class DiyMaterialService {
    * - missing_image=true       缺图素材（image_media_id IS NULL）
    * - missing_copy=true        缺文案素材（meaning 或 five_elements 为空）
    * - zero_price_enabled=true  0 价且启用素材（价格护栏兜底排查）
+   * - missing_physical=true    缺物理数据素材（沿绳占用无法派生，手围驱动方案 §11.5）
    *
    * @param {Object} params - { page, page_size, group_code, category_id, item_type, keyword,
-   *   is_enabled, missing_image, missing_copy, zero_price_enabled }
+   *   is_enabled, missing_image, missing_copy, zero_price_enabled, missing_physical }
    * @returns {{rows: DiyMaterial[], count: number}} 分页材料列表
    */
   static async getAdminMaterialList(params = {}) {
@@ -112,6 +147,20 @@ class DiyMaterialService {
     if (params.zero_price_enabled === 'true' || params.zero_price_enabled === true) {
       where.price = 0
       where.is_enabled = true
+    }
+    /*
+     * 缺物理数据筛选（手围驱动方案 §11.5）：沿绳占用无法派生的素材
+     * 口径与 deriveCordOccupyMm 一致：管珠缺长边 / 药片缺短边 / 圆珠缺直径
+     */
+    if (params.missing_physical === 'true' || params.missing_physical === true) {
+      where[Op.and] = where[Op.and] || []
+      where[Op.and].push({
+        [Op.or]: [
+          { bore_orientation: 'along_length', size_length_mm: null },
+          { bore_orientation: 'along_width', size_width_mm: null },
+          { bore_orientation: 'none', diameter: null }
+        ]
+      })
     }
     if (params.keyword) {
       where[Op.or] = [
@@ -473,3 +522,5 @@ class DiyMaterialService {
 }
 
 module.exports = DiyMaterialService
+/* 沿绳占用派生函数（WorkService 确认校验 / AdminQueryService 统计复用，保证三处同口径） */
+module.exports.deriveCordOccupyMm = deriveCordOccupyMm

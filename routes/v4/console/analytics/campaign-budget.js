@@ -414,7 +414,7 @@ router.get(
           mobile: user.mobile
         },
         budget_balances: budgetBalances.map(b => ({
-          balance_id: b.balance_id,
+          account_asset_balance_id: b.account_asset_balance_id,
           lottery_campaign_id: b.lottery_campaign_id,
           available_amount: Number(b.available_amount),
           frozen_amount: Number(b.frozen_amount),

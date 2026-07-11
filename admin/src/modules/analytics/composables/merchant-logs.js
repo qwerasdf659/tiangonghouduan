@@ -31,7 +31,7 @@ export function useMerchantLogsState() {
     logStats: { totalLogs: 0, todayLogs: 0, warningLogs: 0, errorLogs: 0 },
     /** @type {Object|null} 选中的日志详情 */
     selectedLog: null,
-    /** @type {Array} 操作类型选项 - 与后端 MerchantOperationLog 枚举一致 */
+    /** @type {Array} 操作类型选项 - 与后端 OperationLog 操作类型枚举一致 */
     operationTypeOptions: [
       { value: 'scan_user', label: '扫码获取用户信息' },
       { value: 'submit_consumption', label: '提交消费记录' },

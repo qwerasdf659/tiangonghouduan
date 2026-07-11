@@ -154,10 +154,10 @@ describe('抽奖欠账管理 + 成长等级公示分级概率', () => {
     })
 
     test('4.2 应根据累计积分正确派生成长等级码', async () => {
-      const admin_user = await User.findByPk(admin_user_id, {
-        attributes: ['user_id', 'history_total_points']
-      })
-      const expected = await UserGrowthLevel.resolveLevelKey(admin_user.history_total_points)
+      // 累计积分账本派生（拍板 4：users.history_total_points 冗余列已删除）
+      const AssetQueryService = require('../../../services/asset/QueryService')
+      const historyTotalPoints = await AssetQueryService.getHistoryTotalPoints(admin_user_id)
+      const expected = await UserGrowthLevel.resolveLevelKey(historyTotalPoints)
       expect(typeof expected).toBe('string')
 
       if (GrowthLevelService) {

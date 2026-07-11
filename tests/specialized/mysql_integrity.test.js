@@ -17,10 +17,10 @@ describe('MySQL数据约束和参照完整性专项测试', () => {
     if (existingUser) {
       testUser = existingUser
     } else {
+      // 拍板 4：users.history_total_points 冗余列已删除，累计积分由资产账本实时派生
       testUser = await User.create({
         mobile: testPhoneNumber,
-        nickname: '测试用户',
-        history_total_points: 1000
+        nickname: '测试用户'
       })
 
       // 🛡️ 为测试用户分配管理员角色
@@ -121,7 +121,6 @@ describe('MySQL数据约束和参照完整性专项测试', () => {
 
   describe('数据一致性测试', () => {
     test('用户资产数据一致性', async () => {
-      const user = await User.findByPk(testUser.user_id)
       const userAccount = await Account.findOne({
         where: { user_id: testUser.user_id, account_type: 'user' }
       })
@@ -133,8 +132,10 @@ describe('MySQL数据约束和参照完整性专项测试', () => {
         })
 
         if (pointsBalance) {
-          // 历史总积分应该大于等于0
-          expect(user.history_total_points).toBeGreaterThanOrEqual(0)
+          // 累计获得积分（账本派生，拍板 4）应该大于等于0
+          const AssetQueryService = require('../../services/asset/QueryService')
+          const historyTotalPoints = await AssetQueryService.getHistoryTotalPoints(testUser.user_id)
+          expect(historyTotalPoints).toBeGreaterThanOrEqual(0)
           // 可用余额应该大于等于0
           expect(Number(pointsBalance.available_amount)).toBeGreaterThanOrEqual(0)
           // 冻结余额应该大于等于0

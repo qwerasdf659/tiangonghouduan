@@ -102,7 +102,7 @@ describe('页面2: 批量工具 (lottery-management.html 批量操作Tab)', () =
 
     if (result.data.logs.length > 0) {
       const log = result.data.logs[0];
-      expect(log).toHaveProperty('batch_operation_log_id');
+      expect(log).toHaveProperty('operation_log_id');
       expect(log).toHaveProperty('operation_type');
       expect(log).toHaveProperty('operation_type_name');
       expect(log).toHaveProperty('status');

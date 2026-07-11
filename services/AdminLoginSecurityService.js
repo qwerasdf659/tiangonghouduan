@@ -9,7 +9,7 @@
  * 核心职责（仅管理端 console 登录/发码使用，不影响用户端 C 端登录）：
  * 1. 失败锁定：同手机号连续登录失败达到阈值后锁定一段时间（LOGIN_LOCKED / 429）。
  * 2. IP 白名单：可选开关，`.env` 的 ADMIN_IP_ALLOWLIST 留空=不启用（默认不启用，管理员“到处登”）。
- * 3. 审计：命中锁定时写入 AdminOperationLog（仅当手机号能解析到真实用户，受 operator_id 外键约束）。
+ * 3. 审计：命中锁定时写入 operation_logs（admin 域，仅当手机号能解析到真实用户，受 operator_id 外键约束）。
  *
  * Redis Key 设计（与 SmsService 的 sms:* 前缀区分，避免混淆）：
  * - admin:login:fail:{mobile} → 连续失败计数（首次失败时设置 TTL=锁定时长）
@@ -110,7 +110,7 @@ class AdminLoginSecurityService {
    *
    * 业务流程：
    * 1. 失败计数 +1；首次失败时设置 TTL=锁定时长（滑动锁定窗口的起点）。
-   * 2. 计数达到阈值 → 写 AdminOperationLog 审计（仅当手机号解析到真实用户，受 operator_id 外键约束）。
+   * 2. 计数达到阈值 → 写 operation_logs 审计（admin 域，仅当手机号解析到真实用户，受 operator_id 外键约束）。
    *
    * @param {Object} params - 参数
    * @param {string} params.mobile - 手机号（11位裸号）

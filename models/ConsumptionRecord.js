@@ -18,7 +18,7 @@
  * 6. 审核拒绝 → 记录拒绝原因
  *
  * 数据库表名：consumption_records
- * 主键：record_id（BIGINT，自增）
+ * 主键：consumption_record_id（BIGINT，自增，统一 {table}_id 命名）
  *
  * 最后更新：2025年12月30日
  */
@@ -95,7 +95,7 @@ class ConsumptionRecord extends Model {
     ConsumptionRecord.belongsTo(models.AssetTransaction, {
       foreignKey: 'reward_transaction_id',
       targetKey: 'asset_transaction_id',
-      as: 'points_transaction',
+      as: 'reward_transaction',
       comment: '关联奖励积分流水（审核通过后填充，逻辑外键用于对账/展示）'
     })
   }
@@ -320,7 +320,7 @@ class ConsumptionRecord extends Model {
   toAPIResponse() {
     // 基础响应数据
     const response = {
-      // 业务主键：统一 {table}_id 命名，全链路一致、前端零映射（替代旧 id/record_id 双别名）
+      // 业务主键：统一 {table}_id 命名，全链路一致、前端零映射
       consumption_record_id: parseInt(this.consumption_record_id),
       user_id: this.user_id,
       merchant_id: this.merchant_id,
@@ -330,7 +330,6 @@ class ConsumptionRecord extends Model {
       status: this.status,
       status_name: this.getStatusName(),
       status_color: this.getStatusColor(),
-      final_status: this.final_status, // V4.7 业务最终状态（中文化显示名称系统 - 2026-01-22）
       order_no: this.order_no || null,
       business_id: this.business_id || null,
       qr_code: this.qr_code,
@@ -377,9 +376,9 @@ class ConsumptionRecord extends Model {
      *   不下发 balance_before/balance_after（账户余额快照）、counterpart 等内部记账字段，
      *   防止微信小程序端抓包泄露用户余额等商业敏感信息。
      */
-    if (this.points_transaction) {
-      response.reward_points = this.points_transaction.delta_amount // 本次奖励到账积分数
-      response.reward_transaction_no = this.points_transaction.transaction_no || null // 积分流水展示号（TX 前缀），便于对账展示
+    if (this.reward_transaction) {
+      response.reward_points = this.reward_transaction.delta_amount // 本次奖励到账积分数
+      response.reward_transaction_no = this.reward_transaction.transaction_no || null // 积分流水展示号（TX 前缀），便于对账展示
     } else {
       response.reward_points = null
       response.reward_transaction_no = null
@@ -394,7 +393,7 @@ class ConsumptionRecord extends Model {
    */
   toSimpleAPIResponse() {
     return {
-      // 业务主键：统一 consumption_record_id（替代旧通用 id）
+      // 业务主键：统一 consumption_record_id 命名
       consumption_record_id: this.consumption_record_id,
       order_no: this.order_no || null,
       consumption_amount: parseFloat(this.consumption_amount),
@@ -462,8 +461,8 @@ module.exports = sequelize => {
        */
       store_id: {
         type: DataTypes.INTEGER,
-        allowNull: true, // 初始允许 NULL（兼容历史数据）
-        comment: '门店ID（外键关联 stores 表，用于多门店管理和权限验证）',
+        allowNull: false, // 消费小票必属某一门店（2026-07-11 收紧 NOT NULL，数据库层强约束）
+        comment: '门店ID（外键关联 stores 表，消费小票必属某一门店）',
         references: {
           model: 'stores',
           key: 'store_id'
@@ -610,7 +609,7 @@ module.exports = sequelize => {
        */
       business_id: {
         type: DataTypes.STRING(150),
-        allowNull: false, // 业务唯一键必填（历史数据已回填完成 - 2026-01-05）
+        allowNull: false, // 业务唯一键必填
         unique: true,
         comment: '业务唯一键（格式：consume_{merchant_id}_{user_id}_{timestamp_ms}）- 必填'
       },
@@ -682,16 +681,9 @@ module.exports = sequelize => {
 
       /*
        * ========================================
-       * 业务结果态字段（2026-01-09 功能重复检查报告决策）
+       * 结算时间（status 为唯一状态机，2026-07-11 final_status 双状态列已合并删除）
        * ========================================
        */
-      final_status: {
-        type: DataTypes.ENUM('pending_review', 'approved', 'rejected'),
-        allowNull: false,
-        defaultValue: 'pending_review',
-        comment: '业务最终状态（审批通过/拒绝后落地）'
-      },
-
       settled_at: {
         type: DataTypes.DATE,
         allowNull: true,

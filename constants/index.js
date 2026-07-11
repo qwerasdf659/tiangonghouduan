@@ -37,15 +37,6 @@ const {
   getRetryStrategy
 } = require('./ErrorCodes')
 
-// 交易市场可交易资产类型常量（P0-4 实施）
-const {
-  MARKET_BLACKLISTED_ASSET_CODES,
-  isBlacklistedForMarket,
-  getBlacklistReason,
-  validateMarketTradability,
-  createMarketBlacklistError
-} = require('./TradableAssetTypes')
-
 // 审计日志 target_type 常量
 const {
   AUDIT_TARGET_TYPES,
@@ -66,7 +57,7 @@ const {
 } = require('./PermissionResources')
 
 // 虚拟资产代码常量（V4.1.0 资产命名重构）
-const { AssetCode, ASSET_CODE_MIGRATION_MAP, AssetForm } = require('./AssetCode')
+const { AssetCode, AssetForm } = require('./AssetCode')
 
 // 物品类型 × 可计价货币白名单（竞价双层防护·硬约束层）
 const {
@@ -98,13 +89,6 @@ module.exports = {
   isRetryableErrorByMessage,
   getRetryStrategy,
 
-  // 交易市场可交易资产类型（P0-4 实施）
-  MARKET_BLACKLISTED_ASSET_CODES,
-  isBlacklistedForMarket,
-  getBlacklistReason,
-  validateMarketTradability,
-  createMarketBlacklistError,
-
   // 审计日志 target_type
   AUDIT_TARGET_TYPES,
   VALID_TARGET_TYPES,
@@ -122,7 +106,6 @@ module.exports = {
 
   // 虚拟资产代码（AssetCode V4.1.0）
   AssetCode,
-  ASSET_CODE_MIGRATION_MAP,
   AssetForm,
 
   // 物品类型 × 可计价货币白名单（竞价双层防护）
@@ -135,7 +118,6 @@ module.exports = {
   // 命名空间导出（便于按模块引用）
   AuditOperationTypes: require('./AuditOperationTypes'),
   ErrorCodes: require('./ErrorCodes'),
-  TradableAssetTypes: require('./TradableAssetTypes'),
   AuditTargetTypes: require('./AuditTargetTypes'),
   PermissionResources: require('./PermissionResources'),
   AssetCodeModule: require('./AssetCode'),

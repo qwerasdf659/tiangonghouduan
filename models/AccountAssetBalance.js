@@ -21,7 +21,7 @@
  * - 每个 (account_id, asset_code) 只有一条记录（唯一约束）
  *
  * 数据库表名：account_asset_balances
- * 主键：balance_id（BIGINT，自增）
+ * 主键：account_asset_balance_id（BIGINT，自增）
  * 外键：account_id → accounts.account_id（CASCADE更新，RESTRICT删除）
  *
  * 最后更新：2025-12-15
@@ -99,14 +99,6 @@ module.exports = sequelize => {
         defaultValue: 0,
         comment:
           '冻结余额（Frozen Amount）：下单冻结、挂牌冻结的余额；业务规则：交易市场购买时冻结买家star_stone，挂牌时冻结卖家标的资产；成交后从冻结转为扣减或入账；取消/超时时解冻回到 available_amount；不可为负数'
-      },
-
-      balance_id: {
-        type: DataTypes.VIRTUAL,
-        /** @returns {number} account_asset_balance_id alias */
-        get() {
-          return this.getDataValue('account_asset_balance_id')
-        }
       }
     },
     {
@@ -182,7 +174,7 @@ module.exports = sequelize => {
 
     if (created) {
       console.log(
-        `✅ 创建资产余额记录：account_id=${account_id}, asset_code=${asset_code}, balance_id=${balance.account_asset_balance_id}`
+        `✅ 创建资产余额记录：account_id=${account_id}, asset_code=${asset_code}, account_asset_balance_id=${balance.account_asset_balance_id}`
       )
     }
 

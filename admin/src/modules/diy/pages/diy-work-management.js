@@ -263,6 +263,31 @@ function diyWorkManagement() {
 
     // ==================== 格式化 ====================
 
+    /**
+     * 手围档位展示（手围驱动方案：design_data.size = { label, wrist_size_mm }）
+     * @param {Object|null} size - 作品设计数据中的手围档位
+     * @returns {string} 展示文案（如 "S 档 · 手围 14.0cm"）
+     */
+    formatWristSize(size) {
+      if (!size) return '未选手围'
+      const wristMm = Number(size.wrist_size_mm)
+      const wristText =
+        Number.isFinite(wristMm) && wristMm > 0 ? `手围 ${(wristMm / 10).toFixed(1)}cm` : ''
+      const labelText = size.label ? `${size.label} 档` : ''
+      return [labelText, wristText].filter(Boolean).join(' · ') || '未选手围'
+    },
+
+    /**
+     * 成品沿绳长度展示（后端 computed_length_mm 派生字段，与 C 端/confirm 校验同口径）
+     * @param {number|null} lengthMm - 成品长度毫米
+     * @returns {string} 展示文案（如 "约 15.2cm"）
+     */
+    formatComputedLength(lengthMm) {
+      const value = Number(lengthMm)
+      if (!Number.isFinite(value) || value <= 0) return '无法计算（空设计或素材缺尺寸）'
+      return `约 ${(value / 10).toFixed(1)}cm`
+    },
+
     getStatusBadgeClass(status) {
       const map = {
         draft: 'bg-gray-100 text-gray-800',

@@ -23,6 +23,8 @@ const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 const BalanceService = require('./asset/BalanceService')
 const ItemService = require('./asset/ItemService')
+const AuditLogService = require('./AuditLogService')
+const BeijingTimeHelper = require('../utils/timeHelper')
 
 /**
  * 客服补偿发放服务
@@ -143,25 +145,24 @@ class CustomerServiceCompensateService {
       }
     }
 
-    /* 写入操作审计日志（admin_operation_logs） */
-    if (models.AdminOperationLog) {
-      await models.AdminOperationLog.create(
-        {
-          admin_id: operator_id,
-          operation_type: 'cs_compensation',
-          target_type: 'user',
-          target_id: String(user_id),
-          details: JSON.stringify({
-            reason,
-            items: compensationLog,
-            session_id,
-            issue_id
-          }),
-          ip_address: options.ip_address || 'unknown'
-        },
-        { transaction }
-      )
-    }
+    /* 写入操作审计日志（operation_logs admin 域，统一走 AuditLogService 入口） */
+    await AuditLogService.logOperation({
+      operator_id,
+      operation_type: 'cs_compensation',
+      target_type: 'user',
+      target_id: user_id,
+      action: 'create',
+      after_data: {
+        reason,
+        items: compensationLog,
+        session_id,
+        issue_id
+      },
+      reason,
+      idempotency_key: `cs_compensation_${user_id}_${session_id || issue_id || 'direct'}_${BeijingTimeHelper.generateIdTimestamp()}`,
+      ip_address: options.ip_address || null,
+      transaction
+    })
 
     /* 在客服会话中插入系统消息（通知用户补偿已发放） */
     if (session_id) {

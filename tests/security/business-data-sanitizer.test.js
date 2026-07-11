@@ -765,7 +765,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
    * 业务场景：用户查看积分流水时，脱敏内部字段
    * 安全要求：account_id、idempotency_key、frozen_amount_change、BUDGET_POINTS 记录不暴露
    */
-  describe('B-5-12 积分记录脱敏（sanitizePointsRecords）', () => {
+  describe('B-5-12 资产流水脱敏（sanitizeTransactionRecords）', () => {
     const mockRecords = [
       {
         asset_transaction_id: 501,
@@ -812,7 +812,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
     ]
 
     test('B-5-12-1 普通用户（public）不可见 account_id', () => {
-      const result = DataSanitizer.sanitizePointsRecords(mockRecords, 'public')
+      const result = DataSanitizer.sanitizeTransactionRecords(mockRecords, 'public')
 
       result.forEach(record => {
         expect(record).not.toHaveProperty('account_id')
@@ -820,7 +820,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
     })
 
     test('B-5-12-2 普通用户（public）不可见 idempotency_key', () => {
-      const result = DataSanitizer.sanitizePointsRecords(mockRecords, 'public')
+      const result = DataSanitizer.sanitizeTransactionRecords(mockRecords, 'public')
 
       result.forEach(record => {
         expect(record).not.toHaveProperty('idempotency_key')
@@ -828,7 +828,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
     })
 
     test('B-5-12-3 普通用户（public）不可见 frozen_amount_change 和 lottery_session_id', () => {
-      const result = DataSanitizer.sanitizePointsRecords(mockRecords, 'public')
+      const result = DataSanitizer.sanitizeTransactionRecords(mockRecords, 'public')
 
       result.forEach(record => {
         expect(record).not.toHaveProperty('frozen_amount_change')
@@ -837,7 +837,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
     })
 
     test('B-5-12-4 普通用户（public）过滤 BUDGET_POINTS 记录', () => {
-      const result = DataSanitizer.sanitizePointsRecords(mockRecords, 'public')
+      const result = DataSanitizer.sanitizeTransactionRecords(mockRecords, 'public')
 
       expect(result.length).toBe(2)
       result.forEach(record => {
@@ -846,35 +846,35 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
     })
 
     test('B-5-12-5 普通用户（public）主键映射 asset_transaction_id → transaction_id', () => {
-      const result = DataSanitizer.sanitizePointsRecords(mockRecords, 'public')
+      const result = DataSanitizer.sanitizeTransactionRecords(mockRecords, 'public')
 
       expect(result[0].transaction_id).toBe(501)
       expect(result[0]).not.toHaveProperty('asset_transaction_id')
     })
 
     test('B-5-12-6 普通用户（public）business_type_display 中文映射', () => {
-      const result = DataSanitizer.sanitizePointsRecords(mockRecords, 'public')
+      const result = DataSanitizer.sanitizeTransactionRecords(mockRecords, 'public')
 
       expect(result[0].business_type_display).toBe('抽奖消耗')
       expect(result[1].business_type_display).toBe('抽奖奖励')
     })
 
     test('B-5-12-7 普通用户（public）meta.description 提取为顶层 description', () => {
-      const result = DataSanitizer.sanitizePointsRecords(mockRecords, 'public')
+      const result = DataSanitizer.sanitizeTransactionRecords(mockRecords, 'public')
 
       expect(result[0].description).toBe('抽奖消耗100积分')
       expect(result[0]).not.toHaveProperty('meta')
     })
 
     test('B-5-12-8 管理员（full）可见完整原始数据', () => {
-      const result = DataSanitizer.sanitizePointsRecords(mockRecords, 'full')
+      const result = DataSanitizer.sanitizeTransactionRecords(mockRecords, 'full')
 
       expect(result).toEqual(mockRecords)
     })
   })
 
   /**
-   * B-5-13: 交易记录脱敏测试（γ 重写方法 - 与 sanitizePointsRecords 共享实现）
+   * B-5-13: 交易记录脱敏测试（γ 重写方法 - sanitizeTransactionRecords 补充场景）
    *
    * 业务场景：用户查看资产交易流水时，脱敏内部字段
    * 安全要求：与积分记录相同的脱敏规则（共享 _sanitizeAssetTransactions 实现）

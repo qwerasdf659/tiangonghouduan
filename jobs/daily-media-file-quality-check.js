@@ -36,8 +36,7 @@ class DailyMediaFileQualityCheck {
     logger.info('[数据质量门禁] 开始每日媒体文件数据质量检查')
 
     try {
-      const { MediaFile, sequelize } = require('../models')
-      const { Op } = sequelize.Sequelize
+      const { MediaFile } = require('../models')
 
       let totalChecked = 0
       let missingThumbnailsCount = 0

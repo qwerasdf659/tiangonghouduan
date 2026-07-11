@@ -42,6 +42,7 @@ router.use('/exchange', require('./exchange'))
 router.use('/bids', require('./bids'))
 router.use('/decorations', require('./decorations'))
 router.use('/dashboard', require('./dashboard'))
+router.use('/notifications', require('./notifications')) // 管理员通知中心（2026-07-11 自 system 域迁入）
 router.use('/diy', require('./diy'))
 
 /**
@@ -239,12 +240,9 @@ router.get('/', (req, res) => {
           '/dashboard/revenue/overview',
           '/dashboard/revenue/by-source',
           '/dashboard/revenue/trend',
-          '/dashboard/revenue/fee-stats',
-          '/dashboard/market-health',
-          '/dashboard/market-health/order-trend',
-          '/dashboard/market-health/top-users'
+          '/dashboard/revenue/fee-stats'
         ],
-        note: '运营首页看板、业务健康度、跨域顶线（B2C+C2C+竞拍）、平台收入、市场健康；仅限 admin 访问'
+        note: '运营首页看板、业务健康度、时间对比、平台收入；仅限 admin 访问'
       },
       pending: {
         description: '待处理中心（2026-01-31 P0）',
@@ -326,7 +324,7 @@ router.get('/', (req, res) => {
         description: '商家操作审计日志（2026-01-12）',
         endpoints: [
           '/audit-logs',
-          '/audit-logs/:merchant_log_id',
+          '/audit-logs/:operation_log_id',
           '/audit-logs/stats/store/:store_id',
           '/audit-logs/stats/operator/:operator_id',
           '/audit-logs/cleanup',
@@ -502,9 +500,6 @@ router.get('/', (req, res) => {
           '/system-data/accounts',
           '/system-data/accounts/:account_id',
           '/system-data/user-roles',
-          '/system-data/market-listings',
-          '/system-data/market-listings/:market_listing_id',
-          '/system-data/market-listings/statistics/summary',
           '/system-data/lottery-campaigns',
           '/system-data/lottery-campaigns/:lottery_campaign_id',
           '/system-data/lottery-campaigns/:lottery_campaign_id/status',
@@ -556,9 +551,8 @@ router.get('/', (req, res) => {
           '/user-data-query/:user_id/asset-transactions',
           '/user-data-query/:user_id/lottery-draws',
           '/user-data-query/:user_id/exchange-records',
-          '/user-data-query/:user_id/trade-records',
-          '/user-data-query/:user_id/market-listings',
-          '/user-data-query/:user_id/conversions'
+          '/user-data-query/:user_id/conversions',
+          '/user-data-query/:user_id/consumption'
         ],
         note: '用户全维度数据检索'
       },

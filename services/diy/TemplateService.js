@@ -11,7 +11,31 @@
 const { Op } = require('sequelize')
 const logger = require('../../utils/logger').logger
 const OrderNoGenerator = require('../../utils/OrderNoGenerator')
-const { DiyTemplate, DiyWork, Category, MediaFile } = require('../../models')
+const { DiyMaterial, DiyTemplate, DiyWork, Category, MediaFile } = require('../../models')
+const { deriveCordOccupyMm } = require('./MaterialService')
+
+/**
+ * 全局默认弹力/工艺余量（毫米），模板 sizing_rules.elastic_margin_mm 可覆盖（拍板 Q7：15mm）
+ *
+ * 唯一定义处：estimate 换算 / confirm 长度校验（WorkService）/ 长度偏差统计（AdminQueryService）
+ * 三处均从本模块引用，禁止再定义副本（避免口径漂移）。
+ */
+const DEFAULT_ELASTIC_MARGIN_MM = 15
+
+/**
+ * 串珠模式布局形状（手围/长度规则仅对串珠模板生效，slots 镶嵌模板不适用）
+ * 唯一定义处，WorkService / AdminQueryService 从本模块引用。
+ */
+const BEADING_SHAPES = ['circle', 'ellipse', 'arc', 'line']
+
+/**
+ * 判断模板是否为串珠模式（手围驱动方案只作用于串珠模板）
+ * @param {DiyTemplate|Object} template - 模板实例或 plain 对象
+ * @returns {boolean} 是否串珠模式
+ */
+function isBeadingTemplate(template) {
+  return BEADING_SHAPES.includes(template.layout?.shape)
+}
 
 /**
  * 用户端模板序列化（数据最小化，拍板决议 11.5-D）
@@ -199,6 +223,19 @@ class DiyTemplateService {
         error.statusCode = 400
         throw error
       }
+
+      /*
+       * 发布护栏（手围驱动方案 §11.5）：按"本次更新落库后的最终状态"校验
+       * 尺寸规则/布局/素材分组可能就在本次 update 中修改，合并后再判
+       */
+      await DiyTemplateService._assertPublishable({
+        layout: data.layout !== undefined ? data.layout : template.layout,
+        sizing_rules: data.sizing_rules !== undefined ? data.sizing_rules : template.sizing_rules,
+        material_group_codes:
+          data.material_group_codes !== undefined
+            ? data.material_group_codes
+            : template.material_group_codes
+      })
     }
 
     await template.update(data, { transaction })
@@ -258,6 +295,9 @@ class DiyTemplateService {
         error.statusCode = 400
         throw error
       }
+
+      /* 发布护栏（手围驱动方案 §11.5）：尺寸档位毫米数据 + 可用素材物理数据完整 */
+      await DiyTemplateService._assertPublishable(template)
     }
 
     await template.update({ status: newStatus }, { transaction })
@@ -345,6 +385,165 @@ class DiyTemplateService {
     const template = await DiyTemplateService.getTemplateDetail(templateId)
     return toUserTemplateJSON(template)
   }
+
+  /**
+   * 手围算珠估算（手围驱动方案拍板 Q2 方案甲：换算规则收敛在后端，前端不写公式）
+   *
+   * 换算规则：
+   * - target_length_mm（目标成品周长）：优先取 sizing_rules.size_options 中
+   *   wrist_size_mm 完全匹配档位的配置值，否则 = 手围 + 弹力余量
+   * - recommend_bead_count = round(target_length_mm / diameter)，并按 capacity_rules 收敛
+   * - 可制作范围：min = 手围本身（短于手围戴不上）；max = 目标周长 + 弹力余量
+   * - 项链等无手围概念的模板：档位只配 target_length_mm，前端把所选档位的佩戴长度
+   *   作为 wrist_size_mm 传入，档位匹配同时按 wrist_size_mm / target_length_mm 双字段命中
+   *
+   * @param {number} templateId - diy_template_id
+   * @param {Object} params - 查询参数 { wrist_size_mm: 手围毫米, diameter: 主珠直径毫米 }
+   * @returns {Object} 估算结果（字段见 return 结构，全部毫米单位）
+   */
+  static async estimateBeadCount(templateId, params = {}) {
+    const wristSizeMm = Number(params.wrist_size_mm)
+    const diameter = Number(params.diameter)
+
+    if (!Number.isFinite(wristSizeMm) || wristSizeMm <= 0) {
+      const error = new Error('wrist_size_mm 必须为正数（毫米）')
+      error.statusCode = 400
+      throw error
+    }
+    if (!Number.isFinite(diameter) || diameter <= 0) {
+      const error = new Error('diameter 必须为正数（毫米）')
+      error.statusCode = 400
+      throw error
+    }
+
+    const template = await DiyTemplateService.getTemplateDetail(templateId)
+
+    if (!isBeadingTemplate(template)) {
+      const error = new Error('镶嵌模式模板不支持手围估算（仅串珠模板适用）')
+      error.statusCode = 400
+      error.errorCode = 'DIY_TEMPLATE_NOT_BEADING'
+      throw error
+    }
+
+    const sizing = template.sizing_rules
+    if (!sizing || !Array.isArray(sizing.size_options) || sizing.size_options.length === 0) {
+      const error = new Error('该模板未配置尺寸规则，不支持手围估算')
+      error.statusCode = 400
+      error.errorCode = 'DIY_SIZING_RULES_MISSING'
+      throw error
+    }
+
+    const elasticMarginMm = Number(sizing.elastic_margin_mm) || DEFAULT_ELASTIC_MARGIN_MM
+
+    /*
+     * 优先匹配运营配置的档位（配置值是商品口径权威，公式推导只是兜底）：
+     * 手链按 wrist_size_mm 命中；项链档位无手围概念，按 target_length_mm（佩戴长度）命中
+     */
+    const matched = sizing.size_options.find(
+      opt =>
+        Number(opt.wrist_size_mm) === wristSizeMm || Number(opt.target_length_mm) === wristSizeMm
+    )
+    const targetLengthMm =
+      matched && Number.isFinite(Number(matched.target_length_mm))
+        ? Number(matched.target_length_mm)
+        : wristSizeMm + elasticMarginMm
+
+    /* 参考颗数 = 目标周长 ÷ 珠径，再按容量规则收敛（兜底防呆，拍板①保留口径） */
+    let recommendBeadCount = Math.round(targetLengthMm / diameter)
+    const capacityRules = template.capacity_rules || {}
+    if (capacityRules.min_beads) {
+      recommendBeadCount = Math.max(recommendBeadCount, Number(capacityRules.min_beads))
+    }
+    if (capacityRules.max_beads) {
+      recommendBeadCount = Math.min(recommendBeadCount, Number(capacityRules.max_beads))
+    }
+
+    return {
+      wrist_size_mm: wristSizeMm,
+      diameter,
+      elastic_margin_mm: elasticMarginMm,
+      target_length_mm: targetLengthMm,
+      recommend_bead_count: recommendBeadCount,
+      /* 可制作范围：低于手围戴不上，高于目标+余量视为过长（confirm 硬校验同口径） */
+      min_length_mm: wristSizeMm,
+      max_length_mm: targetLengthMm + elasticMarginMm,
+      matched_size_label: matched ? matched.label : null
+    }
+  }
+
+  /**
+   * 发布前置护栏（手围驱动方案 §11.5，与既有"底图/预览图必填"护栏同哲学）
+   *
+   * 仅对串珠模板校验（slots 镶嵌模板无手围/长度概念）：
+   * 1. 尺寸规则完整：size_options 每档必须含数值型 wrist_size_mm 或 target_length_mm
+   *    （手链品类两者都要；项链品类允许只配 target_length_mm）
+   * 2. 素材物理数据完整：模板可用素材（material_group_codes 范围内已启用）不得存在
+   *    沿绳占用无法派生的项（拍板 Q6：拒绝发布，错误信息列出素材编码清单）
+   *
+   * @param {DiyTemplate} template - 待发布的模板实例
+   * @returns {Promise<void>} 校验不通过时抛错（statusCode=400 + errorCode）
+   * @private
+   */
+  static async _assertPublishable(template) {
+    if (!isBeadingTemplate(template)) return
+
+    // ---- 护栏 1：尺寸档位数据完整 ----
+    const sizing = template.sizing_rules
+    const sizeOptions = sizing && Array.isArray(sizing.size_options) ? sizing.size_options : []
+    if (sizeOptions.length === 0) {
+      const error = new Error('发布失败：串珠模板必须配置尺寸规则（sizing_rules.size_options）')
+      error.statusCode = 400
+      error.errorCode = 'DIY_SIZING_RULES_MISSING'
+      throw error
+    }
+    const invalidOptions = sizeOptions.filter(
+      opt =>
+        !Number.isFinite(Number(opt.target_length_mm)) &&
+        !Number.isFinite(Number(opt.wrist_size_mm))
+    )
+    if (invalidOptions.length > 0) {
+      const labels = invalidOptions.map(opt => opt.label || '?').join(', ')
+      const error = new Error(
+        `发布失败：尺寸档位 [${labels}] 缺少 wrist_size_mm / target_length_mm 毫米数据，请在模板编辑中补录`
+      )
+      error.statusCode = 400
+      error.errorCode = 'DIY_SIZING_RULES_INCOMPLETE'
+      throw error
+    }
+
+    // ---- 护栏 2：可用素材物理数据完整（拍板 Q6：拒绝发布） ----
+    const materialWhere = { is_enabled: true }
+    const groupCodes = template.material_group_codes
+    if (Array.isArray(groupCodes) && groupCodes.length > 0) {
+      materialWhere.group_code = { [Op.in]: groupCodes }
+    }
+    const materials = await DiyMaterial.findAll({
+      where: materialWhere,
+      attributes: [
+        'material_code',
+        'bore_orientation',
+        'diameter',
+        'size_length_mm',
+        'size_width_mm'
+      ],
+      raw: true
+    })
+    const missingPhysical = materials
+      .filter(mat => deriveCordOccupyMm(mat) === null)
+      .map(mat => mat.material_code)
+    if (missingPhysical.length > 0) {
+      const error = new Error(
+        `发布失败：以下素材缺少沿绳尺寸数据（管珠缺长边/药片缺短边/圆珠缺直径），请先补录：${missingPhysical.join(', ')}`
+      )
+      error.statusCode = 400
+      error.errorCode = 'DIY_MATERIAL_SIZE_MISSING'
+      error.data = { material_codes: missingPhysical }
+      throw error
+    }
+  }
 }
 
 module.exports = DiyTemplateService
+/* 手围驱动方案共享常量（WorkService 校验 / AdminQueryService 统计复用，保证三处同口径） */
+module.exports.DEFAULT_ELASTIC_MARGIN_MM = DEFAULT_ELASTIC_MARGIN_MM
+module.exports.BEADING_SHAPES = BEADING_SHAPES

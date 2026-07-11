@@ -50,6 +50,51 @@ const STATUS_OPTIONS = [
 const SHAPE_LABELS = Object.fromEntries(SHAPE_OPTIONS.map(o => [o.value, o.label]))
 const STATUS_LABELS = Object.fromEntries(STATUS_OPTIONS.map(o => [o.value, o.label]))
 
+/**
+ * 串珠模板默认尺寸档位（手围驱动方案 §11.1 权威 Schema + Q7 决议行业默认值）
+ *
+ * wrist_size_mm 手围 / target_length_mm 目标成品周长（= 手围 + 15mm 弹力余量），
+ * 发布护栏要求每档至少含其一（后端 DIY_SIZING_RULES_INCOMPLETE 校验），
+ * bead_count 保留为兜底防呆颗数，radius_x/radius_y 为画布渲染半径。
+ *
+ * @returns {Object} sizing_rules 默认结构
+ */
+function defaultSizingRules() {
+  return {
+    default_size: 'M',
+    elastic_margin_mm: 15,
+    size_options: [
+      {
+        label: 'S',
+        display: '小号 (约15cm)',
+        bead_count: 14,
+        radius_x: 95,
+        radius_y: 95,
+        wrist_size_mm: 140,
+        target_length_mm: 155
+      },
+      {
+        label: 'M',
+        display: '中号 (约17cm)',
+        bead_count: 18,
+        radius_x: 120,
+        radius_y: 120,
+        wrist_size_mm: 155,
+        target_length_mm: 170
+      },
+      {
+        label: 'L',
+        display: '大号 (约19cm)',
+        bead_count: 22,
+        radius_x: 140,
+        radius_y: 140,
+        wrist_size_mm: 175,
+        target_length_mm: 190
+      }
+    ]
+  }
+}
+
 /** 空表单（对齐后端字段名） */
 function emptyForm() {
   return {
@@ -57,14 +102,7 @@ function emptyForm() {
     category_id: '',
     layout: { shape: 'circle', bead_count: 18, radius_x: 120, radius_y: 120 },
     bead_rules: { margin: 10, default_diameter: 10, allowed_diameters: [6, 8, 10, 12] },
-    sizing_rules: {
-      default_size: 'M',
-      size_options: [
-        { label: 'S', display: '小号', bead_count: 14, radius_x: 95, radius_y: 95 },
-        { label: 'M', display: '中号', bead_count: 18, radius_x: 120, radius_y: 120 },
-        { label: 'L', display: '大号', bead_count: 22, radius_x: 140, radius_y: 140 }
-      ]
-    },
+    sizing_rules: defaultSizingRules(),
     capacity_rules: { min_beads: 12, max_beads: 24 },
     material_group_codes: [],
     sort_order: 0,
@@ -270,12 +308,14 @@ function diyTemplateManagement() {
         }
         const t = res.data
         this.editingId = Number(t.diy_template_id)
+        const layout = t.layout || { shape: 'circle', bead_count: 18, radius_x: 120, radius_y: 120 }
         this.form = {
           display_name: t.display_name || '',
           category_id: t.category_id || '',
-          layout: t.layout || { shape: 'circle', bead_count: 18, radius_x: 120, radius_y: 120 },
+          layout,
           bead_rules: t.bead_rules || { margin: 10, default_diameter: 10, allowed_diameters: [8] },
-          sizing_rules: t.sizing_rules || null,
+          /* 串珠模板缺 sizing_rules 时给默认结构（发布护栏要求档位毫米数据必填）；镶嵌模板保持 null */
+          sizing_rules: t.sizing_rules || (layout.shape !== 'slots' ? defaultSizingRules() : null),
           capacity_rules: t.capacity_rules || null,
           material_group_codes: t.material_group_codes || [],
           sort_order: t.sort_order || 0,
@@ -349,6 +389,30 @@ function diyTemplateManagement() {
               /* 保持原值 */
             }
           }
+        }
+
+        /*
+         * 尺寸档位数字字段归一：空串/undefined → null（后端 JSON 列不收空串），
+         * 弹力余量缺省回落 15mm（Q7 决议默认值，与后端 DEFAULT_ELASTIC_MARGIN_MM 同值）
+         */
+        if (data.sizing_rules && Array.isArray(data.sizing_rules.size_options)) {
+          const marginRaw = Number(data.sizing_rules.elastic_margin_mm)
+          data.sizing_rules.elastic_margin_mm =
+            Number.isFinite(marginRaw) && marginRaw > 0 ? marginRaw : 15
+          data.sizing_rules.size_options = data.sizing_rules.size_options.map(option => {
+            const normalized = { ...option }
+            for (const numField of [
+              'wrist_size_mm',
+              'target_length_mm',
+              'bead_count',
+              'radius_x',
+              'radius_y'
+            ]) {
+              const value = Number(normalized[numField])
+              normalized[numField] = Number.isFinite(value) && value > 0 ? value : null
+            }
+            return normalized
+          })
         }
 
         // 绑定预览图
@@ -428,11 +492,45 @@ function diyTemplateManagement() {
             allowed_diameters: [6, 8, 10, 12]
           }
         }
+        /* 串珠模式必须有尺寸档位（手围驱动方案：发布护栏校验毫米数据） */
+        if (!this.form.sizing_rules) {
+          this.form.sizing_rules = defaultSizingRules()
+        }
       }
     },
 
     get isSlotMode() {
       return this.form.layout?.shape === 'slots'
+    },
+
+    // ==================== 尺寸档位编辑（手围驱动方案 §11.6-1） ====================
+
+    /** 新增一个空尺寸档位行（毫米字段留空由运营填写，发布时后端校验） */
+    addSizeOption() {
+      if (!this.form.sizing_rules) {
+        this.form.sizing_rules = defaultSizingRules()
+        return
+      }
+      if (!Array.isArray(this.form.sizing_rules.size_options)) {
+        this.form.sizing_rules.size_options = []
+      }
+      this.form.sizing_rules.size_options.push({
+        label: '',
+        display: '',
+        bead_count: null,
+        radius_x: 120,
+        radius_y: 120,
+        wrist_size_mm: null,
+        target_length_mm: null
+      })
+    },
+
+    /**
+     * 删除指定尺寸档位行
+     * @param {number} index - size_options 数组下标
+     */
+    removeSizeOption(index) {
+      this.form.sizing_rules?.size_options?.splice(index, 1)
     },
 
     // ==================== 图片上传 ====================

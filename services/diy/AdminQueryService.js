@@ -19,6 +19,20 @@ const {
   MediaFile,
   User
 } = require('../../models')
+const { deriveCordOccupyMm } = require('./MaterialService')
+const DiyWorkService = require('./WorkService')
+/* 手围驱动方案共享常量（唯一定义在 TemplateService，与 estimate/confirm 校验同口径） */
+const { DEFAULT_ELASTIC_MARGIN_MM, BEADING_SHAPES } = require('./TemplateService')
+
+/**
+ * 解析可能为字符串的 JSON 列（raw:true 查询下 MySQL JSON 列可能返回字符串）
+ * @param {Object|string|null} value - JSON 列原始值
+ * @returns {Object|null} 解析后的对象
+ */
+function parseJsonColumn(value) {
+  if (!value) return null
+  return typeof value === 'string' ? JSON.parse(value) : value
+}
 
 /** DIY 管理后台查询服务 */
 class DiyAdminQueryService {
@@ -129,7 +143,52 @@ class DiyAdminQueryService {
       throw error
     }
 
-    return work
+    /*
+     * 成品沿绳长度（毫米，手围驱动方案 §11.7-A3）：
+     * 与 C 端 beads 接口 cord_occupy_mm / confirm 硬校验同一派生函数计算，
+     * 供客服排查"戴不上手"客诉与产线发货前核对成品尺寸；
+     * 素材缺物理数据或空设计时为 null（管理端展示"无法计算"）
+     */
+    const plain = work.toJSON()
+    plain.computed_length_mm = await DiyAdminQueryService._computeWorkLengthMm(plain.design_data)
+    return plain
+  }
+
+  /**
+   * 计算作品的成品沿绳长度（毫米）
+   *
+   * 从 design_data 提取逐颗素材编码 → 查物理尺寸 → deriveCordOccupyMm 逐颗累加。
+   * 任一素材缺沿绳尺寸（派生为 null）或素材不存在时返回 null（不编造估算值）。
+   *
+   * @param {Object} designData - 作品设计数据
+   * @returns {Promise<number|null>} 成品长度毫米（1 位小数），无法精确计算时 null
+   * @private
+   */
+  static async _computeWorkLengthMm(designData) {
+    const usedCodes = DiyWorkService.extractUsedMaterialCodes(parseJsonColumn(designData))
+    if (usedCodes.length === 0) return null
+
+    const materials = await DiyMaterial.findAll({
+      where: { material_code: { [Op.in]: [...new Set(usedCodes)] } },
+      attributes: [
+        'material_code',
+        'bore_orientation',
+        'diameter',
+        'size_length_mm',
+        'size_width_mm'
+      ],
+      raw: true
+    })
+    const materialMap = new Map(materials.map(m => [m.material_code, m]))
+
+    let totalMm = 0
+    for (const code of usedCodes) {
+      const material = materialMap.get(code)
+      const occupyMm = material ? deriveCordOccupyMm(material) : null
+      if (occupyMm === null) return null
+      totalMm += occupyMm
+    }
+    return Math.round(totalMm * 10) / 10
   }
 
   /**
@@ -154,6 +213,21 @@ class DiyAdminQueryService {
     const zeroPriceEnabled = await DiyMaterial.count({
       where: { price: 0, is_enabled: true }
     })
+    /*
+     * 缺物理数据的启用素材数（手围驱动方案 §11.5/§11.7-A1）：
+     * 沿绳占用无法派生（管珠缺长边/药片缺短边/圆珠缺直径），
+     * 口径与 deriveCordOccupyMm / 素材列表 missing_physical 筛选完全一致
+     */
+    const missingPhysical = await DiyMaterial.count({
+      where: {
+        is_enabled: true,
+        [Op.or]: [
+          { bore_orientation: 'along_length', size_length_mm: null },
+          { bore_orientation: 'along_width', size_width_mm: null },
+          { bore_orientation: 'none', diameter: null }
+        ]
+      }
+    })
 
     // ---- 模板侧完备度 ----
     const templateTotal = await DiyTemplate.count()
@@ -164,7 +238,7 @@ class DiyAdminQueryService {
     /* published 但无可用素材的模板数（material_group_codes 空=全部允许） */
     const publishedTemplates = await DiyTemplate.findAll({
       where: { status: 'published', is_enabled: true },
-      attributes: ['diy_template_id', 'material_group_codes'],
+      attributes: ['diy_template_id', 'material_group_codes', 'layout', 'sizing_rules'],
       raw: true
     })
     const enabledGroupRows = await DiyMaterial.findAll({
@@ -175,11 +249,29 @@ class DiyAdminQueryService {
     })
     const enabledGroups = new Set(enabledGroupRows.map(r => r.group_code))
     const publishedWithoutMaterials = publishedTemplates.filter(t => {
-      const groups = t.material_group_codes
+      const groups = parseJsonColumn(t.material_group_codes)
       if (!groups || !Array.isArray(groups) || groups.length === 0) {
         return enabledGroups.size === 0
       }
       return !groups.some(g => enabledGroups.has(g))
+    }).length
+
+    /*
+     * 已发布串珠模板缺档位毫米数据的数量（手围驱动方案 §11.7-A2 兜底暴露口）：
+     * 发布护栏只拦"新发布动作"，对存量 published 模板无效，这里是存量脏数据的唯一可见口。
+     * 口径与 TemplateService._assertPublishable 一致：任一档位既无 wrist_size_mm 也无 target_length_mm
+     */
+    const publishedMissingSizing = publishedTemplates.filter(t => {
+      const layout = parseJsonColumn(t.layout)
+      if (!BEADING_SHAPES.includes(layout?.shape)) return false
+      const sizing = parseJsonColumn(t.sizing_rules)
+      const sizeOptions = sizing && Array.isArray(sizing.size_options) ? sizing.size_options : []
+      if (sizeOptions.length === 0) return true
+      return sizeOptions.some(
+        opt =>
+          !Number.isFinite(Number(opt.target_length_mm)) &&
+          !Number.isFinite(Number(opt.wrist_size_mm))
+      )
     }).length
 
     return {
@@ -189,14 +281,16 @@ class DiyAdminQueryService {
         disabled_count: materialTotal - materialEnabled,
         missing_image_count: missingImage,
         missing_copy_count: missingCopy,
-        zero_price_enabled_count: zeroPriceEnabled
+        zero_price_enabled_count: zeroPriceEnabled,
+        missing_physical_count: missingPhysical
       },
       templates: {
         total: templateTotal,
         missing_preview_count: missingPreview,
         missing_base_image_count: missingBaseImage,
         draft_count: draftCount,
-        published_without_materials_count: publishedWithoutMaterials
+        published_without_materials_count: publishedWithoutMaterials,
+        published_missing_sizing_count: publishedMissingSizing
       }
     }
   }
@@ -377,13 +471,144 @@ class DiyAdminQueryService {
   }
 
   /**
+   * 手围档位分布 + 长度偏差分布（手围驱动方案 §11.7-B4/B5）
+   *
+   * - size_distribution：frozen/completed 作品按 design_data.size（label + wrist_size_mm）聚合，
+   *   运营配货备料参考（哪个手围段卖得多 → 对应珠径/数量备货）
+   * - length_deviation：可测作品的 |成品长度 − 目标周长| 偏差分档计数，
+   *   elastic_margin_mm 余量参数是否合理的量化依据（偏差普遍偏大 → 调余量）
+   *   目标周长与 confirm 校验同一套规则（档位配置值优先，否则手围+余量）
+   *
+   * @returns {Object} { size_distribution, length_deviation } 手围统计
+   * @private
+   */
+  static async _getWristSizeStats() {
+    const works = await DiyWork.findAll({
+      where: { status: { [Op.in]: ['frozen', 'completed'] } },
+      attributes: ['diy_work_id', 'design_data', 'diy_template_id'],
+      raw: true
+    })
+
+    // ---- 手围档位分布（label + wrist_size_mm 分组） ----
+    const distributionMap = new Map() // 'label|wrist_size_mm' → count
+    let unsetCount = 0
+    const perWork = [] // 长度偏差计算的中间集
+    const allCodes = new Set()
+
+    for (const row of works) {
+      const designData = parseJsonColumn(row.design_data)
+      const size = designData?.size || null
+      const wristSizeMm = Number(size?.wrist_size_mm)
+
+      if (Number.isFinite(wristSizeMm) && wristSizeMm > 0) {
+        const key = `${size.label || '自定义'}|${wristSizeMm}`
+        distributionMap.set(key, (distributionMap.get(key) || 0) + 1)
+      } else {
+        unsetCount += 1
+      }
+
+      const codes = DiyWorkService.extractUsedMaterialCodes(designData)
+      codes.forEach(code => allCodes.add(code))
+      perWork.push({ diy_template_id: row.diy_template_id, wristSizeMm, codes })
+    }
+
+    const sizeDistribution = {
+      options: [...distributionMap.entries()]
+        .map(([key, count]) => {
+          const [label, wrist] = key.split('|')
+          return { label, wrist_size_mm: Number(wrist), count }
+        })
+        .sort((a, b) => a.wrist_size_mm - b.wrist_size_mm),
+      unset_count: unsetCount
+    }
+
+    // ---- 长度偏差分布（批量查素材物理数据 + 模板尺寸规则，禁止 N+1） ----
+    const materials =
+      allCodes.size > 0
+        ? await DiyMaterial.findAll({
+            where: { material_code: { [Op.in]: [...allCodes] } },
+            attributes: [
+              'material_code',
+              'bore_orientation',
+              'diameter',
+              'size_length_mm',
+              'size_width_mm'
+            ],
+            raw: true
+          })
+        : []
+    const materialMap = new Map(materials.map(m => [m.material_code, m]))
+
+    const templateIds = [...new Set(perWork.map(w => Number(w.diy_template_id)))]
+    const templates =
+      templateIds.length > 0
+        ? await DiyTemplate.findAll({
+            where: { diy_template_id: { [Op.in]: templateIds } },
+            attributes: ['diy_template_id', 'sizing_rules'],
+            raw: true
+          })
+        : []
+    const templateSizingMap = new Map(
+      templates.map(t => [Number(t.diy_template_id), parseJsonColumn(t.sizing_rules) || {}])
+    )
+
+    /* 偏差分档：≤5mm 工艺可吸收 / 5~10mm 需关注 / >10mm 余量参数需复核 / 不可测（缺手围或缺物理数据） */
+    const lengthDeviation = { within_5mm: 0, within_10mm: 0, over_10mm: 0, unmeasurable: 0 }
+    for (const { diy_template_id, wristSizeMm, codes } of perWork) {
+      if (!Number.isFinite(wristSizeMm) || wristSizeMm <= 0 || codes.length === 0) {
+        lengthDeviation.unmeasurable += 1
+        continue
+      }
+
+      /* 档位匹配双字段命中（与 confirm 校验同口径）：手链按手围，项链按目标佩戴长度 */
+      const sizing = templateSizingMap.get(Number(diy_template_id)) || {}
+      const elasticMarginMm = Number(sizing.elastic_margin_mm) || DEFAULT_ELASTIC_MARGIN_MM
+      const matched = Array.isArray(sizing.size_options)
+        ? sizing.size_options.find(
+            opt =>
+              Number(opt.wrist_size_mm) === wristSizeMm ||
+              Number(opt.target_length_mm) === wristSizeMm
+          )
+        : null
+      const targetLengthMm =
+        matched && Number.isFinite(Number(matched.target_length_mm))
+          ? Number(matched.target_length_mm)
+          : wristSizeMm + elasticMarginMm
+
+      let currentLengthMm = 0
+      let hasMissingSize = false
+      for (const code of codes) {
+        const material = materialMap.get(code)
+        const occupyMm = material ? deriveCordOccupyMm(material) : null
+        if (occupyMm === null) {
+          hasMissingSize = true
+          break
+        }
+        currentLengthMm += occupyMm
+      }
+      if (hasMissingSize) {
+        lengthDeviation.unmeasurable += 1
+        continue
+      }
+
+      const deviationMm = Math.abs(currentLengthMm - targetLengthMm)
+      if (deviationMm <= 5) lengthDeviation.within_5mm += 1
+      else if (deviationMm <= 10) lengthDeviation.within_10mm += 1
+      else lengthDeviation.over_10mm += 1
+    }
+
+    return { size_distribution: sizeDistribution, length_deviation: lengthDeviation }
+  }
+
+  /**
    * 管理端 DIY 数据统计（页内卡片 + 独立数据大屏共用同一套接口，不建独立数据源）
    *
-   * 返回结构（拍板决议 11.6-4，P0/P1/P2 三级）：
+   * 返回结构（拍板决议 11.6-4，P0/P1/P2 三级 + 手围驱动方案 §11.7）：
    * - templates / works / template_ranking：基础统计（原有）
-   * - completeness：P0 数据完备度（素材缺图/缺文案/0价，模板缺图/未发布）
+   * - completeness：P0 数据完备度（素材缺图/缺文案/0价/缺物理数据，模板缺图/未发布/缺档位）
    * - funnel / gmv / fulfillment：P1 经营看板（转化漏斗/GMV/履约）
    * - material_ranking / five_elements_distribution：P2 素材热度
+   * - size_distribution / length_deviation：手围档位分布 + 长度偏差分布（配货备料/余量调参）
    *
    * @returns {Object} DIY 业务统计数据
    */
@@ -447,6 +672,8 @@ class DiyAdminQueryService {
     const { funnel, gmv, fulfillment } = await DiyAdminQueryService._getOperationStats(byStatus)
     const { material_ranking, five_elements_distribution } =
       await DiyAdminQueryService._getMaterialHeatStats()
+    // 手围档位分布 + 长度偏差分布（手围驱动方案 §11.7-B4/B5）
+    const { size_distribution, length_deviation } = await DiyAdminQueryService._getWristSizeStats()
 
     return {
       templates: {
@@ -469,7 +696,9 @@ class DiyAdminQueryService {
       gmv,
       fulfillment,
       material_ranking,
-      five_elements_distribution
+      five_elements_distribution,
+      size_distribution,
+      length_deviation
     }
   }
 

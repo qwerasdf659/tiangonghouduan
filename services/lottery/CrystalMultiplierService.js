@@ -296,6 +296,7 @@ class CrystalMultiplierService {
 
     // 预取用户对象（segment 求值 / eligibility 需要）
     let userObj = null
+    let userHistoryPoints = 0
     const needUser = targets.some(t => ['segment', 'growth_level'].includes(t.target_type))
     if (needUser) {
       userObj = await User.findByPk(user_id, {
@@ -305,7 +306,6 @@ class CrystalMultiplierService {
           'created_at',
           'updated_at', // 内置回退规则（SEGMENT_RULE_VERSIONS）引用 user.updated_at，须保留
           'last_active_at',
-          'history_total_points',
           'user_level',
           'consecutive_fail_count',
           'login_count',
@@ -313,6 +313,14 @@ class CrystalMultiplierService {
         ],
         transaction
       })
+      /*
+       * 累计积分账本派生（拍板 4：history_total_points 冗余列已删除，
+       * 分群/成长等级求值输入的字段名不变，取值改为账本派生）
+       */
+      if (userObj) {
+        const AssetQueryService = require('../asset/QueryService')
+        userHistoryPoints = await AssetQueryService.getHistoryTotalPoints(user_id, { transaction })
+      }
     }
 
     // segment 需要活动 resolver_version + SegmentResolver
@@ -322,16 +330,16 @@ class CrystalMultiplierService {
         lottery_campaign_id,
         transaction
       )
-      userSegmentKey = await SegmentResolver.resolveSegmentAsync(
-        resolverVersion,
-        userObj.get({ plain: true })
-      )
+      userSegmentKey = await SegmentResolver.resolveSegmentAsync(resolverVersion, {
+        ...userObj.get({ plain: true }),
+        history_total_points: userHistoryPoints
+      })
     }
 
     // growth_level 复用 UserGrowthLevel.resolveLevelKey
     let userLevelKey = null
     if (targets.some(t => t.target_type === 'growth_level') && userObj) {
-      userLevelKey = await UserGrowthLevel.resolveLevelKey(userObj.history_total_points, {
+      userLevelKey = await UserGrowthLevel.resolveLevelKey(userHistoryPoints, {
         transaction
       })
     }

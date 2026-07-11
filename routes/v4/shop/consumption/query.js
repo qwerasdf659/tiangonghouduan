@@ -99,7 +99,7 @@ router.get(
       req.user.role_level >= 100,
       {
         include_review_records: true,
-        include_points_transaction: true
+        include_reward_transaction: true
       }
     )
 

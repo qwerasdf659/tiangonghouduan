@@ -6,7 +6,8 @@
  *
  * 业务定位：
  * - 成长等级是独立一等公民体系，区别于 users.user_level（身份类型 normal/vip/merchant）
- * - 用户当前等级由 users.history_total_points 实时派生（单一数据源，无 per-user 同步债）
+ * - 用户当前等级由累计积分实时派生；累计积分本身由资产账本派生
+ *   （asset/QueryService.getHistoryTotalPoints，拍板 4：账本是唯一真相，无冗余字段同步债）
  * - B 线公示分级概率：各等级在 lottery_strategy_config.level_probability 按活动配置中奖率倍数
  *
  * 服务职责：
@@ -25,6 +26,7 @@
  */
 
 const logger = require('../../utils/logger').logger
+const AssetQueryService = require('../asset/QueryService') // 累计积分账本派生（拍板 4）
 
 /** level_probability 配置组：倍数键前缀（如 multiplier_silver） */
 const LEVEL_MULTIPLIER_PREFIX = 'multiplier_'
@@ -51,7 +53,7 @@ class UserGrowthLevelService {
    * 等级分布看板数据（管理端 P0-3，拍板⑫）
    *
    * 统计口径：
-   * - 各档人数/累计积分贡献：全量用户按 history_total_points 实时分档
+   * - 各档人数/累计积分贡献：全量用户按账本派生的累计积分实时分档
    *   （用户量当前很小，JS 分桶即可；上量后再改 SQL CASE 聚合——工程加固 §9-8 结论）；
    * - 累计积分 ≈ 累计消费贡献（1 元 = 1 积分的 A 口径代理）；
    * - 本月升级人数：本月获得的"计入等级"积分（排除加成笔）使其跨过当前档阈值的用户数。
@@ -64,11 +66,14 @@ class UserGrowthLevelService {
       (a, b) => Number(a.min_history_points) - Number(b.min_history_points)
     )
 
-    // 全量用户累计积分（仅取单列；14 行级别，上量后改 SQL 聚合）
+    // 全量用户列表 + 账本批量派生累计积分（拍板 4：单条 GROUP BY 聚合，避免 N+1）
     const users = await this.User.findAll({
-      attributes: ['user_id', 'history_total_points'],
+      attributes: ['user_id'],
       raw: true
     })
+    const historyPointsMap = await AssetQueryService.getHistoryTotalPointsByUserIds(
+      users.map(u => u.user_id)
+    )
 
     /*
      * 本月"计入等级"积分增量（北京时间月初起，DB 会话时区 +08:00 故 NOW() 即北京时刻）：
@@ -112,7 +117,7 @@ class UserGrowthLevelService {
     }))
 
     for (const user of users) {
-      const points = Number(user.history_total_points) || 0
+      const points = historyPointsMap.get(Number(user.user_id)) || 0
       const idx = resolveIndex(points)
       if (idx < 0) continue
       buckets[idx].user_count += 1
@@ -238,13 +243,15 @@ class UserGrowthLevelService {
    */
   async resolveUserLevel(user_id, options = {}) {
     const user = await this.User.findByPk(user_id, {
-      attributes: ['user_id', 'history_total_points'],
+      attributes: ['user_id'],
       transaction: options.transaction
     })
     if (!user) {
       return null
     }
-    return this.UserGrowthLevel.resolveLevelKey(user.history_total_points, options)
+    // 累计积分账本派生（拍板 4；事务内读取直查账本保证同事务可见性）
+    const historyTotalPoints = await AssetQueryService.getHistoryTotalPoints(user_id, options)
+    return this.UserGrowthLevel.resolveLevelKey(historyTotalPoints, options)
   }
 
   /**
@@ -259,13 +266,15 @@ class UserGrowthLevelService {
    */
   async resolveUserLevelWithMultiplier(user_id, options = {}) {
     const user = await this.User.findByPk(user_id, {
-      attributes: ['user_id', 'history_total_points'],
+      attributes: ['user_id'],
       transaction: options.transaction
     })
     if (!user) {
       return { level_key: null, level_name: null, earn_multiplier: 1.0 }
     }
-    const level = await this.UserGrowthLevel.resolveLevel(user.history_total_points, options)
+    // 累计积分账本派生（拍板 4；事务内读取直查账本保证同事务可见性）
+    const historyTotalPoints = await AssetQueryService.getHistoryTotalPoints(user_id, options)
+    const level = await this.UserGrowthLevel.resolveLevel(historyTotalPoints, options)
     return {
       level_key: level ? level.level_key : null,
       level_name: level ? level.level_name : null,
@@ -294,11 +303,11 @@ class UserGrowthLevelService {
    * @returns {Promise<Object>} { current_level_key, current_level_name, history_total_points, thresholds_confirmed, levels: [{level_key, level_name, min_history_points|null}] }
    */
   async getUserGrowthLevelView(user_id) {
-    // 用户累计积分（单一数据源 users.history_total_points）
+    // 用户累计积分（拍板 4：账本派生 + 缓存，响应字段名不变）
     const user = await this.User.findByPk(user_id, {
-      attributes: ['user_id', 'history_total_points']
+      attributes: ['user_id']
     })
-    const historyTotalPoints = user ? Number(user.history_total_points) || 0 : 0
+    const historyTotalPoints = user ? await AssetQueryService.getHistoryTotalPoints(user_id) : 0
 
     // 全部启用等级（升序）
     const levels = await this.UserGrowthLevel.getActiveLevels()

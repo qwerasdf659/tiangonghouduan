@@ -148,7 +148,7 @@ async function auditCrossScopeRead(req, ctx) {
       operation_type: 'view_consumption_list',
       action: 'read',
       target_user_id: ctx.view === 'staff' ? ctx.target_user_id : null,
-      result: 'success',
+      status: 'success',
       extra_data: {
         view: ctx.view,
         store_scope: ctx.store_scope,

@@ -127,13 +127,22 @@ module.exports = sequelize => {
       },
 
       /**
-       * 尺寸规则（串珠模式必填，镶嵌模式为 null）
-       * { default_size: 'M', size_options: [{ label: 'S', bead_count: 14 }, { label: 'M', bead_count: 18 }] }
+       * 尺寸规则（串珠模式必填，镶嵌模式为 null）— 手围驱动方案权威 Schema（拍板 Q1/Q7）
+       *
+       * { default_size: 'M', elastic_margin_mm: 15, size_options: [{
+       *     label: 'S', display: '小号 (约15cm)', bead_count: 14, radius_x: 95, radius_y: 95,
+       *     wrist_size_mm: 140, target_length_mm: 155 }] }
+       *
+       * - wrist_size_mm：手围毫米（手链品类必填；项链等无手围概念的品类不填）
+       * - target_length_mm：目标成品周长毫米（所有串珠模板必填，长度联动/校验基准）
+       * - elastic_margin_mm：模板级弹力/工艺余量毫米（缺省 15）
+       * - bead_count 保留为兜底防呆颗数；发布护栏校验每档至少含一项毫米数据
        */
       sizing_rules: {
         type: DataTypes.JSON,
         allowNull: true,
-        comment: '尺寸规则（串珠模式）：默认尺寸、尺寸选项列表'
+        comment:
+          '尺寸规则（串珠模式）：{ default_size, elastic_margin_mm, size_options[{ label, display, bead_count, radius_x, radius_y, wrist_size_mm, target_length_mm }] }'
       },
 
       /**

@@ -340,7 +340,7 @@ class TierPickStage extends BaseStage {
        *
        * 业务背景：
        * - per-user 暗箱干预下线后，"让某类人更易中"改为按成长等级的公示分级概率
-       * - 成长等级由 users.history_total_points 实时派生（UserGrowthLevelService）
+       * - 成长等级由账本派生的累计积分实时派生（UserGrowthLevelService，拍板 4）
        * - 各等级倍数存于 lottery_strategy_config.level_probability（按活动公示），默认 1.0（零行为变化）
        * - 倍数仅放大 high 档位权重；最终仍受 §4a 硬上限 MAX_HIGH_TIER_PROBABILITY 约束（内部成本控制上限 high≤8%，不对外公示固定概率，对外仅按动态机制如实告知）
        */
@@ -579,7 +579,6 @@ class TierPickStage extends BaseStage {
           'created_at',
           'updated_at', // 内置回退规则（SEGMENT_RULE_VERSIONS）引用 user.updated_at，须保留
           'last_active_at',
-          'history_total_points',
           'user_level',
           'consecutive_fail_count',
           'login_count',
@@ -592,8 +591,18 @@ class TierPickStage extends BaseStage {
         return 'default'
       }
 
+      /*
+       * 分群输入快照注入累计积分派生值（拍板 4：history_total_points 冗余列已删除，
+       * 分群规则字段名不变，取值改为 asset/QueryService 账本派生 + 缓存）
+       */
+      const AssetQueryService = require('../../../asset/QueryService')
+      const userSnapshot = {
+        ...user.toJSON(),
+        history_total_points: await AssetQueryService.getHistoryTotalPoints(user_id)
+      }
+
       // 优先从数据库加载自定义分群规则，回退到内置规则
-      const segment = await SegmentResolver.resolveSegmentAsync(resolver_version, user.toJSON())
+      const segment = await SegmentResolver.resolveSegmentAsync(resolver_version, userSnapshot)
 
       this.log('info', '用户分群解析成功', {
         user_id,

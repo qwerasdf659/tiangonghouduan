@@ -201,7 +201,7 @@ router.post(
             request_id: req.id || null,
             ip_address: req.ip,
             user_agent: req.headers['user-agent'],
-            result: 'blocked',
+            status: 'blocked',
             error_message: riskCheckResult.blockReason,
             consumption_amount: parseFloat(consumption_amount),
             extra_data: {
@@ -325,12 +325,12 @@ router.post(
             operation_type: 'submit_consumption',
             action: 'create',
             target_user_id: record.user_id,
-            related_record_id: record.consumption_record_id,
+            consumption_record_id: record.consumption_record_id,
             consumption_amount: parseFloat(consumption_amount),
             request_id: req.id || null,
             ip_address: req.ip,
             user_agent: req.headers['user-agent'],
-            result: 'success',
+            status: 'success',
             idempotency_key,
             extra_data: {
               points_to_award: record.points_to_award,

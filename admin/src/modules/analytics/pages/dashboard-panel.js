@@ -500,7 +500,7 @@ function dashboardPanelPage() {
     /**
      * 获取用户统计数据
      * @description 用户分层来自 /api/v4/console/users/segments；
-     *              今日新增来自 /api/v4/system/admin/overview 的真实字段 users.new_today。
+     *              今日新增来自 /api/v4/console/dashboard/overview 的真实字段 users.new_today。
      *              segments 接口本身不返回今日新增，缺失时返回 0，绝不本地估算。
      */
     async fetchUserStats() {
@@ -508,7 +508,7 @@ function dashboardPanelPage() {
         // 并行获取分层统计与系统概览（今日新增的真实来源）
         const [segResult, overviewResult] = await Promise.all([
           request({ url: `${API_PREFIX}/console/users/segments` }),
-          request({ url: `${API_PREFIX}/system/admin/overview` })
+          request({ url: `${API_PREFIX}/console/dashboard/overview` })
         ])
 
         if (segResult.success && segResult.data) {

@@ -19,6 +19,8 @@
 
 const BusinessError = require('../utils/BusinessError')
 const models = require('../models')
+/** 管理员域日志视图（operation_logs 单表 + operator_type='admin'，拍板 10 三表合并；读/条件更新自动带域过滤） */
+const AdminOperationLog = models.OperationLog.scope('admin')
 const AuditLogService = require('./AuditLogService')
 const logger = require('../utils/logger')
 const BeijingTimeHelper = require('../utils/timeHelper')
@@ -59,10 +61,10 @@ const ROLLBACK_HANDLERS = {
         asset_code: AssetCode.STAR_STONE,
         delta_amount: deltaPoints,
         business_type: 'audit_rollback',
-        idempotency_key: `rollback_points_${log.admin_operation_log_id}_${Date.now()}`,
+        idempotency_key: `rollback_points_${log.operation_log_id}_${Date.now()}`,
         meta: {
           rollback_reason: reason || '管理员回滚',
-          original_log_id: log.admin_operation_log_id,
+          original_log_id: log.operation_log_id,
           operator_id
         }
       },
@@ -186,7 +188,7 @@ class AuditRollbackService {
    * @returns {Promise<Object>} 检查结果
    */
   static async checkRollbackable(logId) {
-    const log = await models.AdminOperationLog.findByPk(logId)
+    const log = await AdminOperationLog.findByPk(logId)
 
     if (!log) {
       return { rollbackable: false, reason: '审计日志不存在' }
@@ -351,7 +353,7 @@ class AuditRollbackService {
 
     const offset = (page - 1) * page_size
 
-    const { count, rows } = await models.AdminOperationLog.findAndCountAll({
+    const { count, rows } = await AdminOperationLog.findAndCountAll({
       where,
       include: [
         {
@@ -389,7 +391,7 @@ class AuditRollbackService {
 
     const offset = (page - 1) * page_size
 
-    const { count, rows } = await models.AdminOperationLog.findAndCountAll({
+    const { count, rows } = await AdminOperationLog.findAndCountAll({
       where,
       include: [
         {
@@ -461,13 +463,13 @@ class AuditRollbackService {
    * @returns {Promise<void>} 无返回值
    */
   static async markAsReversible(logId, reversalData, options = {}) {
-    await models.AdminOperationLog.update(
+    await AdminOperationLog.update(
       {
         is_reversible: true,
         reversal_data: reversalData
       },
       {
-        where: { admin_operation_log_id: logId },
+        where: { operation_log_id: logId },
         ...options
       }
     )
@@ -496,45 +498,45 @@ class AuditRollbackService {
     }
 
     // 总操作数
-    const totalCount = await models.AdminOperationLog.count({ where })
+    const totalCount = await AdminOperationLog.count({ where })
 
     // 按类型统计
-    const byType = await models.AdminOperationLog.findAll({
+    const byType = await AdminOperationLog.findAll({
       where,
       attributes: [
         'operation_type',
-        [models.sequelize.fn('COUNT', models.sequelize.col('admin_operation_log_id')), 'count']
+        [models.sequelize.fn('COUNT', models.sequelize.col('operation_log_id')), 'count']
       ],
       group: ['operation_type'],
       raw: true
     })
 
     // 按风险等级统计
-    const byRiskLevel = await models.AdminOperationLog.findAll({
+    const byRiskLevel = await AdminOperationLog.findAll({
       where,
       attributes: [
         'risk_level',
-        [models.sequelize.fn('COUNT', models.sequelize.col('admin_operation_log_id')), 'count']
+        [models.sequelize.fn('COUNT', models.sequelize.col('operation_log_id')), 'count']
       ],
       group: ['risk_level'],
       raw: true
     })
 
     // 回滚统计
-    const reversedCount = await models.AdminOperationLog.count({
+    const reversedCount = await AdminOperationLog.count({
       where: { ...where, is_reversed: true }
     })
 
-    const reversibleCount = await models.AdminOperationLog.count({
+    const reversibleCount = await AdminOperationLog.count({
       where: { ...where, is_reversible: true, is_reversed: false }
     })
 
     // 按操作者统计（Top 10）
-    const byOperator = await models.AdminOperationLog.findAll({
+    const byOperator = await AdminOperationLog.findAll({
       where,
       attributes: [
         'operator_id',
-        [models.sequelize.fn('COUNT', models.sequelize.col('admin_operation_log_id')), 'count']
+        [models.sequelize.fn('COUNT', models.sequelize.col('operation_log_id')), 'count']
       ],
       include: [
         {
@@ -544,9 +546,7 @@ class AuditRollbackService {
         }
       ],
       group: ['operator_id', 'operator.user_id', 'operator.nickname'],
-      order: [
-        [models.sequelize.fn('COUNT', models.sequelize.col('admin_operation_log_id')), 'DESC']
-      ],
+      order: [[models.sequelize.fn('COUNT', models.sequelize.col('operation_log_id')), 'DESC']],
       limit: 10,
       raw: false
     })
@@ -609,16 +609,14 @@ class AuditRollbackService {
     }
 
     // 按 target_type 分组统计
-    const stats = await models.AdminOperationLog.findAll({
+    const stats = await AdminOperationLog.findAll({
       where,
       attributes: [
         'target_type',
-        [models.sequelize.fn('COUNT', models.sequelize.col('admin_operation_log_id')), 'count']
+        [models.sequelize.fn('COUNT', models.sequelize.col('operation_log_id')), 'count']
       ],
       group: ['target_type'],
-      order: [
-        [models.sequelize.fn('COUNT', models.sequelize.col('admin_operation_log_id')), 'DESC']
-      ],
+      order: [[models.sequelize.fn('COUNT', models.sequelize.col('operation_log_id')), 'DESC']],
       raw: true
     })
 
@@ -692,11 +690,11 @@ class AuditRollbackService {
     }
 
     // 按日期分组统计（使用 DATE 函数提取日期部分）
-    const stats = await models.AdminOperationLog.findAll({
+    const stats = await AdminOperationLog.findAll({
       where,
       attributes: [
         [models.sequelize.fn('DATE', models.sequelize.col('created_at')), 'date'],
-        [models.sequelize.fn('COUNT', models.sequelize.col('admin_operation_log_id')), 'count']
+        [models.sequelize.fn('COUNT', models.sequelize.col('operation_log_id')), 'count']
       ],
       group: [models.sequelize.fn('DATE', models.sequelize.col('created_at'))],
       order: [[models.sequelize.fn('DATE', models.sequelize.col('created_at')), 'ASC']],

@@ -5,7 +5,7 @@
  *
  * 业务背景（详见 docs/抽奖管理干预接入缺口诊断.md §十六 B 线）：
  * - per-user 暗箱干预下线后，"让某类人更易中"改为"按成长等级的公示分级概率"
- * - 成长等级由 users.history_total_points 实时派生（UserGrowthLevelService）
+ * - 成长等级由账本派生的累计积分实时派生（UserGrowthLevelService，拍板 4）
  * - 各等级的中奖率倍数存于 lottery_strategy_config.level_probability（按活动），抽奖内核 TierPickStage 只读消费
  *
  * 架构规范：

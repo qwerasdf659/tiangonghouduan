@@ -78,6 +78,22 @@
                  x-text="completeness?.templates?.published_without_materials_count ?? '-'"></div>
           </div>
         </div>
+        <!-- 手围驱动方案 §11.7-A1/A2：物理数据 + 档位毫米数据完备度 -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+          <a href="/admin/diy-material-management.html?filter=missing_physical"
+             class="bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-red-300 transition">
+            <div class="text-xs text-gray-500">素材缺物理数据 ▸ 去补录</div>
+            <div class="text-2xl font-bold mt-1" :class="(completeness?.materials?.missing_physical_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
+                 x-text="completeness?.materials?.missing_physical_count ?? '-'"></div>
+            <div class="text-xs text-gray-400 mt-1">长度联动/校验不可用，禁止发布</div>
+          </a>
+          <div class="bg-white rounded-xl shadow p-4">
+            <div class="text-xs text-gray-500">已发布模板缺档位数据</div>
+            <div class="text-2xl font-bold mt-1" :class="(completeness?.templates?.published_missing_sizing_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
+                 x-text="completeness?.templates?.published_missing_sizing_count ?? '-'"></div>
+            <div class="text-xs text-gray-400 mt-1">存量脏数据兜底口（护栏只拦新发布）</div>
+          </div>
+        </div>
       </section>
 
       <!-- P1 经营看板：转化漏斗 + GMV + 履约 -->
@@ -155,6 +171,42 @@
           <div class="bg-white rounded-xl shadow p-4">
             <div class="text-xs text-gray-500 mb-2">素材库五行分布（配货平衡参考）</div>
             <div ref="fiveElementsChart" class="w-full h-72"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 手围看板：档位分布 + 长度偏差（手围驱动方案 §11.7-B4/B5） -->
+      <section>
+        <h2 class="text-sm font-semibold text-gray-700 mb-3">手围看板 · 档位分布 & 长度偏差（配货备料 / 余量调参）</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-white rounded-xl shadow p-4">
+            <div class="text-xs text-gray-500 mb-2">手围档位分布（冻结/完成作品，哪个手围段卖得多）</div>
+            <div ref="sizeDistributionChart" class="w-full h-64"></div>
+            <div class="text-xs text-gray-400 mt-2">
+              未选手围作品 <span x-text="sizeDistribution?.unset_count ?? 0"></span> 个
+            </div>
+          </div>
+          <div class="bg-white rounded-xl shadow p-4">
+            <div class="text-xs text-gray-500 mb-2">成品长度偏差分布（|成品长度 − 目标周长|，余量参数是否合理的量化依据）</div>
+            <div class="grid grid-cols-2 gap-3 mt-3">
+              <div class="rounded-lg border p-3">
+                <div class="text-xs text-gray-500">≤ 5mm（工艺可吸收）</div>
+                <div class="text-2xl font-bold text-green-600 mt-1" x-text="lengthDeviation?.within_5mm ?? '-'"></div>
+              </div>
+              <div class="rounded-lg border p-3">
+                <div class="text-xs text-gray-500">5 ~ 10mm（需关注）</div>
+                <div class="text-2xl font-bold text-amber-600 mt-1" x-text="lengthDeviation?.within_10mm ?? '-'"></div>
+              </div>
+              <div class="rounded-lg border p-3">
+                <div class="text-xs text-gray-500">&gt; 10mm（复核余量参数）</div>
+                <div class="text-2xl font-bold text-red-600 mt-1" x-text="lengthDeviation?.over_10mm ?? '-'"></div>
+              </div>
+              <div class="rounded-lg border p-3">
+                <div class="text-xs text-gray-500">不可测（缺手围/缺素材尺寸）</div>
+                <div class="text-2xl font-bold text-gray-500 mt-1" x-text="lengthDeviation?.unmeasurable ?? '-'"></div>
+              </div>
+            </div>
+            <div class="text-xs text-gray-400 mt-3">偏差普遍偏大时应调整模板的弹力余量（elastic_margin_mm），数据驱动而非拍脑袋</div>
           </div>
         </div>
       </section>

@@ -49,6 +49,7 @@ const {
 const logger = require('../../utils/logger')
 const BalanceService = require('./BalanceService')
 const BeijingTimeHelper = require('../../utils/timeHelper')
+const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 
 /**
  * 资产查询服务类
@@ -715,6 +716,107 @@ class QueryService {
       },
       updated_at: new Date().toISOString()
     }
+  }
+
+  /**
+   * 派生用户累计获得积分（history_total_points，拍板 4：账本实时派生 + Redis 缓存）
+   *
+   * 业务语义："用户在平台累计获得过多少积分"（单调只增，消费不扣减），
+   * 是成长等级派生与臻选空间解锁的单一数据源。
+   *
+   * 派生口径（与原 users.history_total_points 字段累加口径完全一致）：
+   * - 用户账户（accounts.account_type='user'）
+   * - points 资产 + 正向入账（delta_amount > 0）
+   * - 排除失效流水（is_invalid）
+   * - 排除防复利名单（level_bonus_reward / activity_bonus_reward——加成笔可花不计等级）
+   *
+   * 缓存策略：
+   * - 无事务读取走 BusinessCacheHelper（USER 域 TTL 120s）
+   * - BalanceService.changeBalance 在计等级积分入账事务提交后失效缓存（afterCommit）
+   * - 事务内读取（如消费审核发分后即时判级）强制直查账本，保证同事务可见性
+   *
+   * @param {number} user_id - 用户ID
+   * @param {Object} [options={}] - 选项
+   * @param {Object} [options.transaction] - Sequelize 事务（传入时跳过缓存，直查账本）
+   * @returns {Promise<number>} 累计获得积分（整数，无流水时为 0）
+   */
+  static async getHistoryTotalPoints(user_id, options = {}) {
+    const { transaction = null } = options
+    const uid = Number(user_id)
+    if (!Number.isInteger(uid) || uid <= 0) {
+      return 0
+    }
+
+    if (!transaction) {
+      const cached = await BusinessCacheHelper.getHistoryPoints(uid)
+      if (cached !== null) {
+        return Number(cached) || 0
+      }
+    }
+
+    const [[row]] = await sequelize.query(
+      `SELECT COALESCE(SUM(t.delta_amount), 0) AS total
+       FROM asset_transactions t
+       JOIN accounts a ON a.account_id = t.account_id AND a.account_type = 'user'
+       WHERE a.user_id = :userId
+         AND t.asset_code = 'points'
+         AND t.delta_amount > 0
+         AND (t.is_invalid IS NULL OR t.is_invalid = 0)
+         AND t.business_type NOT IN (:excludedTypes)`,
+      {
+        replacements: {
+          userId: uid,
+          excludedTypes: BalanceService.HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES
+        },
+        transaction
+      }
+    )
+
+    const total = Number(row.total) || 0
+
+    if (!transaction) {
+      await BusinessCacheHelper.setHistoryPoints(uid, total)
+    }
+
+    return total
+  }
+
+  /**
+   * 批量派生多个用户的累计获得积分（管理端看板/列表用，不走缓存）
+   *
+   * 业务场景：等级分布看板、用户管理列表等需要一次取全量/多用户累计积分的场景，
+   * 单条 GROUP BY 聚合替代 N 次单用户派生，避免 N+1。
+   *
+   * @param {Array<number>} user_ids - 用户ID数组（空数组返回空 Map）
+   * @param {Object} [options={}] - 选项
+   * @param {Object} [options.transaction] - Sequelize 事务（可选）
+   * @returns {Promise<Map<number, number>>} user_id → 累计获得积分（无流水的用户不在 Map 中，读取方按 0 兜底）
+   */
+  static async getHistoryTotalPointsByUserIds(user_ids, options = {}) {
+    if (!Array.isArray(user_ids) || user_ids.length === 0) {
+      return new Map()
+    }
+
+    const [rows] = await sequelize.query(
+      `SELECT a.user_id, COALESCE(SUM(t.delta_amount), 0) AS total
+       FROM asset_transactions t
+       JOIN accounts a ON a.account_id = t.account_id AND a.account_type = 'user'
+       WHERE a.user_id IN (:userIds)
+         AND t.asset_code = 'points'
+         AND t.delta_amount > 0
+         AND (t.is_invalid IS NULL OR t.is_invalid = 0)
+         AND t.business_type NOT IN (:excludedTypes)
+       GROUP BY a.user_id`,
+      {
+        replacements: {
+          userIds: user_ids.map(Number),
+          excludedTypes: BalanceService.HISTORY_POINTS_EXCLUDED_BUSINESS_TYPES
+        },
+        transaction: options.transaction
+      }
+    )
+
+    return new Map(rows.map(r => [Number(r.user_id), Number(r.total) || 0]))
   }
 }
 

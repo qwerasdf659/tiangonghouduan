@@ -108,8 +108,7 @@ class MerchantService {
 
       // 附加中文显示名称
       const recordsWithDisplayNames = await attachDisplayNames(formattedRecords, [
-        { field: 'status', dictType: 'consumption_status' },
-        { field: 'final_status', dictType: 'consumption_final_status' }
+        { field: 'status', dictType: 'consumption_status' }
       ])
 
       return {
@@ -249,8 +248,7 @@ class MerchantService {
       const formattedRecord = record.toJSON()
 
       const recordWithDisplayNames = await attachDisplayNames(formattedRecord, [
-        { field: 'status', dictType: 'consumption_status' },
-        { field: 'final_status', dictType: 'consumption_final_status' }
+        { field: 'status', dictType: 'consumption_status' }
       ])
 
       return recordWithDisplayNames

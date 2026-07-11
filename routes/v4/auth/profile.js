@@ -28,12 +28,16 @@ router.get('/profile', authenticateToken, async (req, res) => {
 
   // 通过ServiceManager获取UserService
   const UserService = req.app.locals.services.getService('user')
+  const AssetQueryService = req.app.locals.services.getService('asset_query')
 
   // 使用 UserService 获取用户信息（含状态验证）
   const user = await UserService.getUserWithValidation(user_id)
 
-  // 获取用户角色信息
-  const userRoles = await getUserRoles(user_id)
+  // 获取用户角色信息 + 累计获得积分（拍板 4：账本实时派生 + 缓存，响应字段名不变）
+  const [userRoles, historyTotalPoints] = await Promise.all([
+    getUserRoles(user_id),
+    AssetQueryService.getHistoryTotalPoints(user_id)
+  ])
 
   const responseData = {
     user: {
@@ -46,7 +50,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
       roles: userRoles.roles,
       status: user.status,
       consecutive_fail_count: user.consecutive_fail_count,
-      history_total_points: user.history_total_points,
+      history_total_points: historyTotalPoints,
       created_at: BeijingTimeHelper.formatToISO(user.created_at),
       last_login: BeijingTimeHelper.formatToISO(user.last_login),
       login_count: user.login_count

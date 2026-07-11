@@ -63,8 +63,15 @@ server.log
 !.cursor/rules/
 !.cursor/rules/*
 
-# Claude AI配置（保留所有内容）
-# .claude目录不忽略
+# Claude AI 本地配置（删32 否决删除：文件保留本地，仅不入库）
+.claude/
+.clauderc
+
+# VSIX 插件安装包（与项目无关的二进制，不入库）
+*.vsix
+
+# 行政区划数据快照（拍板 14：保留文件，仅不入库）
+data/pcas-code.json
 
 # 禁止手动迁移脚本（强制规范 - 2026-01-04拍板）
 # 所有数据库变更必须走标准迁移流程，无例外
@@ -76,15 +83,8 @@ migrations/manual/
 # .env 命令行修改前的时间戳备份（仅本地留存，不入库）
 .env.bak.*
 
-# 大型备份文件（超过GitHub 100MB限制）
-backups/backup_2026-02-01_complete/*.sql
-backups/backup_2026-02-01_complete/*.json
-
-# 大型备份文件（超过GitHub 100MB限制）
-backups/**/*.sql
-backups/**/*.json
-# CSV 数据快照迁出对象存储/网盘后勿再入库（技术债务 §2.10）
-backups/**/*.csv
+# 备份目录整体不入库（删33：本地/对象存储留存，git 不承载数据备份）
+backups/
 dump.rdb
 # Redis AOF 持久化产物（开启 appendonly 后生成于运行目录，不入库）
 appendonlydir/

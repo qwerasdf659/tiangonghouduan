@@ -151,7 +151,7 @@ export function useAuditLogsMethods() {
     async viewLogDetail(log) {
       try {
         const response = await this.apiGet(
-          buildURL(SYSTEM_ENDPOINTS.AUDIT_LOG_DETAIL, { id: log.admin_operation_log_id }),
+          buildURL(SYSTEM_ENDPOINTS.AUDIT_LOG_DETAIL, { id: log.operation_log_id }),
           {},
           { showLoading: true }
         )

@@ -573,7 +573,7 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('merchantLogsDataTable', () => {
     const table = dataTable({
       columns: [
-        { key: 'id', label: '日志ID', sortable: true },
+        { key: 'operation_log_id', label: '日志ID', sortable: true },
         {
           key: 'operator_info',
           label: '操作人',
@@ -598,13 +598,13 @@ document.addEventListener('alpine:init', () => {
           render: (val, row) => row.store_info?.store_name || '-'
         },
         {
-          key: 'result',
+          key: 'status',
           label: '结果',
           render: (val, row) => {
             if (val === 'success') return '<span class="text-green-600">✅ 成功</span>'
             if (val === 'failed') return '<span class="text-red-600">❌ 失败</span>'
             if (val === 'blocked') return '<span class="text-yellow-600">⚠️ 被阻断</span>'
-            return row.result_name || val || '-'
+            return row.status_name || val || '-'
           }
         },
         { key: 'created_at', label: '操作时间', type: 'datetime', sortable: true }
@@ -637,7 +637,7 @@ document.addEventListener('alpine:init', () => {
           total: res.data?.pagination?.total || res.data?.count || 0
         }
       },
-      primaryKey: 'id',
+      primaryKey: 'operation_log_id',
       sortable: true,
       page_size: 20
     })

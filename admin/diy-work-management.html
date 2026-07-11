@@ -184,6 +184,15 @@
                 <span class="text-gray-500">冻结时间：</span>
                 <span x-text="detailData?.frozen_at ? formatDate(detailData.frozen_at) : '-'"></span>
               </div>
+              <!-- 手围驱动方案 §11.7-A3：客服排查"戴不上手"客诉 + 产线发货前核对成品尺寸 -->
+              <div>
+                <span class="text-gray-500">手围档位：</span>
+                <span x-text="formatWristSize(detailData?.design_data?.size)"></span>
+              </div>
+              <div>
+                <span class="text-gray-500">成品长度：</span>
+                <span x-text="formatComputedLength(detailData?.computed_length_mm)"></span>
+              </div>
             </div>
 
             <!-- 材料消耗（兼容新格式 { price_snapshot, payments } 和旧格式 [{ asset_code, amount }]） -->

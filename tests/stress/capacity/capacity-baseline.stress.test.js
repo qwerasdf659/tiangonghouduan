@@ -473,9 +473,9 @@ describe('🚀 容量基准压力测试（P1-2）', () => {
 
             // 记录幂等请求
             await IdempotencyService.getOrCreateRequest(idempotencyKey, {
-              api_path: '/api/v4/marketplace/listings/:id/purchase',
+              api_path: '/api/v4/exchange',
               http_method: 'POST',
-              request_params: { market_listing_id: 1, buyer_index: index },
+              request_params: { exchange_item_id: 1, buyer_index: index },
               user_id: testUserId + index
             })
 
@@ -817,9 +817,9 @@ describe('🚀 容量基准压力测试（P1-2）', () => {
 
           try {
             await IdempotencyService.getOrCreateRequest(idempotencyKey, {
-              api_path: '/api/v4/marketplace/listings/:id/purchase',
+              api_path: '/api/v4/exchange',
               http_method: 'POST',
-              request_params: { market_listing_id: (index % 10) + 1 },
+              request_params: { exchange_item_id: (index % 10) + 1 },
               user_id: testUserId
             })
 

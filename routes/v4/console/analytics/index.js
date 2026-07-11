@@ -8,7 +8,7 @@ const express = require('express')
 const router = express.Router()
 
 router.use('/analytics', require('./analytics'))
-router.use('/dashboard', require('./dashboard'))
+// 注：dashboard 已合并至 routes/v4/console/dashboard/（2026-07-11 双 dashboard 合并，URL 不变）
 router.use('/statistics', require('./multi-dimension-stats'))
 router.use('/report-templates', require('./report-templates'))
 router.use('/business-records', require('./business-records'))

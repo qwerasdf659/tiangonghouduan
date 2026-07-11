@@ -46,7 +46,7 @@ if (!ENABLE_DATA_CLEANUP) {
      * 使用 UnifiedDistributedLock 防止多实例并发执行（多 Pod 场景）
      * 通过 ServiceManager 获取 DataManagementService，调用 runAutoCleanup()
      *
-     * @returns {Promise<void>}
+     * @returns {Promise<void>} 执行完成
      */
     static async run() {
       const startTime = Date.now()

@@ -11,7 +11,7 @@
  *
  * 业务规则（2026-06-25 起，以下阈值为默认值，运营可在 Web 后台「系统设置 → 臻选空间」动态调整，
  * 存 system_settings category='premium'，PremiumService 经 AdminSystemService.getSettingValue 读取）：
- * - 解锁条件1: users.history_total_points >= history_points_threshold（默认 100000，历史累计积分门槛）
+ * - 解锁条件1: 累计获得积分（资产账本派生，拍板 4）>= history_points_threshold（默认 100000，历史累计积分门槛）
  * - 解锁条件2: account_asset_balances.available_amount >= unlock_cost（默认 100，当前 POINTS 余额门槛）
  * - 解锁费用: unlock_cost（默认 100 积分）
  * - 有效期: validity_hours（默认 24 小时）
