@@ -25,6 +25,7 @@ const {
 } = require('../../models')
 const BalanceService = require('../asset/BalanceService')
 const AssetQueryService = require('../asset/QueryService') // 累计积分账本派生（拍板 4：users.history_total_points 冗余列已删除）
+const ConsumptionBonusService = require('./BonusService') // 消费加成活动命中（方案C：多活动独立倍率，商家专属优先）
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const OrderNoGenerator = require('../../utils/OrderNoGenerator')
 const { generateConsumptionBusinessId } = require('../../utils/IdempotencyHelper')
@@ -212,25 +213,11 @@ class CoreService {
     const levelKeyLocked = lockedLevel ? lockedLevel.level_key : null
     const earnMultiplierLocked = lockedLevel ? Number(lockedLevel.earn_multiplier) || 1.0 : 1.0
 
-    /*
-     * 步骤6.2：活动加成率提交时锁定（拍板⑮-(b)，2026-07-11 落地）
-     * - 与等级倍数同点位锁定：读取 system_settings 的 points/activity_bonus_rate（0=无活动），
-     *   随消费记录落表——活动启停/调率不影响已提交小票的到账金额（用户承诺一致）；
-     * - 发放侧独立成 activity_bonus_reward 笔（加法叠加、不计 history_total_points）。
-     */
-    const activityBonusRateRaw = Number(
-      await AdminSystemService.getSettingValue('points', 'activity_bonus_rate', 0)
-    )
-    const activityBonusRateLocked =
-      Number.isFinite(activityBonusRateRaw) && activityBonusRateRaw > 0
-        ? Math.min(activityBonusRateRaw, EARN_MULTIPLIER_HARD_CAP - 1)
-        : null
-
     // 业务唯一键：consume_{merchant_id}_{user_id}_{timestamp_ms}
     const business_id = generateConsumptionBusinessId(data.merchant_id, userId, Date.now())
     const placeholder_cs = `PH${crypto.randomBytes(12).toString('hex').toUpperCase()}`
 
-    // 步骤6.5：处理 store_id
+    // 步骤6.5：处理 store_id（活动命中依赖门店/商家，须在活动锁定前确定）
     let storeId = data.store_id
     if (!storeId) {
       const merchantStores = await StoreStaff.findAll({
@@ -253,6 +240,25 @@ class CoreService {
         logger.warn(`⚠️ 商家 ${data.merchant_id} 未关联任何门店，消费记录将缺少门店信息`)
       }
     }
+
+    /*
+     * 步骤6.6：活动加成率提交时锁定（消费加成活动·方案C，2026-07-15）
+     * - 按门店/商家/时间窗自动命中消费加成活动（ConsumptionBonusService，商家专属优先），
+     *   命中的 bonus_rate 锁定随消费记录落表——活动启停/调率不影响已提交小票（用户承诺一致）；
+     * - 须在 store_id 确定后执行（命中判定依赖门店/商家）；
+     * - 发放侧独立成 activity_bonus_reward 笔（加法叠加、不计 history_total_points），逻辑不变。
+     */
+    const { bonus_rate: activityBonusRate } =
+      await ConsumptionBonusService.resolveConsumptionBonusRate({
+        store_id: storeId || null,
+        merchant_id: data.merchant_id,
+        now: BeijingTimeHelper.createBeijingTime(),
+        transaction
+      })
+    const activityBonusRateLocked =
+      Number.isFinite(activityBonusRate) && activityBonusRate > 0
+        ? Math.min(activityBonusRate, EARN_MULTIPLIER_HARD_CAP - 1)
+        : null
 
     // 步骤7：创建消费记录
     const consumptionRecord = await ConsumptionRecord.create(
@@ -630,8 +636,8 @@ class CoreService {
    *
    * 当前规则（按序应用，加法叠加）：
    * 1. 等级加成（发放线九档阶梯，倍数取提交时锁定值 earn_multiplier_locked）；
-   * 2. 活动加成（拍板⑮-(b)，2026-07-11 落地：加成率取提交时锁定值 activity_bonus_rate_locked，
-   *    运营在 system_settings 配 points/activity_bonus_rate 即启用，0/NULL=无活动）。
+   * 2. 活动加成（消费加成活动·方案C，2026-07-15：加成率取提交时锁定值 activity_bonus_rate_locked，
+   *    由 consumption_bonus_rules 按门店/商家/时间命中活动锁定，商家专属优先，0/NULL=无活动）。
    *
    * 硬封顶（拍板⑮-(d)）：可用积分总倍数 = 1 + Σ 加成率 ≤ 3.0（EARN_MULTIPLIER_HARD_CAP）——
    * 按规则顺序对后续规则的加成率做"剩余空间截断"（等级优先、活动让位），

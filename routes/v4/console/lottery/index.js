@@ -21,6 +21,8 @@ router.use('/prize-definitions', require('./prize-definitions'))
 router.use('/', require('./multiplier-rules'))
 // 活动预算归集规则（限时翻倍活动消费预算重定向 + event_points 发放，§12.10）
 router.use('/event-budget-collection-rules', require('./event-budget-collection-rules'))
+// 消费加成活动规则（多活动独立倍率，全平台+商家专属并存，方案C 2026-07-15）
+router.use('/consumption-bonus-rules', require('./consumption-bonus-rules'))
 
 // ── 抽奖监控与分析 ──
 router.use('/lottery-realtime', require('./lottery-realtime'))

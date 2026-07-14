@@ -35,6 +35,11 @@ const pageConfigs = {
   // 抽奖管理模块
   'lottery-management': { title: '抽奖活动管理', pageIcon: '🎰', pageTitle: '抽奖活动管理' },
   'multiplier-management': { title: '水晶倍率活动管理', pageIcon: '✨', pageTitle: '水晶倍率活动管理' },
+  'consumption-bonus-management': {
+    title: '消费加成活动管理',
+    pageIcon: '🎁',
+    pageTitle: '消费加成活动管理'
+  },
   'pool-list': { title: '奖池管理', pageIcon: '🎱', pageTitle: '奖池管理' },
   'prize-list': { title: '奖品管理', pageIcon: '🎁', pageTitle: '奖品管理' },
   'probability-config': { title: '概率配置', pageIcon: '📊', pageTitle: '概率配置' },

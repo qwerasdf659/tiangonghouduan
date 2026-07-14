@@ -127,6 +127,7 @@ export const PAGE_ACCESS_RULES = {
   'lottery-management.html': { minLevel: 30, menuId: 'lottery.campaigns' },
   'presets.html': { minLevel: 30, menuId: 'lottery.presets' },
   'multiplier-management.html': { minLevel: 100, menuId: 'lottery.multiplier' },
+  'consumption-bonus-management.html': { minLevel: 100, menuId: 'lottery.consumption_bonus' },
 
   'asset-management.html': { minLevel: 30, menuId: 'assets.asset-mgmt' },
   'asset-adjustment.html': { minLevel: 30, menuId: 'assets.asset-adj' },

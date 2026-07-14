@@ -116,7 +116,8 @@ const {
 const {
   CoreService: ConsumptionCoreService, // 核心操作（提交/审核/删除/恢复）
   QueryService: ConsumptionQueryService, // 查询服务（用户/管理员/待审核列表）
-  MerchantService: ConsumptionMerchantService // 商家侧服务（商家员工专用查询）
+  MerchantService: ConsumptionMerchantService, // 商家侧服务（商家员工专用查询）
+  BonusService: ConsumptionBonusService // 消费加成活动（多活动独立倍率，方案C）
 } = require('./consumption')
 
 // Reporting 域子服务
@@ -336,6 +337,7 @@ class ServiceManager {
       this._services.set('consumption_core', ConsumptionCoreService) // 核心操作（静态类）
       this._services.set('consumption_query', ConsumptionQueryService) // 查询服务（静态类）
       this._services.set('consumption_merchant', ConsumptionMerchantService) // 商家侧服务（静态类）
+      this._services.set('consumption_bonus', ConsumptionBonusService) // 消费加成活动（静态类，方案C）
 
       this._services.set('customer_service_session', CustomerServiceSessionService)
       this._services.set('hierarchy_management', HierarchyManagementService)

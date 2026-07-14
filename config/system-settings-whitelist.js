@@ -224,26 +224,10 @@ const SYSTEM_SETTINGS_WHITELIST = {
   },
 
   /*
-   * 活动加成率（拍板⑮-(b) 加法叠加，2026-07-11 落地）：
-   * 总加成 = 基础 × (1 + 等级加成率 + 活动加成率)，活动加成独立成 activity_bonus_reward 笔、
-   * 不计 history_total_points（防复利排除名单）。0 = 无活动（默认，行为与现状一致）。
-   * 提交时锁定（与 earn_multiplier 同点位）：改本配置只影响此后提交的小票。
-   * 硬封顶联动：可用积分总倍数 ≤ 3.0（发放侧对活动率按剩余空间截断），故上限设 2.0。
+   * 注：原全局单值 points/activity_bonus_rate 已于 2026-07-15 废弃删除（消费加成活动·方案C）。
+   * 活动加成率改由 consumption_bonus_rules 表按活动配置（多活动独立倍率，商家专属优先），
+   * 命中的 bonus_rate 在消费提交时锁定到 consumption_records.activity_bonus_rate_locked，发放逻辑不变。
    */
-  'points/activity_bonus_rate': {
-    type: 'number',
-    min: 0, // 0 = 无活动加成（默认关闭态）
-    max: 2.0, // 总倍数硬封顶 3.0 = 基础 1 + 加成空间 2.0（拍板⑮-(d)）
-    step: 0.01,
-    default: 0,
-    readonly: false,
-    description:
-      '消费积分活动加成率（限时活动放大主积分用，加法叠加：总倍数=1+等级加成率+活动加成率；0=无活动）',
-    changeRequiresRestart: false,
-    businessImpact: 'CRITICAL',
-    auditRequired: true,
-    approvalRequired: false
-  },
 
   'points/star_stone_quota_ratio': {
     type: 'number',

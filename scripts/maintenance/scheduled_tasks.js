@@ -255,7 +255,7 @@ class ScheduledTasks {
     cron.schedule('0 * * * *', async () => {
       try {
         await ExchangeTimeoutCheckJobs.executeHourlyCheck()
-      } catch (error) {
+            } catch (error) {
         logger.error('[定时任务] 24小时超时订单检查失败', { error: error.message })
       }
     })
@@ -287,7 +287,7 @@ class ScheduledTasks {
     cron.schedule('0 * * * *', async () => {
       try {
         await HourlyPremiumExpiryReminder.execute()
-      } catch (error) {
+            } catch (error) {
         logger.error('[定时任务] 高级空间过期提醒失败', { error: error.message })
       }
     })
@@ -347,12 +347,12 @@ class ScheduledTasks {
         startMsg: '[定时任务] 获取分布式锁成功，开始执行每日核销订单过期清理...',
         errorMsg: '[定时任务] 核销订单过期清理失败',
         run: async () => {
-          const report = await DailyRedemptionOrderExpiration.execute()
-          if (report.expired_count > 0) {
-            logger.warn(`[定时任务] 每日核销订单过期清理完成：${report.expired_count}个订单已过期`)
-          } else {
-            logger.info('[定时任务] 每日核销订单过期清理完成：无过期订单')
-          }
+        const report = await DailyRedemptionOrderExpiration.execute()
+        if (report.expired_count > 0) {
+          logger.warn(`[定时任务] 每日核销订单过期清理完成：${report.expired_count}个订单已过期`)
+        } else {
+          logger.info('[定时任务] 每日核销订单过期清理完成：无过期订单')
+        }
         }
       })
     )
@@ -387,13 +387,13 @@ class ScheduledTasks {
         startMsg: '[定时任务] 获取分布式锁成功，开始执行未绑定媒体清理...',
         errorMsg: '[定时任务] 未绑定图片清理失败',
         run: async () => {
-          // 调用 Job 类执行清理（治本 C：孤儿只软删进回收站，不物理删）
-          const report = await HourlyCleanupUnboundMedia.execute(24)
-          if (report.trashed_count > 0) {
-            logger.warn(`[定时任务] 未绑定媒体清理完成：${report.trashed_count} 个孤儿已移入回收站`)
-          } else {
-            logger.info('[定时任务] 未绑定媒体清理完成：无需清理')
-          }
+        // 调用 Job 类执行清理（治本 C：孤儿只软删进回收站，不物理删）
+        const report = await HourlyCleanupUnboundMedia.execute(24)
+        if (report.trashed_count > 0) {
+          logger.warn(`[定时任务] 未绑定媒体清理完成：${report.trashed_count} 个孤儿已移入回收站`)
+        } else {
+          logger.info('[定时任务] 未绑定媒体清理完成：无需清理')
+        }
         }
       })
     )
@@ -409,18 +409,18 @@ class ScheduledTasks {
         errorMsg: '[定时任务] 商家审计日志清理失败',
         run: async () => {
           const report = await DailyMerchantAuditLogCleanup.execute(180)
-          if (report.deleted_count > 0) {
-            logger.warn(
-              `[定时任务] 商家审计日志清理完成：删除 ${report.deleted_count} 条超过180天的记录`,
-              {
-                deleted_count: report.deleted_count,
-                cutoff_date: report.cutoff_date,
-                duration_ms: report.duration_ms
-              }
-            )
-          } else {
-            logger.info('[定时任务] 商家审计日志清理完成：无需清理')
-          }
+        if (report.deleted_count > 0) {
+          logger.warn(
+            `[定时任务] 商家审计日志清理完成：删除 ${report.deleted_count} 条超过180天的记录`,
+            {
+              deleted_count: report.deleted_count,
+              cutoff_date: report.cutoff_date,
+              duration_ms: report.duration_ms
+            }
+          )
+        } else {
+          logger.info('[定时任务] 商家审计日志清理完成：无需清理')
+        }
         }
       })
     )
@@ -435,18 +435,18 @@ class ScheduledTasks {
         startMsg: '[定时任务] 获取分布式锁成功，开始执行媒体文件数据质量检查...',
         errorMsg: '[定时任务] 媒体文件数据质量检查失败',
         run: async () => {
-          const report = await DailyMediaFileQualityCheck.execute()
-          if (report.total_issues > 0) {
-            logger.warn(`[定时任务] 媒体文件数据质量检查完成：发现 ${report.total_issues} 个问题`, {
-              total_checked: report.total_checked,
-              missing_thumbnails: report.missing_thumbnails_count,
-              incomplete_thumbnails: report.incomplete_thumbnails_count,
-              invalid_file_paths: report.invalid_file_path_count,
-              duration_ms: report.duration_ms
-            })
-          } else {
-            logger.info('[定时任务] 媒体文件数据质量检查完成：数据质量良好')
-          }
+        const report = await DailyMediaFileQualityCheck.execute()
+        if (report.total_issues > 0) {
+          logger.warn(`[定时任务] 媒体文件数据质量检查完成：发现 ${report.total_issues} 个问题`, {
+            total_checked: report.total_checked,
+            missing_thumbnails: report.missing_thumbnails_count,
+            incomplete_thumbnails: report.incomplete_thumbnails_count,
+            invalid_file_paths: report.invalid_file_path_count,
+            duration_ms: report.duration_ms
+          })
+        } else {
+          logger.info('[定时任务] 媒体文件数据质量检查完成：数据质量良好')
+        }
         }
       })
     )
@@ -461,17 +461,17 @@ class ScheduledTasks {
         startMsg: '[定时任务] 获取分布式锁成功，开始执行媒体回收站清理...',
         errorMsg: '[定时任务] 媒体回收站清理失败',
         run: async () => {
-          const report = await DailyMediaTrashCleanup.execute(30)
-          if (report.cleaned_count > 0) {
-            logger.warn(`[定时任务] 媒体回收站清理完成：清理 ${report.cleaned_count} 个过期媒体文件`, {
-              total_found: report.total_found,
-              cleaned_count: report.cleaned_count,
-              failed_count: report.failed_count,
-              duration_ms: report.duration_ms
-            })
-          } else {
-            logger.info('[定时任务] 媒体回收站清理完成：无过期记录需要清理')
-          }
+        const report = await DailyMediaTrashCleanup.execute(30)
+        if (report.cleaned_count > 0) {
+          logger.warn(`[定时任务] 媒体回收站清理完成：清理 ${report.cleaned_count} 个过期媒体文件`, {
+            total_found: report.total_found,
+            cleaned_count: report.cleaned_count,
+            failed_count: report.failed_count,
+            duration_ms: report.duration_ms
+          })
+        } else {
+          logger.info('[定时任务] 媒体回收站清理完成：无过期记录需要清理')
+        }
         }
       })
     )
@@ -488,17 +488,17 @@ class ScheduledTasks {
         errorStack: true,
         releaseMode: 'finally',
         run: async () => {
-          const result = await HourlyPricingConfigScheduler.execute()
-          if (result.activated > 0) {
-            logger.info('[定时任务] 定价配置定时生效检查完成', {
-              processed: result.processed,
-              activated: result.activated,
-              failed: result.failed,
-              skipped: result.skipped
-            })
-          } else {
-            logger.debug('[定时任务] 定价配置定时生效检查完成，无需激活的配置')
-          }
+        const result = await HourlyPricingConfigScheduler.execute()
+        if (result.activated > 0) {
+          logger.info('[定时任务] 定价配置定时生效检查完成', {
+            processed: result.processed,
+            activated: result.activated,
+            failed: result.failed,
+            skipped: result.skipped
+          })
+        } else {
+          logger.debug('[定时任务] 定价配置定时生效检查完成，无需激活的配置')
+        }
         }
       })
     )
@@ -515,9 +515,9 @@ class ScheduledTasks {
         errorStack: true,
         releaseMode: 'finally',
         run: async () => {
-          const job = new HourlyLotteryMetricsAggregation()
-          await job.execute()
-          logger.info('[定时任务] 抽奖指标小时聚合完成')
+        const job = new HourlyLotteryMetricsAggregation()
+        await job.execute()
+        logger.info('[定时任务] 抽奖指标小时聚合完成')
         }
       })
     )
@@ -534,9 +534,9 @@ class ScheduledTasks {
         errorStack: true,
         releaseMode: 'finally',
         run: async () => {
-          const job = new DailyLotteryMetricsAggregation()
-          await job.execute()
-          logger.info('[定时任务] 抽奖指标日报聚合完成')
+        const job = new DailyLotteryMetricsAggregation()
+        await job.execute()
+        logger.info('[定时任务] 抽奖指标日报聚合完成')
         }
       })
     )
@@ -572,13 +572,13 @@ class ScheduledTasks {
         startMsg: '[定时任务] 获取分布式锁成功，开始执行认证会话清理...',
         errorMsg: '[定时任务] 认证会话清理失败',
         run: async () => {
-          const { AuthenticationSession } = require('../../models')
-          const deletedCount = await AuthenticationSession.cleanupExpiredSessions()
-          if (deletedCount > 0) {
-            logger.info(`[定时任务] 认证会话清理完成：删除 ${deletedCount} 个过期会话`)
-          } else {
-            logger.info('[定时任务] 认证会话清理完成：无过期会话')
-          }
+        const { AuthenticationSession } = require('../../models')
+        const deletedCount = await AuthenticationSession.cleanupExpiredSessions()
+        if (deletedCount > 0) {
+          logger.info(`[定时任务] 认证会话清理完成：删除 ${deletedCount} 个过期会话`)
+        } else {
+          logger.info('[定时任务] 认证会话清理完成：无过期会话')
+        }
         }
       })
     )
@@ -627,18 +627,18 @@ class ScheduledTasks {
         errorMsg: '[定时任务] 管理员操作日志清理失败',
         run: async () => {
           const report = await DailyAdminOperationLogCleanup.execute(180)
-          if (report.deleted_count > 0) {
-            logger.warn(
-              `[定时任务] 管理员操作日志清理完成：删除 ${report.deleted_count} 条超过180天的记录`,
-              {
-                deleted_count: report.deleted_count,
-                cutoff_date: report.cutoff_date,
-                duration_ms: report.duration_ms
-              }
-            )
-          } else {
-            logger.info('[定时任务] 管理员操作日志清理完成：无需清理')
-          }
+        if (report.deleted_count > 0) {
+          logger.warn(
+            `[定时任务] 管理员操作日志清理完成：删除 ${report.deleted_count} 条超过180天的记录`,
+            {
+              deleted_count: report.deleted_count,
+              cutoff_date: report.cutoff_date,
+              duration_ms: report.duration_ms
+            }
+          )
+        } else {
+          logger.info('[定时任务] 管理员操作日志清理完成：无需清理')
+        }
         }
       })
     )
@@ -654,18 +654,18 @@ class ScheduledTasks {
         errorMsg: '[定时任务] WebSocket启动日志清理失败',
         run: async () => {
           const report = await DailyWebSocketStartupLogCleanup.execute(180)
-          if (report.deleted_count > 0) {
-            logger.warn(
-              `[定时任务] WebSocket启动日志清理完成：删除 ${report.deleted_count} 条超过180天的记录`,
-              {
-                deleted_count: report.deleted_count,
-                cutoff_date: report.cutoff_date,
-                duration_ms: report.duration_ms
-              }
-            )
-          } else {
-            logger.info('[定时任务] WebSocket启动日志清理完成：无需清理')
-          }
+        if (report.deleted_count > 0) {
+          logger.warn(
+            `[定时任务] WebSocket启动日志清理完成：删除 ${report.deleted_count} 条超过180天的记录`,
+            {
+              deleted_count: report.deleted_count,
+              cutoff_date: report.cutoff_date,
+              duration_ms: report.duration_ms
+            }
+          )
+        } else {
+          logger.info('[定时任务] WebSocket启动日志清理完成：无需清理')
+        }
         }
       })
     )
@@ -737,13 +737,13 @@ class ScheduledTasks {
         releaseMode: 'checked',
         unlockErrorMsg: '[定时任务33] 释放分布式锁失败',
         run: async () => {
-          logger.info('[定时任务33] 开始执行积分商城订单自动确认收货...')
-          const DailyExchangeOrderAutoConfirm = require('../../jobs/daily-exchange-order-auto-confirm')
-          const report = await DailyExchangeOrderAutoConfirm.execute()
-          logger.info('[定时任务33] 积分商城订单自动确认收货完成', {
-            auto_confirmed_count: report.auto_confirmed_count,
-            duration_ms: report.duration_ms
-          })
+        logger.info('[定时任务33] 开始执行积分商城订单自动确认收货...')
+        const DailyExchangeOrderAutoConfirm = require('../../jobs/daily-exchange-order-auto-confirm')
+        const report = await DailyExchangeOrderAutoConfirm.execute()
+        logger.info('[定时任务33] 积分商城订单自动确认收货完成', {
+          auto_confirmed_count: report.auto_confirmed_count,
+          duration_ms: report.duration_ms
+        })
         }
       })
     )
@@ -760,14 +760,14 @@ class ScheduledTasks {
         releaseMode: 'checked',
         unlockErrorMsg: '[定时任务34] 释放分布式锁失败',
         run: async () => {
-          logger.info('[定时任务34] 开始执行物流超时预警扫描...')
-          const DailyShippingTimeoutScan = require('../../jobs/daily-shipping-timeout-scan')
-          const report = await DailyShippingTimeoutScan.execute()
-          logger.info('[定时任务34] 物流超时预警扫描完成', {
-            not_picked_up_count: report.not_picked_up_count,
-            not_delivered_count: report.not_delivered_count,
-            duration_ms: report.duration_ms
-          })
+        logger.info('[定时任务34] 开始执行物流超时预警扫描...')
+        const DailyShippingTimeoutScan = require('../../jobs/daily-shipping-timeout-scan')
+        const report = await DailyShippingTimeoutScan.execute()
+        logger.info('[定时任务34] 物流超时预警扫描完成', {
+          not_picked_up_count: report.not_picked_up_count,
+          not_delivered_count: report.not_delivered_count,
+          duration_ms: report.duration_ms
+        })
         }
       })
     )
@@ -782,17 +782,17 @@ class ScheduledTasks {
         startMsg: '[定时任务] 获取分布式锁成功，开始执行媒体存储一致性检测...',
         errorMsg: '[定时任务] 媒体存储一致性检测失败',
         run: async () => {
-          const DailyMediaStorageConsistencyCheck = require('../../jobs/daily-media-storage-consistency-check')
-          const report = await DailyMediaStorageConsistencyCheck.execute()
-          if (report.missing_count > 0) {
-            logger.warn(`[定时任务] 媒体存储一致性检测完成：发现 ${report.missing_count} 个文件缺失`, {
-              total_checked: report.total_checked,
-              missing_count: report.missing_count,
-              duration_ms: report.duration_ms
-            })
-          } else {
-            logger.info('[定时任务] 媒体存储一致性检测完成：存储一致性良好')
-          }
+        const DailyMediaStorageConsistencyCheck = require('../../jobs/daily-media-storage-consistency-check')
+        const report = await DailyMediaStorageConsistencyCheck.execute()
+        if (report.missing_count > 0) {
+          logger.warn(`[定时任务] 媒体存储一致性检测完成：发现 ${report.missing_count} 个文件缺失`, {
+            total_checked: report.total_checked,
+            missing_count: report.missing_count,
+            duration_ms: report.duration_ms
+          })
+        } else {
+          logger.info('[定时任务] 媒体存储一致性检测完成：存储一致性良好')
+        }
         }
       })
     )
@@ -1256,8 +1256,8 @@ class ScheduledTasks {
     logger.info('[手动触发] 管理员操作日志清理完成', {
       deleted_count: report.deleted_count,
       cutoff_date: report.cutoff_date,
-      duration_ms: report.duration_ms
-    })
+            duration_ms: report.duration_ms
+          })
     return report
   }
 

@@ -50,6 +50,9 @@ const addressesRoutes = require('./addresses')
 // 用户成长等级 C 端只读路由（BE-4：会员尊享/解锁条件展示，脱敏无倍数）
 const growthLevelRoutes = require('./growth-level')
 
+// 消费加成活动 C 端只读路由（方案C：展示当前门店/商家生效活动，脱敏）
+const consumptionBonusRoutes = require('./consumption-bonus')
+
 /**
  * GET /api/v4/user/me
  * @desc 获取当前用户基本信息（通过token识别）
@@ -101,5 +104,8 @@ router.use('/addresses', authenticateToken, addressesRoutes)
 
 // 挂载用户成长等级路由（/api/v4/user/growth-level，需登录）
 router.use('/growth-level', authenticateToken, growthLevelRoutes)
+
+// 挂载消费加成活动路由（/api/v4/user/consumption-bonus，需登录）
+router.use('/consumption-bonus', authenticateToken, consumptionBonusRoutes)
 
 module.exports = router

@@ -166,6 +166,11 @@ export function sidebarNav() {
             url: '/admin/multiplier-management.html'
           },
           {
+            id: 'consumption-bonus-management',
+            name: '🎁 消费加成活动',
+            url: '/admin/consumption-bonus-management.html'
+          },
+          {
             id: 'exchange-page-config',
             name: '🛍️ 兑换页面配置',
             url: '/admin/exchange-page-config.html'

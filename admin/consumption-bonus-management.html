@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', {
+    title: '消费加成活动管理',
+    pageStyle: '[x-cloak] { display: none !important; }'
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+
+  <div x-data="consumptionBonusManagementPage()" x-init="init()" x-cloak>
+
+    <!-- 导航栏 -->
+    <nav class="bg-purple-600 text-white shadow-lg">
+      <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+        <div class="flex items-center space-x-4">
+          <a href="/admin/workspace.html" class="hover:text-purple-200">← 返回工作台</a>
+          <span class="text-lg font-semibold">🎁 消费加成活动管理</span>
+        </div>
+        <button @click="openAddForm()" class="bg-white text-purple-600 px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-purple-50">
+          + 新增加成活动
+        </button>
+      </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-6">
+
+      <!-- 页面横幅 -->
+      <div class="themed-card rounded-lg shadow p-4 mb-6 border-l-4 border-purple-500">
+        <h1 class="text-xl font-bold themed-text mb-1">🎁 消费加成活动（多活动独立倍率）</h1>
+        <p class="themed-text-muted text-sm">
+          支持多个消费加成活动并行，各自独立加成率、时间窗、生效范围。门店/商家 ID 均留空 = 全平台活动；
+          填写任一 = 商家专属活动（命中时优先于全平台）。用户消费时后端按门店/商家/时间自动匹配，无需用户选择。
+          加成率与等级倍率加法叠加，受总倍数 3.0 硬封顶。
+        </p>
+      </div>
+
+      <!-- 筛选区域 -->
+      <div class="themed-card rounded-lg shadow p-4 mb-6">
+        <div class="flex flex-wrap gap-4 items-center">
+          <div>
+            <label class="text-sm themed-text-muted block mb-1">状态</label>
+            <select x-model="filter_status" @change="applyFilter()" class="themed-input rounded px-3 py-1.5 text-sm">
+              <option value="">全部</option>
+              <option value="active">生效中</option>
+              <option value="inactive">已停用</option>
+            </select>
+          </div>
+          <div class="flex-1"></div>
+          <div class="text-sm themed-text-muted">
+            共 <span class="font-bold" x-text="pagination.total"></span> 个活动
+          </div>
+        </div>
+      </div>
+
+      <!-- 规则表格 -->
+      <div class="themed-card rounded-lg shadow overflow-hidden mb-6">
+        <template x-if="rules_loading">
+          <div class="p-8 text-center themed-text-muted">加载中...</div>
+        </template>
+        <template x-if="rules_error && !rules_loading">
+          <div class="p-8 text-center text-red-500" x-text="rules_error"></div>
+        </template>
+
+        <template x-if="!rules_loading && !rules_error">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="themed-bg-muted">
+                <tr>
+                  <th class="px-4 py-3 text-left themed-text font-medium">ID</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">规则 / 展示名</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">加成率</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">活动范围</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">优先级</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">时间窗</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">状态</th>
+                  <th class="px-4 py-3 text-left themed-text font-medium">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="rule in rules" :key="rule.consumption_bonus_rule_id">
+                  <tr class="border-t themed-border hover:themed-bg-muted transition-colors">
+                    <td class="px-4 py-3 themed-text-muted" x-text="rule.consumption_bonus_rule_id"></td>
+                    <td class="px-4 py-3">
+                      <div class="font-medium themed-text" x-text="rule.rule_name"></div>
+                      <div class="text-xs themed-text-muted" x-text="'对用户展示：' + rule.display_name"></div>
+                    </td>
+                    <td class="px-4 py-3">
+                      <span class="font-mono text-purple-600 font-bold" x-text="'+' + ratePercent(rule.bonus_rate)"></span>
+                      <div class="text-xs themed-text-muted" x-text="'上限 +' + ratePercent(rule.max_bonus_rate)"></div>
+                    </td>
+                    <td class="px-4 py-3">
+                      <span class="px-2 py-0.5 rounded text-xs"
+                            :class="scopeLabel(rule) === '商家专属' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'"
+                            x-text="scopeLabel(rule)"></span>
+                    </td>
+                    <td class="px-4 py-3 themed-text" x-text="rule.priority"></td>
+                    <td class="px-4 py-3 themed-text-muted text-xs">
+                      <div x-text="rule.start_at ? formatDateTime(rule.start_at) : '不限'"></div>
+                      <div x-text="'~ ' + (rule.end_at ? formatDateTime(rule.end_at) : '不限')"></div>
+                    </td>
+                    <td class="px-4 py-3">
+                      <span class="px-2 py-0.5 rounded text-xs" :class="statusColor(rule.status)" x-text="statusLabel(rule.status)"></span>
+                    </td>
+                    <td class="px-4 py-3">
+                      <div class="flex gap-2">
+                        <button @click="openEditForm(rule)" class="text-purple-600 hover:underline text-xs">编辑</button>
+                        <button @click="toggleStatus(rule)" class="text-blue-600 hover:underline text-xs"
+                                x-text="rule.status === 'active' ? '停用' : '启用'"></button>
+                        <button @click="confirmDelete(rule)" class="text-red-600 hover:underline text-xs">删除</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+                <template x-if="rules.length === 0">
+                  <tr>
+                    <td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无消费加成活动，点击右上角新增</td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </template>
+      </div>
+
+      <!-- 分页 -->
+      <div class="flex justify-center items-center gap-4 mb-6" x-show="!rules_loading && pagination.total > 0">
+        <button @click="prevPage()" :disabled="!has_prev_page"
+                class="px-3 py-1.5 rounded text-sm themed-card themed-text disabled:opacity-40">上一页</button>
+        <span class="text-sm themed-text-muted">
+          第 <span x-text="pagination.page"></span> / <span x-text="total_pages"></span> 页
+        </span>
+        <button @click="nextPage()" :disabled="!has_next_page"
+                class="px-3 py-1.5 rounded text-sm themed-card themed-text disabled:opacity-40">下一页</button>
+      </div>
+
+    </div>
+
+    <!-- ==================== 表单弹窗 ==================== -->
+    <div x-show="show_form" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="closeForm()">
+      <div class="themed-card rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="px-6 py-4 border-b themed-border flex justify-between items-center">
+          <h3 class="text-lg font-semibold themed-text" x-text="is_editing ? '编辑消费加成活动' : '新增消费加成活动'"></h3>
+          <button @click="closeForm()" class="themed-text-muted hover:themed-text text-xl">&times;</button>
+        </div>
+
+        <div class="px-6 py-4 space-y-4">
+          <div>
+            <label class="text-sm themed-text-muted block mb-1">规则名（对内识别）<span class="text-red-500">*</span></label>
+            <input x-model="form.rule_name" type="text" placeholder="如：双11消费加成" class="themed-input rounded px-3 py-2 text-sm w-full">
+          </div>
+          <div>
+            <label class="text-sm themed-text-muted block mb-1">展示名（对用户）<span class="text-red-500">*</span></label>
+            <input x-model="form.display_name" type="text" placeholder="如：双11消费多送50%积分" class="themed-input rounded px-3 py-2 text-sm w-full">
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="text-sm themed-text-muted block mb-1">加成率（如 0.5 = 多送50%）<span class="text-red-500">*</span></label>
+              <input x-model.number="form.bonus_rate" type="number" step="0.01" min="0" class="themed-input rounded px-3 py-2 text-sm w-full">
+            </div>
+            <div>
+              <label class="text-sm themed-text-muted block mb-1">加成率上限（防配错）</label>
+              <input x-model.number="form.max_bonus_rate" type="number" step="0.01" min="0" class="themed-input rounded px-3 py-2 text-sm w-full">
+            </div>
+          </div>
+          <div>
+            <label class="text-sm themed-text-muted block mb-1">
+              命中门店 ID（逗号分隔，留空=不限门店）
+            </label>
+            <input x-model="form.store_ids_text" type="text" placeholder="如：90001,90002；留空表示不限" class="themed-input rounded px-3 py-2 text-sm w-full">
+          </div>
+          <div>
+            <label class="text-sm themed-text-muted block mb-1">
+              命中商家 ID（逗号分隔，留空=不限商家）
+            </label>
+            <input x-model="form.merchant_ids_text" type="text" placeholder="如：80001；留空表示不限" class="themed-input rounded px-3 py-2 text-sm w-full">
+            <p class="text-xs themed-text-muted mt-1">门店/商家 ID 均留空 = 全平台活动；任一填写 = 商家专属活动（命中时优先于全平台）。</p>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="text-sm themed-text-muted block mb-1">生效开始（留空=不限）</label>
+              <input x-model="form.start_at" type="datetime-local" class="themed-input rounded px-3 py-2 text-sm w-full">
+            </div>
+            <div>
+              <label class="text-sm themed-text-muted block mb-1">生效结束（留空=不限）</label>
+              <input x-model="form.end_at" type="datetime-local" class="themed-input rounded px-3 py-2 text-sm w-full">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="text-sm themed-text-muted block mb-1">优先级（同组多命中取最高）</label>
+              <input x-model.number="form.priority" type="number" min="0" class="themed-input rounded px-3 py-2 text-sm w-full">
+            </div>
+            <div>
+              <label class="text-sm themed-text-muted block mb-1">状态</label>
+              <select x-model="form.status" class="themed-input rounded px-3 py-2 text-sm w-full">
+                <option value="inactive">已停用</option>
+                <option value="active">生效中</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="text-sm themed-text-muted block mb-1">备注</label>
+            <textarea x-model="form.remark" rows="2" class="themed-input rounded px-3 py-2 text-sm w-full"></textarea>
+          </div>
+        </div>
+
+        <div class="px-6 py-4 border-t themed-border flex justify-end gap-3">
+          <button @click="closeForm()" class="px-4 py-2 rounded text-sm themed-bg-muted themed-text">取消</button>
+          <button @click="submitForm()" class="px-4 py-2 rounded text-sm bg-purple-600 text-white hover:bg-purple-700"
+                  x-text="is_editing ? '保存修改' : '创建活动'"></button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- JS 模块 -->
+  <script type="module" src="/src/alpine/index.js"></script>
+  <script type="module" src="/src/modules/lottery/pages/consumption-bonus-management.js"></script>
+</body>
+</html>

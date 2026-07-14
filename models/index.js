@@ -736,6 +736,14 @@ models.RewardMultiplierTarget = require('./RewardMultiplierTarget')(sequelize, D
  */
 models.EventBudgetCollectionRule = require('./EventBudgetCollectionRule')(sequelize, DataTypes)
 
+/*
+ * ✅ ConsumptionBonusRule：消费加成活动规则（多活动独立倍率，方案C，2026-07-15）
+ * - 替代原全局单值 system_settings.points/activity_bonus_rate，支持多活动并行、各自独立倍率/时间窗/范围
+ * - 全平台活动（store_ids/merchant_ids 均 NULL）+ 单商家专属活动（任一非空）并存，商家专属优先
+ * - 命中的 bonus_rate 锁定到 consumption_records.activity_bonus_rate_locked，发放侧逻辑不变
+ */
+models.ConsumptionBonusRule = require('./ConsumptionBonusRule')(sequelize, DataTypes)
+
 // 🔴 统一资产转换规则模型（2026-04-05 合并 ExchangeRate + MaterialConversionRule）
 models.AssetConversionRule = require('./AssetConversionRule')(sequelize, DataTypes)
 /*

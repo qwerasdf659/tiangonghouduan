@@ -289,18 +289,19 @@ class UserGrowthLevelService {
    * - 小程序"会员尊享/解锁条件"展示用户当前成长等级与等级阶梯。
    * - 服务 V-4（"当前 X / 需达 Y 解锁"）与 L-3（成长等级 C 端可见性）。
    *
-   * 严格脱敏口径（拍板点④）：
-   * - 仅下发 level_key / level_name / 用户累计积分 / 等级阶梯（level_name）。
-   * - 倍数 / 权重 / 风控字段绝不下发（商业机密）。
+   * 脱敏口径（拍板点④，2026-07-12 修订）：
+   * - 下发 level_key / level_name / 用户累计积分 / 等级阶梯 / earn_multiplier（积分加成倍率）。
+   * - earn_multiplier 属营销激励数值（同淘宝/京东/有赞会员倍率），公开可增强升级动力，故对 C 端下发。
+   * - ⚠️ 抽奖中奖概率 / 分层权重 / 风控字段仍绝不下发（真正的商业机密，不在本接口，见 TierPickStage）。
    *
    * 占位阈值保护（拍板点⑨）：
-   * - 成长等级 4 档阈值当前为"占位值，需运营确认"（user_growth_levels.description 标注）。
+   * - 成长等级阈值若为"占位值，需运营确认"（user_growth_levels.description 标注）时保护。
    * - 在运营把占位阈值改成真实阈值前，min_history_points（门槛数字）一律下发 null，
    *   C 端只显示等级名、不显示"需达 Y 积分"，避免用占位数字误导用户。
    * - 由数据驱动：description 含"占位"标记 → 判定为未定稿 → 数字置 null。
    *
    * @param {number} user_id - 用户ID
-   * @returns {Promise<Object>} { current_level_key, current_level_name, history_total_points, thresholds_confirmed, levels: [{level_key, level_name, min_history_points|null}] }
+   * @returns {Promise<Object>} { current_level_key, current_level_name, current_earn_multiplier, history_total_points, thresholds_confirmed, next_level, levels: [{level_key, level_name, min_history_points|null, earn_multiplier}] }
    */
   async getUserGrowthLevelView(user_id) {
     // 用户累计积分（拍板 4：账本派生 + 缓存，响应字段名不变）
@@ -346,6 +347,8 @@ class UserGrowthLevelService {
     return {
       current_level_key: currentLevelKey,
       current_level_name: currentLevel ? currentLevel.level_name : null,
+      // 当前等级积分加成倍率（2026-07-12 拍板：成长等级倍率属营销激励，对 C 端公开，对标淘宝/京东/有赞）
+      current_earn_multiplier: currentLevel ? Number(currentLevel.earn_multiplier) || 1.0 : 1.0,
       history_total_points: historyTotalPoints,
       thresholds_confirmed: thresholdsConfirmed,
       // 下一级差值（顶档/未定稿为 null；小程序渲染"再消费 X 元升级"）
@@ -354,7 +357,9 @@ class UserGrowthLevelService {
         level_key: l.level_key,
         level_name: l.level_name,
         // 占位阶段不下发门槛数字（拍板点⑨）
-        min_history_points: thresholdsConfirmed ? l.min_history_points : null
+        min_history_points: thresholdsConfirmed ? l.min_history_points : null,
+        // 积分加成倍率（营销激励，公开下发；抽奖概率/权重仍严格保密，不在此接口）
+        earn_multiplier: Number(l.earn_multiplier) || 1.0
       }))
     }
   }

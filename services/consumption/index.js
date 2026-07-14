@@ -13,6 +13,7 @@ const CoreService = require('./CoreService')
 const QueryService = require('./QueryService')
 const MerchantService = require('./MerchantService')
 const AnomalyService = require('./AnomalyService')
+const BonusService = require('./BonusService')
 const viewResolver = require('./viewResolver')
 
 module.exports = {
@@ -20,5 +21,6 @@ module.exports = {
   QueryService,
   MerchantService,
   AnomalyService,
+  BonusService,
   viewResolver
 }
