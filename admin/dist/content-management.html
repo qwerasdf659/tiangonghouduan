@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>内容管理中心 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/content-management-B6nzpjn0.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-blue-200 transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">📄 内容管理中心</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="contentManagement()" x-init="init()">
+
+    <!-- 统计概览卡片 -->
+    <div class="stats-grid stats-grid-2 mb-6">
+      <div class="stats-card stats-warning stats-card-animate">
+        <div class="stats-card-icon">🖼️</div>
+        <div class="stats-card-value" x-text="mediaStats?.total || 0"></div>
+        <div class="stats-card-label">媒体文件</div>
+      </div>
+      <div class="stats-card stats-info stats-card-animate">
+        <div class="stats-card-icon">💾</div>
+        <div class="stats-card-value" x-text="formatFileSize(mediaStats?.totalSize || 0)"></div>
+        <div class="stats-card-label">存储占用</div>
+      </div>
+    </div>
+
+    <!-- 子页面导航 -->
+    <div class="themed-card rounded-xl shadow-sm mb-6 overflow-hidden">
+      <div class="flex overflow-x-auto" style="scrollbar-width: none;">
+        <template x-for="page in subPages" :key="page.id">
+          <button 
+            @click="switchPage(page.id)"
+            :class="current_page === page.id 
+              ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50/60 font-semibold dark:bg-blue-900/10 dark:text-blue-400' 
+              : 'themed-text-muted themed-hover-bg border-b-2 border-transparent'"
+            class="px-6 py-3.5 font-medium whitespace-nowrap transition-all duration-200 relative"
+            x-text="page.icon + ' ' + page.name"
+          ></button>
+        </template>
+      </div>
+    </div>
+
+    <!-- 图片资源管理 -->
+    <div x-show="current_page === 'image-resources'" x-cloak>
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden">
+        <div class="p-5 border-b flex justify-between items-center bg-gradient-to-r from-amber-50 to-transparent dark:from-amber-900/10">
+          <div>
+            <h5 class="font-semibold text-base">🖼️ 图片资源</h5>
+            <p class="text-xs themed-text-muted mt-0.5">统一管理系统中的图片素材，支持分类筛选和批量操作</p>
+          </div>
+          <button @click="showModal('uploadMediaModal')" class="px-4 py-2 themed-btn-primary rounded-lg shadow-sm hover:shadow transition-shadow">
+            ➕ 上传图片
+          </button>
+        </div>
+
+        <!-- 筛选栏（对齐后端 GET /api/v4/console/media 查询参数） -->
+        <div class="p-4 border-b themed-bg-subtle flex flex-wrap gap-3 items-end">
+          <div class="flex flex-col">
+            <label class="text-xs themed-text-muted mb-1">文件夹</label>
+            <select x-model="mediaFilters.folder" @change="searchMedia()" class="text-sm border rounded-lg px-3 py-1.5 themed-bg-primary themed-text-primary">
+              <option value="">全部</option>
+              <option value="categories">categories（分类图标）</option>
+              <option value="materials">materials（材料图标）</option>
+              <option value="products">products（商品图片）</option>
+              <option value="photos">photos（通用图片）</option>
+            </select>
+          </div>
+          <div class="flex flex-col">
+            <label class="text-xs themed-text-muted mb-1">状态</label>
+            <select x-model="mediaFilters.status" @change="searchMedia()" class="text-sm border rounded-lg px-3 py-1.5 themed-bg-primary themed-text-primary">
+              <option value="">全部</option>
+              <option value="active">active（正常）</option>
+              <option value="archived">archived（已归档）</option>
+              <option value="trashed">trashed（回收站）</option>
+            </select>
+          </div>
+          <div class="flex flex-col">
+            <label class="text-xs themed-text-muted mb-1">标签</label>
+            <input type="text" x-model="mediaFilters.tags" @keyup.enter="searchMedia()" placeholder="输入标签名" class="text-sm border rounded-lg px-3 py-1.5 themed-bg-primary themed-text-primary w-36">
+          </div>
+          <div class="flex flex-col">
+            <label class="text-xs themed-text-muted mb-1">关键词</label>
+            <input type="text" x-model="mediaFilters.keyword" @keyup.enter="searchMedia()" placeholder="搜索文件名" class="text-sm border rounded-lg px-3 py-1.5 themed-bg-primary themed-text-primary w-36">
+          </div>
+          <div class="flex flex-col">
+            <label class="text-xs themed-text-muted mb-1">引用情况</label>
+            <select x-model="mediaFilters.unused_only" @change="searchMedia()" class="text-sm border rounded-lg px-3 py-1.5 themed-bg-primary themed-text-primary">
+              <option value="">全部</option>
+              <option value="true">仅未使用（引用数=0）</option>
+            </select>
+          </div>
+          <button @click="searchMedia()" class="px-3 py-1.5 themed-btn-primary rounded-lg text-sm">搜索</button>
+          <button @click="resetMediaFilters()" class="px-3 py-1.5 themed-bg-muted themed-text-secondary rounded-lg text-sm hover:bg-gray-300">重置</button>
+        </div>
+
+        <div x-show="mediaFiles.length === 0" class="empty-state">
+          <div class="empty-state-icon-circle">
+            <div class="empty-state-icon">🖼️</div>
+          </div>
+          <div class="empty-state-title">暂无图片资源</div>
+          <div class="empty-state-description">上传图片素材统一管理，所有轮播图、弹窗使用的图片都会在这里归档和检索</div>
+          <button @click="showModal('uploadMediaModal')" class="empty-state-action">➕ 上传第一张图片</button>
+          <div class="empty-state-tips">
+            <div class="empty-state-tips-title">💡 使用提示</div>
+            <div>· 支持 JPG/PNG/GIF/WebP 格式，单张不超过 5MB</div>
+            <div>· 上传后自动生成 3 档宽度衍生图（w375/w750/w1080，WebP）</div>
+            <div>· 图片可绑定到具体业务（回馈、交易、活动等）</div>
+            <div>· 点击图片可预览、复制链接或删除</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 p-4" x-show="mediaFiles.length > 0">
+          <template x-for="media in mediaFiles" :key="media.media_id">
+            <div class="themed-card rounded-xl overflow-hidden group relative shadow-sm hover:shadow-md transition-all duration-200">
+              <div class="aspect-square themed-bg-subtle flex items-center justify-center img-blur-load">
+                <img :data-src="media.public_url" :alt="media.original_name"
+                     class="w-full h-full object-cover img-lazy"
+                     x-init="$nextTick(() => { if(media.public_url) { $el.src = media.public_url; $el.classList.add('loaded') } })">
+              </div>
+              <div class="p-2.5">
+                <p class="text-xs font-medium truncate" x-text="media.original_name || '未命名'"></p>
+                <p class="text-xs themed-text-muted mt-0.5" x-text="formatFileSize(media.file_size)"></p>
+                <p class="text-xs mt-0.5"
+                   :class="(media.reference_count || 0) > 0 ? 'text-green-600' : 'text-gray-400'"
+                   x-text="(media.reference_count || 0) > 0 ? ('引用 ' + media.reference_count + ' 处') : '未使用'"></p>
+              </div>
+              <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2 rounded-xl">
+                <button @click="viewMedia(media)" class="px-3 py-1.5 bg-white text-gray-700 rounded-lg text-xs font-medium shadow-sm hover:bg-gray-50 transition-colors">查看</button>
+                <button @click="deleteMedia(media)" class="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium shadow-sm hover:bg-red-600 transition-colors">删除</button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- 存储管理 -->
+    <div x-show="current_page === 'storage-management'" x-cloak>
+
+      <!-- 存储概览 -->
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden mb-6">
+        <div class="p-5 border-b themed-gradient-light flex justify-between items-center">
+          <div>
+            <h5 class="font-semibold text-base">📊 存储概览</h5>
+            <p class="text-xs themed-text-muted mt-0.5">各文件夹存储统计（数据来源: Sealos 对象存储）</p>
+          </div>
+          <button @click="optimizeStorage()" class="px-4 py-2 themed-btn-primary rounded-lg text-sm hover:shadow transition-shadow"
+                  :disabled="optimizing">
+            <span x-show="optimizing" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+            🛠️ 批量优化衍生图
+          </button>
+        </div>
+        <div x-show="storageLoading" class="p-8 text-center themed-text-muted">
+          <span class="inline-block w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></span>
+          <p class="mt-2">加载中...</p>
+        </div>
+        <div x-show="!storageLoading && storageOverview" class="p-4">
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <template x-for="folder in (storageOverview?.folders || storageOverview?.by_folder || [])" :key="folder.folder || folder.name">
+              <div class="themed-card rounded-lg p-4 border">
+                <div class="text-sm font-medium" x-text="'📁 ' + (folder.folder || folder.name)"></div>
+                <div class="text-2xl font-bold mt-1" x-text="folder.count || folder.file_count || 0"></div>
+                <div class="text-xs themed-text-muted" x-text="'文件数'"></div>
+              </div>
+            </template>
+          </div>
+          <div x-show="!storageOverview?.folders?.length && !storageOverview?.by_folder?.length" class="text-center themed-text-muted py-4">
+            暂无存储数据
+          </div>
+        </div>
+      </div>
+
+      <!-- 孤儿文件 -->
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden mb-6">
+        <div class="p-5 border-b bg-gradient-to-r from-yellow-50 to-transparent dark:from-yellow-900/10 flex justify-between items-center">
+          <div>
+            <h5 class="font-semibold text-base">🔍 孤儿文件检测</h5>
+            <p class="text-xs themed-text-muted mt-0.5">无任何业务关联（media_attachments）的媒体文件</p>
+          </div>
+          <span class="px-3 py-1 rounded-full text-sm font-medium"
+                :class="orphanFiles.length > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'"
+                x-text="orphanFiles.length > 0 ? orphanFiles.length + ' 个孤儿' : '无孤儿'"></span>
+        </div>
+        <div x-show="orphanFiles.length === 0" class="p-6 text-center themed-text-muted">
+          ✅ 所有媒体文件均已关联到业务实体，无孤儿文件
+        </div>
+        <div x-show="orphanFiles.length > 0" class="overflow-x-auto">
+          <table class="data-table w-full">
+            <thead>
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">media_id</th>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">文件路径</th>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">大小</th>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">创建时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="file in orphanFiles" :key="file.media_id">
+                <tr class="border-t">
+                  <td class="px-4 py-3 text-sm" x-text="file.media_id"></td>
+                  <td class="px-4 py-3 text-sm font-mono text-xs" x-text="file.object_key"></td>
+                  <td class="px-4 py-3 text-sm" x-text="formatFileSize(file.file_size)"></td>
+                  <td class="px-4 py-3 text-sm" x-text="formatDate(file.created_at)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 回收站 -->
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden mb-6">
+        <div class="p-5 border-b bg-gradient-to-r from-red-50 to-transparent dark:from-red-900/10 flex justify-between items-center">
+          <div>
+            <h5 class="font-semibold text-base">🗑️ 回收站</h5>
+            <p class="text-xs themed-text-muted mt-0.5">已移入回收站的文件（超过 30 天自动物理删除）</p>
+          </div>
+          <button @click="cleanupTrash()" class="px-4 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition-colors"
+                  :disabled="cleaning || trashFiles.length === 0"
+                  x-show="trashFiles.length > 0">
+            <span x-show="cleaning" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+            清理回收站
+          </button>
+        </div>
+        <div x-show="trashFiles.length === 0" class="p-6 text-center themed-text-muted">
+          🗑️ 回收站为空
+        </div>
+        <div x-show="trashFiles.length > 0" class="overflow-x-auto">
+          <table class="data-table w-full">
+            <thead>
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">media_id</th>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">文件路径</th>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">大小</th>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">移入时间</th>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">剩余天数</th>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="file in trashFiles" :key="file.media_id">
+                <tr class="border-t">
+                  <td class="px-4 py-3 text-sm" x-text="file.media_id"></td>
+                  <td class="px-4 py-3 text-sm font-mono text-xs" x-text="file.object_key"></td>
+                  <td class="px-4 py-3 text-sm" x-text="formatFileSize(file.file_size)"></td>
+                  <td class="px-4 py-3 text-sm" x-text="formatDate(file.trashed_at || file.updated_at)"></td>
+                  <td class="px-4 py-3 text-sm" x-text="trashRemainingDays(file.trashed_at) + ' 天'"></td>
+                  <td class="px-4 py-3 text-sm whitespace-nowrap">
+                    <button @click="restoreTrashFile(file.media_id)"
+                            class="px-2.5 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 transition-colors mr-1.5">恢复</button>
+                    <button @click="purgeTrashFile(file.media_id)"
+                            class="px-2.5 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600 transition-colors">彻底删除</button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 缺原图/受损媒体核对（N3 治本配套：DB 有记录但对象存储缺原图，引导运营重传） -->
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden mb-6">
+        <div class="p-5 border-b bg-gradient-to-r from-orange-50 to-transparent dark:from-orange-900/10 flex justify-between items-center">
+          <div>
+            <h5 class="font-semibold text-base">🩹 缺原图核对</h5>
+            <p class="text-xs themed-text-muted mt-0.5">DB 有记录但 Sealos 对象存储缺原图的受损图（需运营在对应业务重新上传）</p>
+          </div>
+          <span class="px-3 py-1 rounded-full text-sm font-medium"
+                :class="damagedFiles.length > 0 ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'"
+                x-text="damagedFiles.length > 0 ? damagedFiles.length + ' 张缺原图' : '无缺原图'"></span>
+        </div>
+        <div x-show="damagedFiles.length === 0" class="p-6 text-center themed-text-muted">
+          ✅ 所有 active 图原图均在对象存储中，无受损图
+        </div>
+        <div x-show="damagedFiles.length > 0" class="overflow-x-auto">
+          <table class="data-table w-full">
+            <thead>
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">media_id</th>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">文件路径</th>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">文件夹</th>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="file in damagedFiles" :key="file.media_id">
+                <tr class="border-t">
+                  <td class="px-4 py-3 text-sm" x-text="file.media_id"></td>
+                  <td class="px-4 py-3 text-sm font-mono text-xs" x-text="file.object_key"></td>
+                  <td class="px-4 py-3 text-sm" x-text="file.folder || '-'"></td>
+                  <td class="px-4 py-3 text-sm">
+                    <span class="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-xs">缺原图·需重传</span>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 重复文件 -->
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden">
+        <div class="p-5 border-b themed-gradient-light flex justify-between items-center">
+          <div>
+            <h5 class="font-semibold text-base">🔄 重复文件检测</h5>
+            <p class="text-xs themed-text-muted mt-0.5">通过 SHA-256 内容哈希检测相同文件</p>
+          </div>
+          <span class="px-3 py-1 rounded-full text-sm font-medium"
+                :class="duplicateFiles.length > 0 ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'"
+                x-text="duplicateFiles.length > 0 ? duplicateFiles.length + ' 组重复' : '无重复'"></span>
+        </div>
+        <div x-show="duplicateFiles.length === 0" class="p-6 text-center themed-text-muted">
+          ✅ 未检测到重复文件
+        </div>
+        <div x-show="duplicateFiles.length > 0" class="p-4 space-y-3">
+          <template x-for="(group, index) in duplicateFiles" :key="index">
+            <div class="themed-card rounded-lg border p-3">
+              <div class="text-sm font-medium mb-2">
+                哈希: <span class="font-mono text-xs" x-text="(group.content_hash || '').substring(0, 16) + '...'"></span>
+                <span class="ml-2 text-xs themed-text-muted" x-text="(group.files?.length || group.count || 0) + ' 个文件'"></span>
+              </div>
+              <div class="space-y-1">
+                <template x-for="file in (group.files || [])" :key="file.media_id">
+                  <div class="text-xs themed-text-muted pl-4">
+                    <span x-text="'#' + file.media_id"></span> — <span class="font-mono" x-text="file.object_key"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== Modal 区域 ==================== -->
+
+    <!-- 图片上传 Modal -->
+    <div x-ref="uploadMediaModal" 
+         x-show="isModalOpen('uploadMediaModal')" 
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('uploadMediaModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold">📤 上传图片</h5>
+          <button @click="hideModal('uploadMediaModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+        </div>
+        <div class="p-6" x-data="{ dragover: false }">
+          <div class="drop-zone p-8 text-center transition-colors"
+               :class="{ 'drag-over': dragover }"
+               @dragover.prevent="dragover = true"
+               @dragleave="dragover = false"
+               @drop.prevent="dragover = false; handleMediaUpload($event)">
+            <span class="text-5xl mb-4 block" x-text="dragover ? '📥' : '☁️'"></span>
+            <p class="mb-2" x-text="dragover ? '释放以上传图片' : '拖拽图片到此处或点击上传'"></p>
+            <input type="file" class="hidden" id="imageUploadInput" accept="image/*" multiple @change="handleMediaUpload($event)">
+            <button type="button" onclick="document.getElementById('imageUploadInput').click()" class="px-4 py-2 themed-btn-primary rounded btn-scale">
+              选择图片
+            </button>
+          </div>
+          <p class="text-sm themed-text-muted mt-2 text-center">支持 JPG、PNG、GIF 格式，单张最大 5MB</p>
+        </div>
+        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
+          <button type="button" @click="hideModal('uploadMediaModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 删除确认 Modal -->
+    <div x-ref="deleteModal" 
+         x-show="isModalOpen('deleteModal')" 
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('deleteModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-sm mx-4 z-10">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold text-red-600">⚠️ 删除确认</h5>
+          <button @click="hideModal('deleteModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+        </div>
+        <div class="p-6 text-center">
+          <span class="text-5xl mb-4 block">🗑️</span>
+          <p class="themed-text-secondary">确定要将此图移入回收站吗？</p>
+          <p class="text-sm themed-text-muted mt-1">软删后保留 30 天，期间可在回收站恢复</p>
+
+          <!-- 删除影响预览（N4：连带删衍生数/引用数/是否被主图引用拦截） -->
+          <div x-show="deletePreview" class="mt-4 text-left text-sm themed-bg-subtle rounded-lg p-3 space-y-1">
+            <div>连带删除衍生图：<span class="font-semibold" x-text="(deletePreview?.derived_count ?? 0) + ' 张'"></span></div>
+            <div>当前被引用次数：<span class="font-semibold" x-text="(deletePreview?.reference_count ?? 0) + ' 处'"></span></div>
+            <div>连带解除挂载关联：<span class="font-semibold" x-text="(deletePreview?.attachments_to_cascade ?? 0) + ' 个'"></span></div>
+            <div>预计释放空间：<span class="font-semibold" x-text="formatFileSize(deletePreview?.freed_bytes_estimate || 0)"></span></div>
+            <div x-show="deletePreview?.blocked_by_primary" class="mt-2 p-2 rounded bg-red-50 text-red-700 dark:bg-red-900/20">
+              ⚠️ 该图正被业务作为主图引用，删除会被拦截，请先在对应商品/奖品/广告换图或下架。
+            </div>
+          </div>
+        </div>
+        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+          <button type="button" @click="hideModal('deleteModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+          <button type="button" @click="confirmDeleteMedia(deleteTarget)" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600" :disabled="deleting">
+            <span x-show="deleting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+            确认删除
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 页面专属逻辑 -->
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+
+</body>
+</html>

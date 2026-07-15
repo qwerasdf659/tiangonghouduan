@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>产品批次管理 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/product-batch-management-DbnPAbxx.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-BYHTji0J.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  <nav class="bg-gray-800 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-gray-300 transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">🏷️ 产品批次管理</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-data x-text="$store.auth?.user?.nickname ? `欢迎，${$store.auth.user.nickname}` : '欢迎，管理员'" class="text-sm text-gray-300">欢迎，管理员</span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6" x-data="productBatchManagement()" x-cloak>
+    <div class="themed-card rounded-xl shadow-sm mb-6 overflow-hidden">
+      <div class="px-5 py-4 bg-gradient-to-r from-slate-50 to-white border-b themed-border">
+        <div class="flex flex-wrap gap-4 items-end">
+          <div class="flex-1 min-w-[160px]">
+            <label class="block text-xs font-medium themed-text-muted mb-1.5">批次码搜索</label>
+            <input type="text" x-model="filters.keyword" @keyup.enter="handleSearch()" placeholder="batch_code" class="w-full px-3 py-2 text-sm border rounded-lg themed-border focus:ring-2 focus:ring-cyan-500">
+          </div>
+          <div class="w-36">
+            <label class="block text-xs font-medium themed-text-muted mb-1.5">exchange_item_id</label>
+            <input type="number" x-model="filters.exchange_item_id" @change="handleSearch()" class="w-full px-3 py-2 text-sm border rounded-lg themed-border">
+          </div>
+          <div class="w-40">
+            <label class="block text-xs font-medium themed-text-muted mb-1.5">供应商</label>
+            <select x-model="filters.supplier_id" @change="handleSearch()" class="w-full px-3 py-2 text-sm border rounded-lg themed-border">
+              <option value="">全部</option>
+              <template x-for="s in supplierOptions" :key="s.supplier_id">
+                <option :value="s.supplier_id" x-text="s.supplier_name"></option>
+              </template>
+            </select>
+          </div>
+          <div class="w-32">
+            <label class="block text-xs font-medium themed-text-muted mb-1.5">状态</label>
+            <select x-model="filters.status" @change="handleSearch()" class="w-full px-3 py-2 text-sm border rounded-lg themed-border">
+              <option value="">全部</option>
+              <option value="active">有效</option>
+              <option value="inactive">已召回</option>
+            </select>
+          </div>
+          <div class="flex gap-2">
+            <button @click="handleSearch()" class="px-4 py-2 text-sm themed-bg-primary text-white rounded-lg">🔍 搜索</button>
+            <button @click="resetFilters()" class="px-4 py-2 text-sm border rounded-lg themed-border hover:bg-gray-50">🔄 重置</button>
+            <button @click="openCreateForm()" class="px-4 py-2 text-sm themed-gradient-primary text-white rounded-lg">➕ 新建批次</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="themed-card rounded-xl shadow-sm border overflow-hidden">
+      <div class="px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b themed-border flex items-center gap-2">
+        <span class="text-sm font-semibold themed-text">批次列表</span>
+        <span class="px-2 py-0.5 text-xs font-medium bg-cyan-100 text-cyan-600 rounded-full" x-text="total + ' 条'"></span>
+      </div>
+      <div x-show="loading" class="p-12 text-center"><div class="animate-spin text-3xl mb-3">⏳</div><p class="text-sm">加载中...</p></div>
+      <div x-show="!loading && items.length === 0" class="p-12 text-center">
+        <p class="text-lg font-medium themed-text mb-2">暂无批次</p>
+        <button @click="openCreateForm()" class="px-4 py-2 text-sm themed-gradient-primary text-white rounded-lg">➕ 新建批次</button>
+      </div>
+      <table x-show="!loading && items.length > 0" class="w-full text-sm">
+        <thead>
+          <tr class="bg-gradient-to-r from-slate-50 to-gray-50 border-b themed-border">
+            <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted">ID</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted">批次码</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted">商品</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted">供应商</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted">数量</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted">状态</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted">生产日期</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted">操作</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y themed-border">
+          <template x-for="row in items" :key="row.batch_id">
+            <tr class="hover:bg-cyan-50/30">
+              <td class="px-4 py-3 font-mono text-xs" x-text="'#' + row.batch_id"></td>
+              <td class="px-4 py-3 font-mono font-medium" x-text="row.batch_code"></td>
+              <td class="px-4 py-3" x-text="row.exchangeItem?.item_name || row.exchange_item_id || '-'"></td>
+              <td class="px-4 py-3" x-text="row.supplier?.supplier_name || '-'"></td>
+              <td class="px-4 py-3 text-center" x-text="row.quantity"></td>
+              <td class="px-4 py-3 text-center">
+                <span class="px-2 py-0.5 rounded-full text-xs font-medium" :class="statusClass(row.status)" x-text="statusLabel(row.status)"></span>
+              </td>
+              <td class="px-4 py-3 text-xs themed-text-muted" x-text="formatDate(row.produced_at)"></td>
+              <td class="px-4 py-3">
+                <div class="flex justify-center gap-1">
+                  <button @click="openEditForm(row.batch_id)" class="px-2 py-1 text-xs text-green-600 hover:bg-green-50 rounded">编辑</button>
+                  <button x-show="row.status === 'active'" @click="handleRecall(row.batch_id, row.batch_code)" class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded">召回</button>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+      <div x-show="total > 0" class="px-5 py-3 flex justify-between items-center bg-gradient-to-r from-slate-50 to-gray-50 border-t themed-border">
+        <span class="text-xs themed-text-muted">共 <span x-text="total"></span> 条，第 <span x-text="pagination.page"></span>/<span x-text="totalPages"></span> 页</span>
+        <div class="flex gap-1">
+          <button @click="goToPage(pagination.page - 1)" :disabled="!hasPrevPage" class="px-3 py-1.5 border rounded-lg text-xs themed-border" :class="hasPrevPage ? '' : 'opacity-40'">← 上一页</button>
+          <button @click="goToPage(pagination.page + 1)" :disabled="!hasNextPage" class="px-3 py-1.5 border rounded-lg text-xs themed-border" :class="hasNextPage ? '' : 'opacity-40'">下一页 →</button>
+        </div>
+      </div>
+    </div>
+
+    <div x-show="show_form" class="fixed inset-0 z-50 flex items-center justify-center" x-cloak>
+      <div class="absolute inset-0 bg-black/50" @click="closeForm()"></div>
+      <div class="relative themed-card rounded-2xl shadow-2xl w-full max-w-lg mx-4 border themed-border">
+        <div class="px-6 py-4 themed-gradient-primary rounded-t-2xl flex justify-between">
+          <h3 class="text-lg font-bold text-white" x-text="is_edit ? '✏️ 编辑批次' : '➕ 新建批次'"></h3>
+          <button @click="closeForm()" class="text-white/80 hover:text-white text-xl">&times;</button>
+        </div>
+        <form @submit.prevent="submitForm()" class="px-6 py-5 space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div><label class="block text-xs font-semibold mb-1.5">exchange_item_id</label><input type="number" x-model="form.exchange_item_id" class="w-full px-3 py-2 text-sm border rounded-lg themed-border"></div>
+            <div><label class="block text-xs font-semibold mb-1.5">sku_id</label><input type="number" x-model="form.sku_id" class="w-full px-3 py-2 text-sm border rounded-lg themed-border"></div>
+            <div>
+              <label class="block text-xs font-semibold mb-1.5">supplier_id</label>
+              <select x-model="form.supplier_id" class="w-full px-3 py-2 text-sm border rounded-lg themed-border">
+                <option value="">无</option>
+                <template x-for="s in supplierOptions" :key="s.supplier_id">
+                  <option :value="s.supplier_id" x-text="s.supplier_name"></option>
+                </template>
+              </select>
+            </div>
+            <div><label class="block text-xs font-semibold mb-1.5">batch_cost</label><input type="number" step="0.01" x-model="form.batch_cost" class="w-full px-3 py-2 text-sm border rounded-lg themed-border"></div>
+            <div><label class="block text-xs font-semibold mb-1.5">quantity</label><input type="number" x-model="form.quantity" min="0" class="w-full px-3 py-2 text-sm border rounded-lg themed-border"></div>
+            <div><label class="block text-xs font-semibold mb-1.5">produced_at</label><input type="date" x-model="form.produced_at" class="w-full px-3 py-2 text-sm border rounded-lg themed-border"></div>
+            <div>
+              <label class="block text-xs font-semibold mb-1.5">status</label>
+              <select x-model="form.status" class="w-full px-3 py-2 text-sm border rounded-lg themed-border">
+                <option value="active">active</option>
+                <option value="inactive">inactive</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex justify-end gap-3 pt-3 border-t themed-border">
+            <button type="button" @click="closeForm()" class="px-5 py-2.5 text-sm border rounded-lg themed-border">取消</button>
+            <button type="submit" :disabled="saving" class="px-5 py-2.5 text-sm themed-gradient-primary text-white rounded-lg disabled:opacity-50" x-text="is_edit ? '💾 保存' : '✅ 创建'"></button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+</body>
+</html>

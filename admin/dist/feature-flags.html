@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>功能开关 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/feature-flags-Ba9pwA2U.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/core-Db48157X.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-DqA_IOCz.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 页面顶部渐变横幅 -->
+  <div class="page-banner">
+    <div class="container mx-auto px-4 flex justify-between items-center">
+      <div>
+        <div class="flex items-center gap-3 mb-1">
+          <a href="/admin/workspace.html" class="text-blue-200 hover:text-white text-sm transition">← 返回工作台</a>
+        </div>
+        <h1>🎚️ 功能开关管理</h1>
+        <p>管理系统功能的灰度发布和开关控制，支持全量、百分比、名单等多种发布策略</p>
+      </div>
+      <div class="text-6xl opacity-20">⚙️</div>
+    </div>
+  </div>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="featureFlags()" x-init="init()" @table-action="handleTableAction($event.detail)">
+    
+    <!-- 操作栏 -->
+    <div class="flex justify-end items-center mb-4">
+      <button @click="openCreateFlagModal()" class="btn-primary px-5 py-2.5 rounded-lg shadow-md transition flex items-center gap-2">
+        <span>➕</span> 新增开关
+      </button>
+    </div>
+
+    <!-- data-table 标准表格组件 -->
+    <div x-data="dataTable({
+      columns: tableColumns,
+      dataSource: fetchTableData,
+      primaryKey: 'flag_key',
+      sortable: true,
+      selectable: false,
+      exportable: false,
+      page_size: 100,
+      emptyText: '暂无功能开关'
+    })" x-init="init()" @dt-refresh.window="refresh()">
+      <!-- 标准数据表格组件模板（data-table EJS partial）- 配合 Alpine.js dataTable 组件使用 -->
+<!-- ===== 工具栏 ===== -->
+<div class="flex justify-between items-center mb-3">
+  <div class="flex items-center gap-3">
+    <!-- 选择信息（#13） -->
+    <template x-if="selectable && selectedRows.length > 0">
+      <div class="flex items-center gap-2 text-sm themed-text-primary themed-bg-primary-light px-3 py-1.5 rounded-lg">
+        <span>已选 <strong x-text="selectedRows.length"></strong> 项</span>
+        <button @click="clearSelection()" class="themed-text-primary hover:underline text-xs underline">取消选择</button>
+      </div>
+    </template>
+    <!-- 上次更新时间（#2） -->
+    <template x-if="lastUpdateTime">
+      <span class="text-xs text-gray-400">最后更新: <span x-text="lastUpdateTime"></span></span>
+    </template>
+  </div>
+  <div class="flex items-center gap-2">
+    <!-- 导出按钮（#12） -->
+    <template x-if="exportable">
+      <button @click="openExport()" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1">
+        📥 <span>导出</span>
+      </button>
+    </template>
+    <!-- 刷新按钮 -->
+    <button @click="refresh()" :disabled="loading" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1 disabled:opacity-50">
+      🔄 <span>刷新</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== 表格 ===== -->
+<div class="overflow-x-auto themed-card rounded-lg shadow">
+  <table class="w-full">
+    <!-- 表头 -->
+    <thead class="themed-bg-muted">
+      <tr>
+        <!-- 选择列（#13） -->
+        <template x-if="selectable">
+          <th class="px-4 py-3 text-center w-12">
+            <input type="checkbox"
+              :checked="isAllSelected"
+              :indeterminate.prop="isPartialSelected"
+              @change="toggleSelectAll($event.target.checked)"
+              class="rounded border-gray-300">
+          </th>
+        </template>
+        <!-- 数据列（#10 排序） -->
+        <template x-for="(col, colIdx) in columns" :key="'th_' + colIdx">
+          <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary"
+            :class="{ 'cursor-pointer themed-th-sortable select-none': sortable && col.sortable }"
+            :style="col.width ? 'width:' + col.width : ''"
+            @click="sort(col)">
+            <div class="flex items-center gap-1">
+              <span x-text="col.label"></span>
+              <template x-if="sortable && col.sortable">
+                <span class="text-xs" :class="sortColumn === col.key ? 'themed-text-primary font-bold' : 'text-gray-400'" x-text="getSortIcon(col)"></span>
+              </template>
+            </div>
+          </th>
+        </template>
+      </tr>
+    </thead>
+    <!-- 状态行（加载/错误/空）独立 tbody，避免与 x-for 在同一 tbody 导致 Alpine.js DOM 引用丢失 -->
+    <tbody x-show="loading || hasError || isEmpty" class="divide-y themed-divide">
+      <!-- 加载状态 -->
+      <tr x-show="loading">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <div class="animate-spin w-8 h-8 border-4 themed-border-primary border-t-transparent rounded-full"></div>
+            <span class="text-sm themed-text-muted">加载中...</span>
+          </div>
+        </td>
+      </tr>
+      <!-- 错误状态（#5） -->
+      <tr x-show="hasError">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-3">
+            <span class="text-4xl">❌</span>
+            <div class="text-red-600 font-medium">加载失败</div>
+            <div class="text-sm text-gray-500" x-text="error"></div>
+            <button @click="loadData()" class="px-4 py-2 themed-bg-primary text-white rounded-lg text-sm">🔄 重试</button>
+          </div>
+        </td>
+      </tr>
+      <!-- 空状态 -->
+      <tr x-show="isEmpty">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <span class="text-4xl">📭</span>
+            <div class="themed-text-muted" x-text="emptyText"></div>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+    <!-- 数据行独立 tbody，x-for 是唯一模板，避免 Alpine.js x-for + x-if 嵌套 DOM 引用 bug -->
+    <tbody x-show="hasData" class="divide-y themed-divide">
+      <template x-for="(row, rowIndex) in data" :key="String(row[primaryKey] || '') + '_' + rowIndex">
+        <tr class="themed-hover-bg transition-colors" @click="handleRowClick(row, rowIndex)">
+          <!-- 选择列 -->
+          <template x-if="selectable">
+            <td class="px-4 py-3 text-center" @click.stop>
+              <input type="checkbox"
+                :checked="isSelected(row[primaryKey])"
+                @change="toggleSelect(row[primaryKey])"
+                class="rounded border-gray-300">
+            </td>
+          </template>
+          <!-- 数据列 -->
+          <template x-for="(col, colIdx) in columns" :key="'td_' + rowIndex + '_' + colIdx">
+            <td class="px-4 py-3 text-sm" :class="col.type === 'actions' ? '' : 'themed-text-primary'">
+              <!-- 普通列：使用 renderCell -->
+              <span x-show="col.type !== 'actions'" x-html="renderCell(row, col)"></span>
+              <!-- 操作列：使用 Alpine 指令（支持 @click） -->
+              <div x-show="col.type === 'actions'" class="flex items-center gap-1" @click.stop>
+                <template x-for="action in (col.actions || [])" :key="action.name">
+                  <button
+                    x-show="!action.condition || action.condition(row)"
+                    @click="$dispatch('table-action', { action: action.name, row: JSON.parse(JSON.stringify(row)) })"
+                    class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
+                    :class="action.class || 'themed-text-primary'"
+                    x-html="(action.icon ? action.icon + ' ' : '') + action.label">
+                  </button>
+                </template>
+              </div>
+            </td>
+          </template>
+        </tr>
+      </template>
+    </tbody>
+  </table>
+
+  <!-- ===== 分页栏（#4 统一分页） ===== -->
+  <template x-if="total_records > 0">
+    <div class="px-4 py-3 border-t themed-divide flex justify-between items-center">
+      <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+      <div class="flex items-center gap-1">
+        <!-- 首页 -->
+        <button @click="firstPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">«</button>
+        <!-- 上一页 -->
+        <button @click="prevPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+        <!-- 页码 -->
+        <template x-for="page in visiblePages" :key="'p_' + page">
+          <button @click="goToPage(page)"
+            :disabled="page === '...'"
+            :class="page === current_page ? 'themed-bg-primary text-white themed-border-primary' : 'hover:bg-gray-50'"
+            class="px-3 py-1 text-sm border rounded min-w-[32px]"
+            x-text="page"></button>
+        </template>
+        <!-- 下一页 -->
+        <button @click="nextPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+        <!-- 末页 -->
+        <button @click="lastPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">»</button>
+      </div>
+    </div>
+  </template>
+</div>
+
+
+    </div>
+
+    <!-- 说明卡片 -->
+    <div class="themed-card rounded-xl shadow-sm mt-6 border border-gray-100 overflow-hidden">
+      <div class="card-header-accent">
+        <span class="header-icon">📖</span>
+        <span>发布策略说明</span>
+      </div>
+      <div class="p-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 text-sm">
+          <div class="flex items-center gap-3 p-3 rounded-lg bg-green-50 border border-green-100">
+            <span class="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-bold">全</span>
+            <div>
+              <div class="font-medium text-green-800">全量发布</div>
+              <div class="text-xs text-green-600 mt-0.5">所有用户立即生效</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 p-3 rounded-lg bg-blue-50 border border-blue-100">
+            <span class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold">%</span>
+            <div>
+              <div class="font-medium text-blue-800">百分比灰度</div>
+              <div class="text-xs text-blue-600 mt-0.5">按比例随机选择用户</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 p-3 rounded-lg bg-amber-50 border border-amber-100">
+            <span class="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">📋</span>
+            <div>
+              <div class="font-medium text-amber-800">用户名单</div>
+              <div class="text-xs text-amber-600 mt-0.5">指定用户ID列表</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 p-3 rounded-lg bg-purple-50 border border-purple-100">
+            <span class="w-8 h-8 rounded-full bg-purple-500 text-white flex items-center justify-center text-xs font-bold">👥</span>
+            <div>
+              <div class="font-medium text-purple-800">用户分群</div>
+              <div class="text-xs text-purple-600 mt-0.5">按用户分群条件</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 p-3 rounded-lg bg-orange-50 border border-orange-100">
+            <span class="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-bold">⏰</span>
+            <div>
+              <div class="font-medium text-orange-800">定时发布</div>
+              <div class="text-xs text-orange-600 mt-0.5">定时自动启用</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 功能开关表单 Modal -->
+    <div x-ref="featureFlagModal" 
+         x-show="isModalOpen('featureFlagModal')" 
+         x-cloak 
+         class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('featureFlagModal')"></div>
+      <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-md mx-4 z-10 animate-slide-in-up">
+        <div class="p-5 border-b flex justify-between items-center themed-gradient-light rounded-t-xl">
+          <h5 class="font-semibold text-blue-900 flex items-center gap-2">
+            <span class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-sm">🎚️</span>
+            <span x-text="editingFlagKey ? '编辑功能开关' : '新增功能开关'"></span>
+          </h5>
+          <button @click="hideModal('featureFlagModal')" class="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">✕</button>
+        </div>
+        <form @submit.prevent="saveFeatureFlag()">
+          <div class="p-6 space-y-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">开关键名 <span class="text-red-500">*</span></label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500" 
+                     x-model="featureFlagForm.flag_key" 
+                     :disabled="!!editingFlagKey" 
+                     required
+                     placeholder="如: feature_new_ui, enable_payment_v2"
+                     x-tooltip="'snake_case 格式的唯一标识符，用于代码中引用'">
+              <p class="text-xs themed-text-muted mt-1" x-show="!editingFlagKey">snake_case格式，创建后不可修改</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">开关名称 <span class="text-red-500">*</span></label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500" 
+                     x-model="featureFlagForm.flag_name" 
+                     required
+                     placeholder="如: 新版界面、支付V2">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">描述</label>
+              <textarea class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500" 
+                        x-model="featureFlagForm.description" 
+                        rows="2" 
+                        placeholder="功能开关描述..."></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">发布策略</label>
+              <select class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                      x-model="featureFlagForm.rollout_strategy">
+                <option value="all">全量发布</option>
+                <option value="percentage">百分比灰度</option>
+                <option value="user_list">用户名单</option>
+                <option value="user_segment">用户分群</option>
+                <option value="schedule">定时发布</option>
+              </select>
+            </div>
+            <div x-show="featureFlagForm.rollout_strategy === 'percentage'">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">灰度比例</label>
+              <div class="flex items-center">
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500" 
+                       x-model.number="featureFlagForm.rollout_percentage" 
+                       min="0" max="100"
+                       placeholder="0-100">
+                <span class="ml-2 text-sm themed-text-muted">%</span>
+              </div>
+            </div>
+            <div class="flex items-center">
+              <input type="checkbox" id="flagEnabled" x-model="featureFlagForm.is_enabled" class="mr-2 rounded">
+              <label for="flagEnabled" class="text-sm font-medium themed-text-secondary">立即启用</label>
+            </div>
+          </div>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
+            <button type="button" @click="hideModal('featureFlagModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300">取消</button>
+            <button type="submit" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50" :disabled="saving">
+              <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+              <span x-text="editingFlagKey ? '保存修改' : '创建开关'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div><!-- 关闭 featureFlags -->
+
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+</body>
+</html>

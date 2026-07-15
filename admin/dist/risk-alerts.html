@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>风控告警 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; } .chart-container { height: 200px; }</style>
+
+
+
+  <!-- ECharts 已通过 main.js 统一导入，无需 CDN -->
+  <script type="module" crossorigin src="/admin/assets/risk-alerts-B3u4n5mJ.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/core-Db48157X.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-DqA_IOCz.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen" x-data="riskAlertsPage()" x-init="init()" x-cloak>
+  
+  <!-- 导航栏 -->
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:opacity-80">← 返回工作台</a>
+        <span class="text-lg font-semibold">🚨 风控告警</span>
+        <span x-show="lastUpdateTime" class="text-xs text-white/60 ml-2">· 最后更新: <span x-text="lastUpdateTime"></span></span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-text="'欢迎，' + (current_user?.nickname || '管理员')"></span>
+        <button @click="logout()" class="px-3 py-1 border border-white/50 rounded hover:bg-white/10">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6">
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-red-500">
+        <div class="text-4xl text-red-400 mb-2">🔴</div>
+        <h4 class="text-2xl font-bold text-red-600" x-text="stats.critical">0</h4>
+        <p class="themed-text-muted text-sm">严重告警</p>
+      </div>
+      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-yellow-500">
+        <div class="text-4xl text-yellow-400 mb-2">🟡</div>
+        <h4 class="text-2xl font-bold text-yellow-600" x-text="stats.warning">0</h4>
+        <p class="themed-text-muted text-sm">警告</p>
+      </div>
+      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 themed-border-primary">
+        <div class="text-4xl text-blue-400 mb-2">🔵</div>
+        <h4 class="text-2xl font-bold themed-text-primary" x-text="stats.info">0</h4>
+        <p class="themed-text-muted text-sm">提示</p>
+      </div>
+      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-green-500">
+        <div class="text-4xl text-green-400 mb-2">✅</div>
+        <h4 class="text-2xl font-bold text-green-600" x-text="stats.resolved">0</h4>
+        <p class="themed-text-muted text-sm">已处理</p>
+      </div>
+    </div>
+
+    <!-- 图表区域 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div class="themed-card rounded-lg shadow">
+        <div class="p-4 border-b">
+          <h5 class="font-semibold">告警级别分布</h5>
+        </div>
+        <div class="p-4">
+          <div id="levelDistChart" class="chart-container"></div>
+        </div>
+      </div>
+      <div class="themed-card rounded-lg shadow">
+        <div class="p-4 border-b">
+          <h5 class="font-semibold">告警类型分布</h5>
+        </div>
+        <div class="p-4">
+          <div id="typeDistChart" class="chart-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 切换 -->
+    <div class="flex border-b mb-6">
+      <button @click="activeTab = 'alerts'"
+              :class="activeTab === 'alerts' ? 'border-b-2 themed-border-primary themed-text-primary font-semibold' : 'themed-text-muted hover:themed-text-secondary'"
+              class="px-6 py-3 text-sm transition-colors">
+        🚨 告警列表
+      </button>
+      <button @click="activeTab = 'silence'"
+              :class="activeTab === 'silence' ? 'border-b-2 themed-border-primary themed-text-primary font-semibold' : 'themed-text-muted hover:themed-text-secondary'"
+              class="px-6 py-3 text-sm transition-colors">
+        🔇 静默规则
+      </button>
+    </div>
+
+    <!-- Tab: 告警列表 -->
+    <div x-show="activeTab === 'alerts'">
+      <!-- 筛选栏 -->
+      <div class="themed-card rounded-lg shadow mb-6">
+        <div class="p-4">
+          <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">告警级别</label>
+              <select x-model="filters.severity" class="w-full px-3 py-2 border rounded-lg">
+                <option value="">全部级别</option>
+                <option value="critical">严重</option>
+                <option value="high">高危</option>
+                <option value="medium">中等</option>
+                <option value="low">低</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">告警类型</label>
+              <select x-model="filters.alert_type" class="w-full px-3 py-2 border rounded-lg">
+                <option value="">全部类型</option>
+                <option value="frequency_limit">频次限制</option>
+                <option value="amount_limit">金额告警</option>
+                <option value="duplicate_user">重复用户</option>
+                <option value="suspicious_pattern">可疑模式</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">处理状态</label>
+              <select x-model="filters.status" class="w-full px-3 py-2 border rounded-lg">
+                <option value="">全部状态</option>
+                <option value="pending">待处理</option>
+                <option value="reviewed">已审核</option>
+                <option value="resolved">已处理</option>
+                <option value="ignored">已忽略</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">时间范围</label>
+              <select x-model="filters.time" class="w-full px-3 py-2 border rounded-lg">
+                <option value="">全部时间</option>
+                <option value="today">今日</option>
+                <option value="week">本周</option>
+                <option value="month">本月</option>
+              </select>
+            </div>
+            <div>
+              <button @click="loadAlerts()" class="w-full px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary">
+                🔍 搜索
+              </button>
+            </div>
+            <div>
+              <button @click="toggleAutoRefresh()" :class="autoRefresh ? 'bg-green-600' : 'bg-gray-500'" class="w-full px-4 py-2 text-white rounded-lg hover:opacity-90">
+                <span x-text="autoRefresh ? '🔄 自动刷新中' : '⏸️ 自动刷新'"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 告警列表（data-table） -->
+      <div class="themed-card rounded-lg shadow" @table-action="handleAlertsTableAction($event.detail)">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold">告警列表</h5>
+          <button @click="batchResolve()" :disabled="selectedAlerts.length === 0" class="px-4 py-2 themed-btn-primary rounded disabled:opacity-50 text-sm">
+            批量处理选中
+          </button>
+        </div>
+        <div x-data="dataTable({
+          columns: alertsTableColumns,
+          dataSource: fetchAlertsTableData,
+          primaryKey: 'risk_alert_id',
+          sortable: true,
+          selectable: true,
+          exportable: false,
+          serverSort: true,
+          page_size: 20,
+          emptyText: '暂无风险告警数据'
+        })" x-init="init()" @dt-refresh.window="refresh()">
+          <!-- 标准数据表格组件模板（data-table EJS partial）- 配合 Alpine.js dataTable 组件使用 -->
+<!-- ===== 工具栏 ===== -->
+<div class="flex justify-between items-center mb-3">
+  <div class="flex items-center gap-3">
+    <!-- 选择信息（#13） -->
+    <template x-if="selectable && selectedRows.length > 0">
+      <div class="flex items-center gap-2 text-sm themed-text-primary themed-bg-primary-light px-3 py-1.5 rounded-lg">
+        <span>已选 <strong x-text="selectedRows.length"></strong> 项</span>
+        <button @click="clearSelection()" class="themed-text-primary hover:underline text-xs underline">取消选择</button>
+      </div>
+    </template>
+    <!-- 上次更新时间（#2） -->
+    <template x-if="lastUpdateTime">
+      <span class="text-xs text-gray-400">最后更新: <span x-text="lastUpdateTime"></span></span>
+    </template>
+  </div>
+  <div class="flex items-center gap-2">
+    <!-- 导出按钮（#12） -->
+    <template x-if="exportable">
+      <button @click="openExport()" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1">
+        📥 <span>导出</span>
+      </button>
+    </template>
+    <!-- 刷新按钮 -->
+    <button @click="refresh()" :disabled="loading" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1 disabled:opacity-50">
+      🔄 <span>刷新</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== 表格 ===== -->
+<div class="overflow-x-auto themed-card rounded-lg shadow">
+  <table class="w-full">
+    <!-- 表头 -->
+    <thead class="themed-bg-muted">
+      <tr>
+        <!-- 选择列（#13） -->
+        <template x-if="selectable">
+          <th class="px-4 py-3 text-center w-12">
+            <input type="checkbox"
+              :checked="isAllSelected"
+              :indeterminate.prop="isPartialSelected"
+              @change="toggleSelectAll($event.target.checked)"
+              class="rounded border-gray-300">
+          </th>
+        </template>
+        <!-- 数据列（#10 排序） -->
+        <template x-for="(col, colIdx) in columns" :key="'th_' + colIdx">
+          <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary"
+            :class="{ 'cursor-pointer themed-th-sortable select-none': sortable && col.sortable }"
+            :style="col.width ? 'width:' + col.width : ''"
+            @click="sort(col)">
+            <div class="flex items-center gap-1">
+              <span x-text="col.label"></span>
+              <template x-if="sortable && col.sortable">
+                <span class="text-xs" :class="sortColumn === col.key ? 'themed-text-primary font-bold' : 'text-gray-400'" x-text="getSortIcon(col)"></span>
+              </template>
+            </div>
+          </th>
+        </template>
+      </tr>
+    </thead>
+    <!-- 状态行（加载/错误/空）独立 tbody，避免与 x-for 在同一 tbody 导致 Alpine.js DOM 引用丢失 -->
+    <tbody x-show="loading || hasError || isEmpty" class="divide-y themed-divide">
+      <!-- 加载状态 -->
+      <tr x-show="loading">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <div class="animate-spin w-8 h-8 border-4 themed-border-primary border-t-transparent rounded-full"></div>
+            <span class="text-sm themed-text-muted">加载中...</span>
+          </div>
+        </td>
+      </tr>
+      <!-- 错误状态（#5） -->
+      <tr x-show="hasError">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-3">
+            <span class="text-4xl">❌</span>
+            <div class="text-red-600 font-medium">加载失败</div>
+            <div class="text-sm text-gray-500" x-text="error"></div>
+            <button @click="loadData()" class="px-4 py-2 themed-bg-primary text-white rounded-lg text-sm">🔄 重试</button>
+          </div>
+        </td>
+      </tr>
+      <!-- 空状态 -->
+      <tr x-show="isEmpty">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <span class="text-4xl">📭</span>
+            <div class="themed-text-muted" x-text="emptyText"></div>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+    <!-- 数据行独立 tbody，x-for 是唯一模板，避免 Alpine.js x-for + x-if 嵌套 DOM 引用 bug -->
+    <tbody x-show="hasData" class="divide-y themed-divide">
+      <template x-for="(row, rowIndex) in data" :key="String(row[primaryKey] || '') + '_' + rowIndex">
+        <tr class="themed-hover-bg transition-colors" @click="handleRowClick(row, rowIndex)">
+          <!-- 选择列 -->
+          <template x-if="selectable">
+            <td class="px-4 py-3 text-center" @click.stop>
+              <input type="checkbox"
+                :checked="isSelected(row[primaryKey])"
+                @change="toggleSelect(row[primaryKey])"
+                class="rounded border-gray-300">
+            </td>
+          </template>
+          <!-- 数据列 -->
+          <template x-for="(col, colIdx) in columns" :key="'td_' + rowIndex + '_' + colIdx">
+            <td class="px-4 py-3 text-sm" :class="col.type === 'actions' ? '' : 'themed-text-primary'">
+              <!-- 普通列：使用 renderCell -->
+              <span x-show="col.type !== 'actions'" x-html="renderCell(row, col)"></span>
+              <!-- 操作列：使用 Alpine 指令（支持 @click） -->
+              <div x-show="col.type === 'actions'" class="flex items-center gap-1" @click.stop>
+                <template x-for="action in (col.actions || [])" :key="action.name">
+                  <button
+                    x-show="!action.condition || action.condition(row)"
+                    @click="$dispatch('table-action', { action: action.name, row: JSON.parse(JSON.stringify(row)) })"
+                    class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
+                    :class="action.class || 'themed-text-primary'"
+                    x-html="(action.icon ? action.icon + ' ' : '') + action.label">
+                  </button>
+                </template>
+              </div>
+            </td>
+          </template>
+        </tr>
+      </template>
+    </tbody>
+  </table>
+
+  <!-- ===== 分页栏（#4 统一分页） ===== -->
+  <template x-if="total_records > 0">
+    <div class="px-4 py-3 border-t themed-divide flex justify-between items-center">
+      <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+      <div class="flex items-center gap-1">
+        <!-- 首页 -->
+        <button @click="firstPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">«</button>
+        <!-- 上一页 -->
+        <button @click="prevPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+        <!-- 页码 -->
+        <template x-for="page in visiblePages" :key="'p_' + page">
+          <button @click="goToPage(page)"
+            :disabled="page === '...'"
+            :class="page === current_page ? 'themed-bg-primary text-white themed-border-primary' : 'hover:bg-gray-50'"
+            class="px-3 py-1 text-sm border rounded min-w-[32px]"
+            x-text="page"></button>
+        </template>
+        <!-- 下一页 -->
+        <button @click="nextPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+        <!-- 末页 -->
+        <button @click="lastPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">»</button>
+      </div>
+    </div>
+  </template>
+</div>
+
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: 静默规则 -->
+    <div x-show="activeTab === 'silence'" x-cloak>
+      <div class="themed-card rounded-lg shadow" @table-action="handleSilenceRulesAction($event.detail)">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold">静默规则列表</h5>
+          <button @click="openSilenceRuleModal()" class="px-4 py-2 themed-btn-primary rounded text-sm">
+            + 新建静默规则
+          </button>
+        </div>
+        <div x-data="dataTable({
+          tableId: 'silenceRulesTable',
+          columns: silenceRulesTableColumns,
+          dataSource: fetchSilenceRulesTableData,
+          primaryKey: 'alert_silence_rule_id',
+          sortable: true,
+          selectable: false,
+          exportable: false,
+          serverSort: true,
+          page_size: 20,
+          emptyText: '暂无静默规则'
+        })" x-init="init()"
+          @refresh-table.window="if ($event.detail?.tableId === 'silenceRulesTable') refresh()">
+          <!-- 标准数据表格组件模板（data-table EJS partial）- 配合 Alpine.js dataTable 组件使用 -->
+<!-- ===== 工具栏 ===== -->
+<div class="flex justify-between items-center mb-3">
+  <div class="flex items-center gap-3">
+    <!-- 选择信息（#13） -->
+    <template x-if="selectable && selectedRows.length > 0">
+      <div class="flex items-center gap-2 text-sm themed-text-primary themed-bg-primary-light px-3 py-1.5 rounded-lg">
+        <span>已选 <strong x-text="selectedRows.length"></strong> 项</span>
+        <button @click="clearSelection()" class="themed-text-primary hover:underline text-xs underline">取消选择</button>
+      </div>
+    </template>
+    <!-- 上次更新时间（#2） -->
+    <template x-if="lastUpdateTime">
+      <span class="text-xs text-gray-400">最后更新: <span x-text="lastUpdateTime"></span></span>
+    </template>
+  </div>
+  <div class="flex items-center gap-2">
+    <!-- 导出按钮（#12） -->
+    <template x-if="exportable">
+      <button @click="openExport()" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1">
+        📥 <span>导出</span>
+      </button>
+    </template>
+    <!-- 刷新按钮 -->
+    <button @click="refresh()" :disabled="loading" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1 disabled:opacity-50">
+      🔄 <span>刷新</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== 表格 ===== -->
+<div class="overflow-x-auto themed-card rounded-lg shadow">
+  <table class="w-full">
+    <!-- 表头 -->
+    <thead class="themed-bg-muted">
+      <tr>
+        <!-- 选择列（#13） -->
+        <template x-if="selectable">
+          <th class="px-4 py-3 text-center w-12">
+            <input type="checkbox"
+              :checked="isAllSelected"
+              :indeterminate.prop="isPartialSelected"
+              @change="toggleSelectAll($event.target.checked)"
+              class="rounded border-gray-300">
+          </th>
+        </template>
+        <!-- 数据列（#10 排序） -->
+        <template x-for="(col, colIdx) in columns" :key="'th_' + colIdx">
+          <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary"
+            :class="{ 'cursor-pointer themed-th-sortable select-none': sortable && col.sortable }"
+            :style="col.width ? 'width:' + col.width : ''"
+            @click="sort(col)">
+            <div class="flex items-center gap-1">
+              <span x-text="col.label"></span>
+              <template x-if="sortable && col.sortable">
+                <span class="text-xs" :class="sortColumn === col.key ? 'themed-text-primary font-bold' : 'text-gray-400'" x-text="getSortIcon(col)"></span>
+              </template>
+            </div>
+          </th>
+        </template>
+      </tr>
+    </thead>
+    <!-- 状态行（加载/错误/空）独立 tbody，避免与 x-for 在同一 tbody 导致 Alpine.js DOM 引用丢失 -->
+    <tbody x-show="loading || hasError || isEmpty" class="divide-y themed-divide">
+      <!-- 加载状态 -->
+      <tr x-show="loading">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <div class="animate-spin w-8 h-8 border-4 themed-border-primary border-t-transparent rounded-full"></div>
+            <span class="text-sm themed-text-muted">加载中...</span>
+          </div>
+        </td>
+      </tr>
+      <!-- 错误状态（#5） -->
+      <tr x-show="hasError">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-3">
+            <span class="text-4xl">❌</span>
+            <div class="text-red-600 font-medium">加载失败</div>
+            <div class="text-sm text-gray-500" x-text="error"></div>
+            <button @click="loadData()" class="px-4 py-2 themed-bg-primary text-white rounded-lg text-sm">🔄 重试</button>
+          </div>
+        </td>
+      </tr>
+      <!-- 空状态 -->
+      <tr x-show="isEmpty">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <span class="text-4xl">📭</span>
+            <div class="themed-text-muted" x-text="emptyText"></div>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+    <!-- 数据行独立 tbody，x-for 是唯一模板，避免 Alpine.js x-for + x-if 嵌套 DOM 引用 bug -->
+    <tbody x-show="hasData" class="divide-y themed-divide">
+      <template x-for="(row, rowIndex) in data" :key="String(row[primaryKey] || '') + '_' + rowIndex">
+        <tr class="themed-hover-bg transition-colors" @click="handleRowClick(row, rowIndex)">
+          <!-- 选择列 -->
+          <template x-if="selectable">
+            <td class="px-4 py-3 text-center" @click.stop>
+              <input type="checkbox"
+                :checked="isSelected(row[primaryKey])"
+                @change="toggleSelect(row[primaryKey])"
+                class="rounded border-gray-300">
+            </td>
+          </template>
+          <!-- 数据列 -->
+          <template x-for="(col, colIdx) in columns" :key="'td_' + rowIndex + '_' + colIdx">
+            <td class="px-4 py-3 text-sm" :class="col.type === 'actions' ? '' : 'themed-text-primary'">
+              <!-- 普通列：使用 renderCell -->
+              <span x-show="col.type !== 'actions'" x-html="renderCell(row, col)"></span>
+              <!-- 操作列：使用 Alpine 指令（支持 @click） -->
+              <div x-show="col.type === 'actions'" class="flex items-center gap-1" @click.stop>
+                <template x-for="action in (col.actions || [])" :key="action.name">
+                  <button
+                    x-show="!action.condition || action.condition(row)"
+                    @click="$dispatch('table-action', { action: action.name, row: JSON.parse(JSON.stringify(row)) })"
+                    class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
+                    :class="action.class || 'themed-text-primary'"
+                    x-html="(action.icon ? action.icon + ' ' : '') + action.label">
+                  </button>
+                </template>
+              </div>
+            </td>
+          </template>
+        </tr>
+      </template>
+    </tbody>
+  </table>
+
+  <!-- ===== 分页栏（#4 统一分页） ===== -->
+  <template x-if="total_records > 0">
+    <div class="px-4 py-3 border-t themed-divide flex justify-between items-center">
+      <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+      <div class="flex items-center gap-1">
+        <!-- 首页 -->
+        <button @click="firstPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">«</button>
+        <!-- 上一页 -->
+        <button @click="prevPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+        <!-- 页码 -->
+        <template x-for="page in visiblePages" :key="'p_' + page">
+          <button @click="goToPage(page)"
+            :disabled="page === '...'"
+            :class="page === current_page ? 'themed-bg-primary text-white themed-border-primary' : 'hover:bg-gray-50'"
+            class="px-3 py-1 text-sm border rounded min-w-[32px]"
+            x-text="page"></button>
+        </template>
+        <!-- 下一页 -->
+        <button @click="nextPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+        <!-- 末页 -->
+        <button @click="lastPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">»</button>
+      </div>
+    </div>
+  </template>
+</div>
+
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 静默规则 新建/编辑 Modal -->
+  <div x-show="showSilenceRuleModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="showSilenceRuleModal = false"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold" x-text="silenceRuleForm.alert_silence_rule_id ? '编辑静默规则' : '新建静默规则'"></h5>
+        <button @click="showSilenceRuleModal = false" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      <form @submit.prevent="saveSilenceRule()">
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">规则名称 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="silenceRuleForm.rule_name" class="w-full px-3 py-2 border rounded-lg" placeholder="如：夜间静默、节假日静默">
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">告警类型 <span class="text-red-500">*</span></label>
+              <select x-model="silenceRuleForm.alert_type" class="w-full px-3 py-2 border rounded-lg">
+                <optgroup label="回馈告警">
+                  <option value="win_rate">发放率异常</option>
+                  <option value="budget">预算告警</option>
+                  <option value="inventory">库存不足</option>
+                  <option value="user">用户行为异常</option>
+                </optgroup>
+                <optgroup label="风控告警">
+                  <option value="frequency_limit">频次超限</option>
+                  <option value="amount_limit">金额超限</option>
+                  <option value="duplicate_user">重复用户</option>
+                  <option value="suspicious_pattern">可疑模式</option>
+                </optgroup>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">告警级别</label>
+              <select x-model="silenceRuleForm.alert_level" class="w-full px-3 py-2 border rounded-lg">
+                <option value="all">全部级别</option>
+                <option value="critical">紧急</option>
+                <option value="warning">警告</option>
+                <option value="info">信息</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">每日开始时间</label>
+              <input type="time" x-model="silenceRuleForm.start_time" class="w-full px-3 py-2 border rounded-lg" step="1">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">每日结束时间</label>
+              <input type="time" x-model="silenceRuleForm.end_time" class="w-full px-3 py-2 border rounded-lg" step="1">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">生效开始日期</label>
+              <input type="date" x-model="silenceRuleForm.effective_start_date" class="w-full px-3 py-2 border rounded-lg">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">生效结束日期</label>
+              <input type="date" x-model="silenceRuleForm.effective_end_date" class="w-full px-3 py-2 border rounded-lg">
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="silenceRuleActive" x-model="silenceRuleForm.is_active" class="w-4 h-4 rounded">
+            <label for="silenceRuleActive" class="text-sm themed-text-secondary">启用此规则</label>
+          </div>
+          <p class="text-xs themed-text-muted">留空时间段表示全天静默；留空日期表示长期生效。</p>
+        </div>
+        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+          <button type="button" @click="showSilenceRuleModal = false" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+          <button type="submit" class="px-4 py-2 themed-btn-primary rounded disabled:opacity-50" :disabled="silenceRuleSubmitting">
+            <span x-show="silenceRuleSubmitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+            <span x-text="silenceRuleForm.alert_silence_rule_id ? '保存修改' : '创建规则'"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 处理告警 Modal (新架构) -->
+  <div x-ref="handleModal" 
+       x-show="isModalOpen('handleModal')" 
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('handleModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">🔧 处理告警</h5>
+        <button @click="hideModal('handleModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      <form @submit.prevent="submitHandle()">
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">处理结果 <span class="text-red-500">*</span></label>
+            <select x-model="handleForm.status" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500">
+              <option value="reviewed">标记为已审核</option>
+              <option value="ignored">忽略此告警</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">处理备注</label>
+            <textarea x-model="handleForm.remark" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500" placeholder="请输入处理备注..."></textarea>
+          </div>
+        </div>
+        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+          <button type="button" @click="hideModal('handleModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+          <button type="submit" class="px-4 py-2 themed-btn-primary rounded disabled:opacity-50" :disabled="submitting">
+            <span x-show="submitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+            确认处理
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 告警详情模态框 -->
+  <div x-show="selectedAlert" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="selectedAlert = null">
+    <div class="themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">告警详情</h5>
+        <button @click="selectedAlert = null" class="themed-text-muted hover:themed-text-secondary">&times;</button>
+      </div>
+      <div class="p-4 space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div><span class="themed-text-muted">告警ID:</span> <span class="font-mono" x-text="selectedAlert?.risk_alert_id"></span></div>
+          <div><span class="themed-text-muted">级别:</span> <span x-text="selectedAlert?.severity_display || selectedAlert?.severity"></span></div>
+          <div><span class="themed-text-muted">类型:</span> <span x-text="selectedAlert?.alert_type_display || selectedAlert?.alert_type"></span></div>
+          <div><span class="themed-text-muted">状态:</span> <span x-text="selectedAlert?.status_display || selectedAlert?.status"></span></div>
+          <div><span class="themed-text-muted">关联用户:</span> <span x-text="selectedAlert?.target_user_info?.nickname || selectedAlert?.target_user_info?.user_id || '-'"></span></div>
+          <div><span class="themed-text-muted">触发时间:</span> <span x-text="formatDate(selectedAlert?.created_at)"></span></div>
+        </div>
+        <div>
+          <p class="themed-text-muted mb-2">告警描述:</p>
+          <div class="p-3 themed-bg-base rounded" x-text="selectedAlert?.alert_message"></div>
+        </div>
+        <div x-show="selectedAlert?.rule_name">
+          <p class="themed-text-muted mb-2">规则信息:</p>
+          <div class="p-3 themed-bg-base rounded">
+            <p><span class="themed-text-muted">规则名称:</span> <span x-text="selectedAlert?.rule_name"></span></p>
+            <p><span class="themed-text-muted">阈值:</span> <span x-text="selectedAlert?.rule_threshold"></span></p>
+            <p><span class="themed-text-muted">实际值:</span> <span x-text="selectedAlert?.actual_value"></span></p>
+            <p><span class="themed-text-muted">是否阻断:</span> <span x-text="selectedAlert?.is_blocked ? '是' : '否'"></span></p>
+          </div>
+        </div>
+        <div x-show="timeline.length > 0">
+          <p class="themed-text-muted mb-2">处理时间线:</p>
+          <div class="space-y-2">
+            <template x-for="item in timeline" :key="item.id">
+              <div class="flex items-start p-2 themed-bg-base rounded">
+                <span class="text-gray-400 text-sm mr-2" x-text="formatDate(item.created_at)"></span>
+                <span x-text="item.action"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+      <div class="p-4 border-t flex justify-end">
+        <button @click="selectedAlert = null" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- P2-8: 合并告警详情弹窗 -->
+  <div 
+    x-show="showMergedAlertsModal" 
+    x-cloak
+    class="fixed inset-0 z-50 flex items-center justify-center"
+    style="display: none;"
+  >
+    <div class="fixed inset-0 bg-black/50" @click="closeMergedAlertsModal()"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[80vh] flex flex-col">
+      <div class="p-4 border-b flex justify-between items-center shrink-0">
+        <h5 class="font-semibold">📊 批量告警详情</h5>
+        <button @click="closeMergedAlertsModal()" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      
+      <template x-if="currentMergedAlertGroup">
+        <div class="p-6 overflow-y-auto flex-1">
+          <!-- 统计摘要 -->
+          <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="text-center p-3 bg-blue-50 rounded-lg">
+              <p class="text-2xl font-bold text-blue-600" x-text="currentMergedAlertGroup.count"></p>
+              <span class="text-xs themed-text-muted">告警总数</span>
+            </div>
+            <div class="text-center p-3 bg-orange-50 rounded-lg">
+              <p class="text-sm font-medium text-orange-600" x-text="currentMergedAlertGroup.type_display || currentMergedAlertGroup.type"></p>
+              <span class="text-xs themed-text-muted">告警类型</span>
+            </div>
+            <div class="text-center p-3 bg-purple-50 rounded-lg">
+              <p class="text-sm font-medium text-purple-600" x-text="currentMergedAlertGroup.first_time"></p>
+              <span class="text-xs themed-text-muted">首次触发</span>
+            </div>
+          </div>
+          
+          <!-- 告警列表 -->
+          <div class="space-y-3">
+            <h6 class="font-medium themed-text mb-2">合并的告警（最近10条）</h6>
+            <template x-for="(alert, idx) in (currentMergedAlertGroup.alerts || []).slice(0, 10)" :key="idx">
+              <div class="p-3 bg-gray-50 rounded-lg flex items-start justify-between">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="text-xs font-mono themed-text-muted" x-text="alert.risk_alert_id"></span>
+                    <span 
+                      :class="{
+                        'bg-red-100 text-red-600': alert.severity === 'critical' || alert.severity === 'high',
+                        'bg-yellow-100 text-yellow-600': alert.severity === 'medium',
+                        'bg-blue-100 text-blue-600': alert.severity === 'low'
+                      }"
+                      class="px-1.5 py-0.5 text-xs rounded"
+                      x-text="alert.severity_display || alert.severity"
+                    ></span>
+                  </div>
+                  <p class="text-sm themed-text" x-text="alert.alert_message || alert.message"></p>
+                  <p class="text-xs themed-text-muted mt-1" x-text="formatDate(alert.created_at)"></p>
+                </div>
+                <button 
+                  @click="openHandleModal(alert); closeMergedAlertsModal()"
+                  class="text-green-500 hover:text-green-700 text-sm shrink-0 ml-2"
+                >
+                  处理
+                </button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+      
+      <div class="p-4 border-t flex justify-between items-center shrink-0">
+        <span class="text-sm themed-text-muted">同类告警1小时内只显示1次</span>
+        <button @click="closeMergedAlertsModal()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+
+</body>
+</html>

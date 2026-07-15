@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>字典管理 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/dict-management-I65YALXg.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-export-DWcgNdQC.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/core-Db48157X.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-DqA_IOCz.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 页面顶部渐变横幅 -->
+  <div class="page-banner" style="background: linear-gradient(135deg, #312e81 0%, #4f46e5 50%, #7c3aed 100%);">
+    <div class="container mx-auto px-4 flex justify-between items-center">
+      <div>
+        <div class="flex items-center gap-3 mb-1">
+          <a href="/admin/workspace.html" class="text-indigo-200 hover:text-white text-sm transition">← 返回工作台</a>
+        </div>
+        <h1>📚 字典管理</h1>
+        <p class="text-indigo-100">管理系统基础数据字典，包含类目、稀有度和资产分组等配置</p>
+      </div>
+      <div class="text-6xl opacity-20">📋</div>
+    </div>
+  </div>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="dictManagement()" @table-action="handleTableAction($event.detail)">
+    
+    <!-- 字典类型切换 - 卡片式 Tab -->
+    <div class="grid grid-cols-3 gap-4 mb-6">
+      <template x-for="(config, key) in dictTypes" :key="key">
+        <button 
+          @click="switchDictType(key)"
+          :class="currentDictType === key 
+            ? 'ring-2 ring-indigo-500 border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50' 
+            : 'border-gray-200 bg-white hover:border-indigo-200 hover:shadow-md'"
+          class="themed-card rounded-xl p-4 border transition-all duration-200 text-left group cursor-pointer"
+        >
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-2xl" x-text="key === 'categories' ? '📂' : key === 'rarities' ? '💎' : '📦'"></span>
+            <span :class="currentDictType === key ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'"
+                  class="text-xs font-medium px-2 py-0.5 rounded-full transition-colors"
+                  x-text="key"></span>
+          </div>
+          <h6 class="font-semibold text-sm" :class="currentDictType === key ? 'text-indigo-900' : 'text-gray-700'" x-text="config.name"></h6>
+          <p class="text-xs mt-1" :class="currentDictType === key ? 'text-indigo-500' : 'text-gray-400'"
+             x-text="key === 'categories' ? '商品类目分类定义' : key === 'rarities' ? '物品稀有度等级' : '资产分组归类'"></p>
+        </button>
+      </template>
+    </div>
+
+    <!-- 页面标题和新增按钮 -->
+    <div class="flex justify-between items-center mb-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg"
+             :class="currentDictType === 'categories' ? 'bg-blue-100 text-blue-600' : currentDictType === 'rarities' ? 'bg-purple-100 text-purple-600' : 'bg-emerald-100 text-emerald-600'">
+          <span x-text="currentDictType === 'categories' ? '📂' : currentDictType === 'rarities' ? '💎' : '📦'"></span>
+        </div>
+        <div>
+          <h5 class="font-semibold text-lg" x-text="getCurrentDictConfig().name">字典管理</h5>
+          <p class="text-xs themed-text-muted" x-text="'管理' + (getCurrentDictConfig().name || '数据字典') + '配置项'"></p>
+        </div>
+      </div>
+      <button @click="openCreateDictModal()" class="btn-primary px-5 py-2.5 rounded-lg shadow-sm flex items-center gap-2 themed-gradient-primary text-white">
+        <span>➕</span> 新增字典
+      </button>
+    </div>
+
+    <!-- 分类树形视图（仅分类 Tab 显示） -->
+    <template x-if="currentDictType === 'categories'">
+      <div class="themed-card rounded-xl border p-4 mb-4">
+        <div class="flex justify-between items-center mb-3">
+          <h6 class="font-semibold text-sm text-gray-700">分类层级结构</h6>
+          <button @click="loadCategoryTree()" class="text-xs text-indigo-600 hover:text-indigo-800">刷新树形</button>
+        </div>
+        <template x-if="categoryTree.length === 0">
+          <p class="text-xs text-gray-400 py-2">暂无分类树数据，点击"刷新树形"加载</p>
+        </template>
+        <div class="space-y-1">
+          <template x-for="parent in categoryTree" :key="parent.category_id">
+            <div>
+              <div class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50 group">
+                <div class="flex items-center gap-2">
+                  <span class="text-gray-400 text-xs" x-text="parent.children && parent.children.length > 0 ? '📂' : '📁'"></span>
+                  <span class="font-medium text-sm" x-text="parent.category_name"></span>
+                  <span class="text-xs text-gray-400" x-text="'(' + parent.category_code + ')'"></span>
+                  <span x-show="parent.children && parent.children.length > 0" class="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded" x-text="parent.children.length + ' 个子分类'"></span>
+                </div>
+                <button @click="openAddSubcategoryModal(parent)" class="text-xs text-indigo-500 hover:text-indigo-700 opacity-0 group-hover:opacity-100 transition-opacity">+ 添加子分类</button>
+              </div>
+              <template x-if="parent.children && parent.children.length > 0">
+                <div class="ml-8 border-l-2 border-gray-100">
+                  <template x-for="child in parent.children" :key="child.category_id">
+                    <div class="flex items-center justify-between py-1.5 px-3 hover:bg-gray-50 rounded">
+                      <div class="flex items-center gap-2">
+                        <span class="text-gray-300 text-xs">└</span>
+                        <span class="text-sm" x-text="child.category_name"></span>
+                        <span class="text-xs text-gray-400" x-text="'(' + child.category_code + ')'"></span>
+                      </div>
+                      <span :class="child.is_enabled ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'" class="text-xs px-1.5 py-0.5 rounded" x-text="child.is_enabled ? '启用' : '禁用'"></span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+
+    <!-- data-table 标准表格组件 -->
+    <div x-data="dataTable({
+      columns: tableColumns,
+      dataSource: fetchTableData,
+      primaryKey: '_row_id',
+      sortable: true,
+      selectable: false,
+      exportable: false,
+      page_size: 100,
+      emptyText: '暂无字典数据'
+    })" x-init="init()" @dt-refresh.window="refresh()">
+      <!-- 标准数据表格组件模板（data-table EJS partial）- 配合 Alpine.js dataTable 组件使用 -->
+<!-- ===== 工具栏 ===== -->
+<div class="flex justify-between items-center mb-3">
+  <div class="flex items-center gap-3">
+    <!-- 选择信息（#13） -->
+    <template x-if="selectable && selectedRows.length > 0">
+      <div class="flex items-center gap-2 text-sm themed-text-primary themed-bg-primary-light px-3 py-1.5 rounded-lg">
+        <span>已选 <strong x-text="selectedRows.length"></strong> 项</span>
+        <button @click="clearSelection()" class="themed-text-primary hover:underline text-xs underline">取消选择</button>
+      </div>
+    </template>
+    <!-- 上次更新时间（#2） -->
+    <template x-if="lastUpdateTime">
+      <span class="text-xs text-gray-400">最后更新: <span x-text="lastUpdateTime"></span></span>
+    </template>
+  </div>
+  <div class="flex items-center gap-2">
+    <!-- 导出按钮（#12） -->
+    <template x-if="exportable">
+      <button @click="openExport()" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1">
+        📥 <span>导出</span>
+      </button>
+    </template>
+    <!-- 刷新按钮 -->
+    <button @click="refresh()" :disabled="loading" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1 disabled:opacity-50">
+      🔄 <span>刷新</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== 表格 ===== -->
+<div class="overflow-x-auto themed-card rounded-lg shadow">
+  <table class="w-full">
+    <!-- 表头 -->
+    <thead class="themed-bg-muted">
+      <tr>
+        <!-- 选择列（#13） -->
+        <template x-if="selectable">
+          <th class="px-4 py-3 text-center w-12">
+            <input type="checkbox"
+              :checked="isAllSelected"
+              :indeterminate.prop="isPartialSelected"
+              @change="toggleSelectAll($event.target.checked)"
+              class="rounded border-gray-300">
+          </th>
+        </template>
+        <!-- 数据列（#10 排序） -->
+        <template x-for="(col, colIdx) in columns" :key="'th_' + colIdx">
+          <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary"
+            :class="{ 'cursor-pointer themed-th-sortable select-none': sortable && col.sortable }"
+            :style="col.width ? 'width:' + col.width : ''"
+            @click="sort(col)">
+            <div class="flex items-center gap-1">
+              <span x-text="col.label"></span>
+              <template x-if="sortable && col.sortable">
+                <span class="text-xs" :class="sortColumn === col.key ? 'themed-text-primary font-bold' : 'text-gray-400'" x-text="getSortIcon(col)"></span>
+              </template>
+            </div>
+          </th>
+        </template>
+      </tr>
+    </thead>
+    <!-- 状态行（加载/错误/空）独立 tbody，避免与 x-for 在同一 tbody 导致 Alpine.js DOM 引用丢失 -->
+    <tbody x-show="loading || hasError || isEmpty" class="divide-y themed-divide">
+      <!-- 加载状态 -->
+      <tr x-show="loading">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <div class="animate-spin w-8 h-8 border-4 themed-border-primary border-t-transparent rounded-full"></div>
+            <span class="text-sm themed-text-muted">加载中...</span>
+          </div>
+        </td>
+      </tr>
+      <!-- 错误状态（#5） -->
+      <tr x-show="hasError">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-3">
+            <span class="text-4xl">❌</span>
+            <div class="text-red-600 font-medium">加载失败</div>
+            <div class="text-sm text-gray-500" x-text="error"></div>
+            <button @click="loadData()" class="px-4 py-2 themed-bg-primary text-white rounded-lg text-sm">🔄 重试</button>
+          </div>
+        </td>
+      </tr>
+      <!-- 空状态 -->
+      <tr x-show="isEmpty">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <span class="text-4xl">📭</span>
+            <div class="themed-text-muted" x-text="emptyText"></div>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+    <!-- 数据行独立 tbody，x-for 是唯一模板，避免 Alpine.js x-for + x-if 嵌套 DOM 引用 bug -->
+    <tbody x-show="hasData" class="divide-y themed-divide">
+      <template x-for="(row, rowIndex) in data" :key="String(row[primaryKey] || '') + '_' + rowIndex">
+        <tr class="themed-hover-bg transition-colors" @click="handleRowClick(row, rowIndex)">
+          <!-- 选择列 -->
+          <template x-if="selectable">
+            <td class="px-4 py-3 text-center" @click.stop>
+              <input type="checkbox"
+                :checked="isSelected(row[primaryKey])"
+                @change="toggleSelect(row[primaryKey])"
+                class="rounded border-gray-300">
+            </td>
+          </template>
+          <!-- 数据列 -->
+          <template x-for="(col, colIdx) in columns" :key="'td_' + rowIndex + '_' + colIdx">
+            <td class="px-4 py-3 text-sm" :class="col.type === 'actions' ? '' : 'themed-text-primary'">
+              <!-- 普通列：使用 renderCell -->
+              <span x-show="col.type !== 'actions'" x-html="renderCell(row, col)"></span>
+              <!-- 操作列：使用 Alpine 指令（支持 @click） -->
+              <div x-show="col.type === 'actions'" class="flex items-center gap-1" @click.stop>
+                <template x-for="action in (col.actions || [])" :key="action.name">
+                  <button
+                    x-show="!action.condition || action.condition(row)"
+                    @click="$dispatch('table-action', { action: action.name, row: JSON.parse(JSON.stringify(row)) })"
+                    class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
+                    :class="action.class || 'themed-text-primary'"
+                    x-html="(action.icon ? action.icon + ' ' : '') + action.label">
+                  </button>
+                </template>
+              </div>
+            </td>
+          </template>
+        </tr>
+      </template>
+    </tbody>
+  </table>
+
+  <!-- ===== 分页栏（#4 统一分页） ===== -->
+  <template x-if="total_records > 0">
+    <div class="px-4 py-3 border-t themed-divide flex justify-between items-center">
+      <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+      <div class="flex items-center gap-1">
+        <!-- 首页 -->
+        <button @click="firstPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">«</button>
+        <!-- 上一页 -->
+        <button @click="prevPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+        <!-- 页码 -->
+        <template x-for="page in visiblePages" :key="'p_' + page">
+          <button @click="goToPage(page)"
+            :disabled="page === '...'"
+            :class="page === current_page ? 'themed-bg-primary text-white themed-border-primary' : 'hover:bg-gray-50'"
+            class="px-3 py-1 text-sm border rounded min-w-[32px]"
+            x-text="page"></button>
+        </template>
+        <!-- 下一页 -->
+        <button @click="nextPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+        <!-- 末页 -->
+        <button @click="lastPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">»</button>
+      </div>
+    </div>
+  </template>
+</div>
+
+
+    </div>
+
+    <!-- 字典表单 Modal -->
+    <!-- 添加子分类弹窗 -->
+    <div x-ref="subcategoryModal"
+         x-show="isModalOpen('subcategoryModal')"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('subcategoryModal')"></div>
+      <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-sm mx-4 z-10">
+        <div class="p-4 border-b flex justify-between items-center bg-indigo-50 rounded-t-xl">
+          <h5 class="font-semibold text-indigo-900">📂 添加子分类</h5>
+          <button @click="hideModal('subcategoryModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <div class="p-5 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">父分类</label>
+            <p class="text-sm font-bold text-indigo-700" x-text="subcategoryForm.parent_name"></p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">分类代码 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="subcategoryForm.category_code" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="如: phone, headphone">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">显示名称 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="subcategoryForm.category_name" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="如: 手机, 耳机">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">描述</label>
+            <input type="text" x-model="subcategoryForm.description" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="可选">
+          </div>
+        </div>
+        <div class="p-4 border-t flex justify-end gap-2">
+          <button @click="hideModal('subcategoryModal')" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">取消</button>
+          <button @click="submitSubcategory()" :disabled="saving" class="px-4 py-2 text-sm bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50">
+            <span x-show="saving" class="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+            确认添加
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div x-ref="dictModal" 
+         x-show="isModalOpen('dictModal')" 
+         x-cloak 
+         class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('dictModal')"></div>
+      <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-md mx-4 z-10 animate-slide-in-up">
+        <div class="p-5 border-b flex justify-between items-center themed-gradient-light rounded-t-xl">
+          <h5 class="font-semibold text-indigo-900 flex items-center gap-2">
+            <span class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-sm">📖</span>
+            <span x-text="isEditDict ? '编辑字典' : '新增字典'"></span>
+          </h5>
+          <button @click="hideModal('dictModal')" class="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">✕</button>
+        </div>
+        <form @submit.prevent="submitDictForm()">
+          <div class="p-6 space-y-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">字典代码 <span class="text-red-500">*</span></label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500" 
+                     x-model="dictForm[getCurrentDictConfig().codeField]" 
+                     :disabled="isEditDict" 
+                     required
+                     placeholder="如: electronics, food_drink">
+              <p class="text-xs themed-text-muted mt-1" x-show="!isEditDict">snake_case格式，创建后不可修改</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">显示名称 <span class="text-red-500">*</span></label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500" 
+                     x-model="dictForm[getCurrentDictConfig().nameField]" 
+                     required
+                     placeholder="如: 电子产品、餐饮美食">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">描述</label>
+              <textarea class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500" 
+                        x-model="dictForm.description" 
+                        rows="3" 
+                        placeholder="字典描述..."></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">排序顺序</label>
+              <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500" 
+                     x-model.number="dictForm.sort_order" 
+                     min="0"
+                     placeholder="数值越小越靠前">
+            </div>
+            <div class="flex items-center">
+              <input type="checkbox" id="dictEnabled" x-model="dictForm.is_enabled" class="mr-2 rounded">
+              <label for="dictEnabled" class="text-sm font-medium themed-text-secondary">启用</label>
+            </div>
+          </div>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
+            <button type="button" @click="hideModal('dictModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300">取消</button>
+            <button type="submit" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50" :disabled="saving">
+              <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+              <span x-text="isEditDict ? '保存修改' : '创建字典'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div><!-- 关闭 dictManagement -->
+
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+</body>
+</html>

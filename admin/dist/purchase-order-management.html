@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>采购单管理 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/purchase-order-management-QDWgW1v3.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-BYHTji0J.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  <nav class="bg-gray-800 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-gray-300 transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">📦 采购单管理</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-data x-text="$store.auth?.user?.nickname ? `欢迎，${$store.auth.user.nickname}` : '欢迎，管理员'" class="text-sm text-gray-300">欢迎，管理员</span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6" x-data="purchaseOrderManagement()" x-cloak>
+    <div class="themed-card rounded-xl shadow-sm mb-6 overflow-hidden">
+      <div class="px-5 py-4 bg-gradient-to-r from-slate-50 to-white border-b themed-border">
+        <div class="flex flex-wrap gap-4 items-end">
+          <div class="flex-1 min-w-[160px]">
+            <label class="block text-xs font-medium themed-text-muted mb-1.5">单号搜索</label>
+            <input type="text" x-model="filters.keyword" @keyup.enter="handleSearch()" placeholder="采购单号" class="w-full px-3 py-2 text-sm border rounded-lg themed-border focus:ring-2 focus:ring-cyan-500">
+          </div>
+          <div class="w-40">
+            <label class="block text-xs font-medium themed-text-muted mb-1.5">供应商</label>
+            <select x-model="filters.supplier_id" @change="handleSearch()" class="w-full px-3 py-2 text-sm border rounded-lg themed-border">
+              <option value="">全部</option>
+              <template x-for="s in supplierOptions" :key="s.supplier_id">
+                <option :value="s.supplier_id" x-text="s.supplier_name"></option>
+              </template>
+            </select>
+          </div>
+          <div class="w-32">
+            <label class="block text-xs font-medium themed-text-muted mb-1.5">状态</label>
+            <select x-model="filters.status" @change="handleSearch()" class="w-full px-3 py-2 text-sm border rounded-lg themed-border">
+              <option value="">全部</option>
+              <option value="draft">草稿</option>
+              <option value="ordered">已下单</option>
+              <option value="received">已收货</option>
+              <option value="cancelled">已取消</option>
+            </select>
+          </div>
+          <div class="flex gap-2">
+            <button @click="handleSearch()" class="px-4 py-2 text-sm themed-bg-primary text-white rounded-lg">🔍 搜索</button>
+            <button @click="resetFilters()" class="px-4 py-2 text-sm border rounded-lg themed-border hover:bg-gray-50">🔄 重置</button>
+            <button @click="openCreateForm()" class="px-4 py-2 text-sm themed-gradient-primary text-white rounded-lg">➕ 新建采购单</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="themed-card rounded-xl shadow-sm border overflow-hidden">
+      <div class="px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b themed-border flex items-center gap-2">
+        <span class="text-sm font-semibold themed-text">采购单列表</span>
+        <span class="px-2 py-0.5 text-xs font-medium bg-cyan-100 text-cyan-600 rounded-full" x-text="total + ' 条'"></span>
+      </div>
+      <div x-show="loading" class="p-12 text-center"><div class="animate-spin text-3xl mb-3">⏳</div><p class="text-sm">加载中...</p></div>
+      <div x-show="!loading && items.length === 0" class="p-12 text-center">
+        <p class="text-lg font-medium themed-text mb-2">暂无采购单</p>
+        <button @click="openCreateForm()" class="px-4 py-2 text-sm themed-gradient-primary text-white rounded-lg">➕ 新建采购单</button>
+      </div>
+      <table x-show="!loading && items.length > 0" class="w-full text-sm">
+        <thead>
+          <tr class="bg-gradient-to-r from-slate-50 to-gray-50 border-b themed-border">
+            <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted">ID</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted">单号</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted">供应商</th>
+            <th class="px-4 py-3 text-right text-xs font-semibold themed-text-muted">总额</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted">状态</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted">创建时间</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted">操作</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y themed-border">
+          <template x-for="row in items" :key="row.purchase_order_id">
+            <tr class="hover:bg-cyan-50/30">
+              <td class="px-4 py-3 font-mono text-xs" x-text="'#' + row.purchase_order_id"></td>
+              <td class="px-4 py-3 font-mono font-medium" x-text="row.order_no"></td>
+              <td class="px-4 py-3" x-text="row.supplier?.supplier_name || '-'"></td>
+              <td class="px-4 py-3 text-right" x-text="row.total_amount ?? '-'"></td>
+              <td class="px-4 py-3 text-center">
+                <span class="px-2 py-0.5 rounded-full text-xs font-medium" :class="statusClass(row.status)" x-text="statusLabel(row.status)"></span>
+              </td>
+              <td class="px-4 py-3 text-xs themed-text-muted" x-text="formatDate(row.created_at)"></td>
+              <td class="px-4 py-3">
+                <div class="flex justify-center gap-1 flex-wrap">
+                  <button @click="viewDetail(row.purchase_order_id)" class="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded">详情</button>
+                  <button x-show="['draft','ordered'].includes(row.status)" @click="openEditForm(row.purchase_order_id)" class="px-2 py-1 text-xs text-green-600 hover:bg-green-50 rounded">编辑</button>
+                  <button x-show="row.status === 'draft'" @click="doAction('submit', row.purchase_order_id, '提交下单')" class="px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50 rounded">提交</button>
+                  <button x-show="row.status === 'ordered'" @click="doAction('receive', row.purchase_order_id, '收货入库')" class="px-2 py-1 text-xs text-teal-600 hover:bg-teal-50 rounded">收货</button>
+                  <button x-show="['draft','ordered'].includes(row.status)" @click="doAction('cancel', row.purchase_order_id, '取消采购单')" class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded">取消</button>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+      <div x-show="total > 0" class="px-5 py-3 flex justify-between items-center bg-gradient-to-r from-slate-50 to-gray-50 border-t themed-border">
+        <span class="text-xs themed-text-muted">共 <span x-text="total"></span> 条，第 <span x-text="pagination.page"></span>/<span x-text="totalPages"></span> 页</span>
+        <div class="flex gap-1">
+          <button @click="goToPage(pagination.page - 1)" :disabled="!hasPrevPage" class="px-3 py-1.5 border rounded-lg text-xs themed-border" :class="hasPrevPage ? '' : 'opacity-40'">← 上一页</button>
+          <button @click="goToPage(pagination.page + 1)" :disabled="!hasNextPage" class="px-3 py-1.5 border rounded-lg text-xs themed-border" :class="hasNextPage ? '' : 'opacity-40'">下一页 →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 创建/编辑弹窗 -->
+    <div x-show="show_form" class="fixed inset-0 z-50 flex items-center justify-center" x-cloak>
+      <div class="absolute inset-0 bg-black/50" @click="closeForm()"></div>
+      <div class="relative themed-card rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border themed-border">
+        <div class="px-6 py-4 themed-gradient-primary rounded-t-2xl flex justify-between items-center">
+          <h3 class="text-lg font-bold text-white" x-text="is_edit ? '✏️ 编辑采购单' : '➕ 新建采购单'"></h3>
+          <button @click="closeForm()" class="text-white/80 hover:text-white text-xl">&times;</button>
+        </div>
+        <form @submit.prevent="submitForm()" class="px-6 py-5 space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold mb-1.5">供应商 <span class="text-red-500">*</span></label>
+              <select x-model="form.supplier_id" required class="w-full px-3 py-2 text-sm border rounded-lg themed-border">
+                <option value="">请选择</option>
+                <template x-for="s in supplierOptions" :key="s.supplier_id">
+                  <option :value="s.supplier_id" x-text="s.supplier_name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold mb-1.5">备注</label>
+              <input type="text" x-model="form.remark" class="w-full px-3 py-2 text-sm border rounded-lg themed-border">
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <label class="text-xs font-semibold">采购明细 <span class="text-red-500">*</span></label>
+              <button type="button" @click="addLine()" class="text-xs text-cyan-600 hover:underline">+ 添加行</button>
+            </div>
+            <template x-for="(line, idx) in form.lines" :key="idx">
+              <div class="grid grid-cols-5 gap-2 mb-2 items-end">
+                <div><label class="text-xs themed-text-muted">exchange_item_id</label><input type="number" x-model="line.exchange_item_id" class="w-full px-2 py-1.5 text-sm border rounded themed-border"></div>
+                <div><label class="text-xs themed-text-muted">sku_id</label><input type="number" x-model="line.sku_id" class="w-full px-2 py-1.5 text-sm border rounded themed-border"></div>
+                <div><label class="text-xs themed-text-muted">quantity</label><input type="number" x-model="line.quantity" min="1" class="w-full px-2 py-1.5 text-sm border rounded themed-border"></div>
+                <div><label class="text-xs themed-text-muted">purchase_price</label><input type="number" step="0.01" x-model="line.purchase_price" class="w-full px-2 py-1.5 text-sm border rounded themed-border"></div>
+                <button type="button" @click="removeLine(idx)" class="px-2 py-1.5 text-xs text-red-600 border rounded themed-border hover:bg-red-50" :disabled="form.lines.length <= 1">删除</button>
+              </div>
+            </template>
+            <p class="text-xs themed-text-muted">每行需填写 exchange_item_id 或 sku_id 之一</p>
+          </div>
+          <div class="flex justify-end gap-3 pt-3 border-t themed-border">
+            <button type="button" @click="closeForm()" class="px-5 py-2.5 text-sm border rounded-lg themed-border">取消</button>
+            <button type="submit" :disabled="saving" class="px-5 py-2.5 text-sm themed-gradient-primary text-white rounded-lg disabled:opacity-50">
+              <span x-text="is_edit ? '💾 保存' : '✅ 创建'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 详情弹窗 -->
+    <div x-show="show_detail" class="fixed inset-0 z-50 flex items-center justify-center" x-cloak>
+      <div class="absolute inset-0 bg-black/50" @click="show_detail = false"></div>
+      <div class="relative themed-card rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[85vh] overflow-y-auto border themed-border">
+        <div class="px-6 py-4 bg-gradient-to-r from-slate-700 to-slate-800 rounded-t-2xl flex justify-between">
+          <h3 class="text-lg font-bold text-white">📋 采购单详情</h3>
+          <button @click="show_detail = false" class="text-white/80 hover:text-white text-xl">&times;</button>
+        </div>
+        <div x-show="detail" class="px-6 py-5 space-y-3 text-sm">
+          <p><span class="font-semibold">单号：</span><span class="font-mono" x-text="detail?.order_no"></span></p>
+          <p><span class="font-semibold">供应商：</span><span x-text="detail?.supplier?.supplier_name"></span></p>
+          <p><span class="font-semibold">状态：</span><span x-text="statusLabel(detail?.status)"></span></p>
+          <p><span class="font-semibold">总额：</span><span x-text="detail?.total_amount"></span></p>
+          <table class="w-full text-sm border rounded mt-3">
+            <thead><tr class="bg-gray-50"><th class="px-2 py-1 text-left">商品</th><th class="px-2 py-1">数量</th><th class="px-2 py-1">进货价</th></tr></thead>
+            <tbody>
+              <template x-for="l in (detail?.lines || [])" :key="l.purchase_order_item_id || l.exchange_item_id">
+                <tr class="border-t"><td class="px-2 py-1" x-text="l.exchangeItem?.item_name || l.exchange_item_id"></td><td class="px-2 py-1 text-center" x-text="l.quantity"></td><td class="px-2 py-1 text-center" x-text="l.purchase_price ?? '-'"></td></tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <div class="px-6 py-3 border-t themed-border flex justify-end">
+          <button @click="show_detail = false" class="px-4 py-2 text-sm border rounded-lg themed-border">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+</body>
+</html>

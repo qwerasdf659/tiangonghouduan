@@ -1,0 +1,62 @@
+[
+  {
+    "template_id": "5",
+    "template_code": "consumption_default",
+    "template_name": "消费审核-默认链",
+    "auditable_type": "consumption",
+    "description": "所有消费记录的默认审核链（1级admin终审），兜底配置",
+    "total_nodes": 1,
+    "is_active": 1,
+    "priority": 0,
+    "match_conditions": {},
+    "created_by": null,
+    "created_at": "2026-03-10 08:18:51",
+    "updated_at": "2026-03-10 08:18:51"
+  },
+  {
+    "template_id": "6",
+    "template_code": "consumption_large",
+    "template_name": "消费审核-大额链",
+    "auditable_type": "consumption",
+    "description": "消费金额≥200元的审核链（2级：业务经理初审→admin终审）",
+    "total_nodes": 2,
+    "is_active": 1,
+    "priority": 10,
+    "match_conditions": {
+      "min_amount": 200
+    },
+    "created_by": null,
+    "created_at": "2026-03-10 08:18:51",
+    "updated_at": "2026-03-10 08:18:51"
+  },
+  {
+    "template_id": "7",
+    "template_code": "merchant_points_default",
+    "template_name": "商家积分审核-默认链",
+    "auditable_type": "merchant_points",
+    "description": "商家积分申请的默认审核链（1级admin终审）",
+    "total_nodes": 1,
+    "is_active": 1,
+    "priority": 0,
+    "match_conditions": {},
+    "created_by": null,
+    "created_at": "2026-03-10 08:18:51",
+    "updated_at": "2026-03-10 08:18:51"
+  },
+  {
+    "template_id": "9",
+    "template_code": "merchant_points_large",
+    "template_name": "商家积分审核-大额链",
+    "auditable_type": "merchant_points",
+    "description": "商家积分申请≥1000的审核链（2级：业务经理初审→admin终审）",
+    "total_nodes": 2,
+    "is_active": 1,
+    "priority": 10,
+    "match_conditions": {
+      "min_amount": 1000
+    },
+    "created_by": null,
+    "created_at": "2026-06-13 04:03:40",
+    "updated_at": "2026-06-13 04:03:40"
+  }
+]

@@ -1,0 +1,73 @@
+[
+  {
+    "batch_operation_log_id": 188,
+    "idempotency_key": "quota_grant_batch:32:29721336:18ead2ebd2d3c93b",
+    "operation_type": "quota_grant_batch",
+    "status": "completed",
+    "total_count": 1,
+    "success_count": 1,
+    "fail_count": 0,
+    "operation_params": {
+      "reason": "集成测试-字段名验证-1783280180006",
+      "user_ids": [
+        32
+      ],
+      "bonus_count": 1,
+      "lottery_campaign_id": 1
+    },
+    "result_summary": {
+      "reason": "集成测试-字段名验证-1783280180006",
+      "bonus_count": 1,
+      "failed_items": [],
+      "success_items": [
+        {
+          "message": "赠送成功",
+          "user_id": 32,
+          "new_bonus_count": 1
+        }
+      ],
+      "lottery_campaign_id": 1
+    },
+    "operator_id": 32,
+    "created_at": "2026-07-06 03:36:20",
+    "completed_at": "2026-07-06 03:36:20",
+    "updated_at": "2026-07-06 03:36:20"
+  },
+  {
+    "batch_operation_log_id": 189,
+    "idempotency_key": "budget_adjust_batch:32:29721336:f377f62a396e619b",
+    "operation_type": "budget_adjust_batch",
+    "status": "failed",
+    "total_count": 1,
+    "success_count": 0,
+    "fail_count": 1,
+    "operation_params": {
+      "reason": "集成测试-预算增加-1783280180362",
+      "adjustments": [
+        {
+          "amount": 100,
+          "adjustment_type": "increase",
+          "lottery_campaign_id": 1
+        }
+      ]
+    },
+    "result_summary": {
+      "reason": "集成测试-预算增加-1783280180362",
+      "failed_items": [
+        {
+          "index": 0,
+          "amount": 100,
+          "error_code": "BUDGET_MODE_NOT_SUPPORTED",
+          "error_message": "活动 餐厅消费回馈 的预算模式为 user，仅 budget_mode=pool 的活动支持预算调整",
+          "adjustment_type": "increase",
+          "lottery_campaign_id": 1
+        }
+      ],
+      "success_items": []
+    },
+    "operator_id": 32,
+    "created_at": "2026-07-06 03:36:20",
+    "completed_at": "2026-07-06 03:36:20",
+    "updated_at": "2026-07-06 03:36:20"
+  }
+]

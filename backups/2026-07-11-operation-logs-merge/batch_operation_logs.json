@@ -1,0 +1,76 @@
+{
+  "ddl": "CREATE TABLE `batch_operation_logs` (\n  `batch_operation_log_id` int NOT NULL AUTO_INCREMENT,\n  `idempotency_key` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '幂等键（格式：{operation_type}:{operator_id}:{timestamp}:{hash}）- 防止重复提交',\n  `operation_type` enum('quota_grant_batch','preset_batch','redemption_verify_batch','campaign_status_batch','budget_adjust_batch') COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '操作类型：quota_grant_batch=批量赠送抽奖次数 | preset_batch=批量设置干预规则 | redemption_verify_batch=批量核销确认 | campaign_status_batch=批量活动状态切换 | budget_adjust_batch=批量预算调整',\n  `status` enum('processing','partial_success','completed','failed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'processing' COMMENT '操作状态：processing=处理中 | partial_success=部分成功 | completed=全部成功 | failed=全部失败',\n  `total_count` int NOT NULL COMMENT '总操作数量',\n  `success_count` int NOT NULL DEFAULT '0' COMMENT '成功数量',\n  `fail_count` int NOT NULL DEFAULT '0' COMMENT '失败数量',\n  `operation_params` json DEFAULT NULL COMMENT '操作参数JSON（存储原始请求参数，便于重试和审计）',\n  `result_summary` json DEFAULT NULL COMMENT '结果摘要JSON（格式：{success_items: [{id, result}], failed_items: [{id, error}]}）',\n  `operator_id` int NOT NULL COMMENT '操作人ID（外键，关联 users.user_id）',\n  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间（北京时间）',\n  `completed_at` datetime DEFAULT NULL COMMENT '完成时间（北京时间）- 操作完成（无论成功/失败）时记录',\n  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间（北京时间）',\n  PRIMARY KEY (`batch_operation_log_id`),\n  UNIQUE KEY `idempotency_key` (`idempotency_key`),\n  UNIQUE KEY `idx_batch_ops_idempotency_key` (`idempotency_key`),\n  KEY `idx_batch_ops_operator_created` (`operator_id`,`created_at`),\n  KEY `idx_batch_ops_status` (`status`),\n  KEY `idx_batch_ops_type_status` (`operation_type`,`status`),\n  KEY `idx_batch_ops_created_at` (`created_at`),\n  CONSTRAINT `batch_operation_logs_ibfk_1` FOREIGN KEY (`operator_id`) REFERENCES `users` (`user_id`) ON DELETE RESTRICT ON UPDATE CASCADE\n) ENGINE=InnoDB AUTO_INCREMENT=190 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='批量操作日志表 - 幂等性控制与操作审计（阶段C核心基础设施）'",
+  "rows": [
+    {
+      "batch_operation_log_id": 188,
+      "idempotency_key": "quota_grant_batch:32:29721336:18ead2ebd2d3c93b",
+      "operation_type": "quota_grant_batch",
+      "status": "completed",
+      "total_count": 1,
+      "success_count": 1,
+      "fail_count": 0,
+      "operation_params": {
+        "reason": "集成测试-字段名验证-1783280180006",
+        "user_ids": [
+          32
+        ],
+        "bonus_count": 1,
+        "lottery_campaign_id": 1
+      },
+      "result_summary": {
+        "reason": "集成测试-字段名验证-1783280180006",
+        "bonus_count": 1,
+        "failed_items": [],
+        "success_items": [
+          {
+            "message": "赠送成功",
+            "user_id": 32,
+            "new_bonus_count": 1
+          }
+        ],
+        "lottery_campaign_id": 1
+      },
+      "operator_id": 32,
+      "created_at": "2026-07-05T19:36:20.000Z",
+      "completed_at": "2026-07-05T19:36:20.000Z",
+      "updated_at": "2026-07-05T19:36:20.000Z"
+    },
+    {
+      "batch_operation_log_id": 189,
+      "idempotency_key": "budget_adjust_batch:32:29721336:f377f62a396e619b",
+      "operation_type": "budget_adjust_batch",
+      "status": "failed",
+      "total_count": 1,
+      "success_count": 0,
+      "fail_count": 1,
+      "operation_params": {
+        "reason": "集成测试-预算增加-1783280180362",
+        "adjustments": [
+          {
+            "amount": 100,
+            "adjustment_type": "increase",
+            "lottery_campaign_id": 1
+          }
+        ]
+      },
+      "result_summary": {
+        "reason": "集成测试-预算增加-1783280180362",
+        "failed_items": [
+          {
+            "index": 0,
+            "amount": 100,
+            "error_code": "BUDGET_MODE_NOT_SUPPORTED",
+            "error_message": "活动 餐厅消费回馈 的预算模式为 user，仅 budget_mode=pool 的活动支持预算调整",
+            "adjustment_type": "increase",
+            "lottery_campaign_id": 1
+          }
+        ],
+        "success_items": []
+      },
+      "operator_id": 32,
+      "created_at": "2026-07-05T19:36:20.000Z",
+      "completed_at": "2026-07-05T19:36:20.000Z",
+      "updated_at": "2026-07-05T19:36:20.000Z"
+    }
+  ]
+}

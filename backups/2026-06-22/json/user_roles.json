@@ -1,0 +1,1302 @@
+[
+  {
+    "user_role_id": 2,
+    "user_id": 34,
+    "role_id": 1,
+    "assigned_at": "2025-09-29 01:09:44",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2025-09-29 01:09:44",
+    "updated_at": "2025-09-29 01:09:44"
+  },
+  {
+    "user_role_id": 3,
+    "user_id": 36,
+    "role_id": 1,
+    "assigned_at": "2025-09-29 01:09:44",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2025-09-29 01:09:44",
+    "updated_at": "2025-09-29 01:09:44"
+  },
+  {
+    "user_role_id": 4,
+    "user_id": 37,
+    "role_id": 1,
+    "assigned_at": "2025-09-29 01:09:44",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2025-09-29 01:09:44",
+    "updated_at": "2025-09-29 01:09:44"
+  },
+  {
+    "user_role_id": 5,
+    "user_id": 38,
+    "role_id": 1,
+    "assigned_at": "2025-09-29 01:09:44",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2025-09-29 01:09:44",
+    "updated_at": "2025-09-29 01:09:44"
+  },
+  {
+    "user_role_id": 16,
+    "user_id": 33,
+    "role_id": 1,
+    "assigned_at": "2025-10-10 03:04:18",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2025-10-10 03:04:18",
+    "updated_at": "2025-10-10 03:04:18"
+  },
+  {
+    "user_role_id": 18,
+    "user_id": 35,
+    "role_id": 1,
+    "assigned_at": "2025-10-10 03:05:29",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2025-10-10 03:05:29",
+    "updated_at": "2025-10-10 03:05:29"
+  },
+  {
+    "user_role_id": 20,
+    "user_id": 39,
+    "role_id": 1,
+    "assigned_at": "2025-10-10 03:57:32",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2025-10-10 03:57:32",
+    "updated_at": "2025-10-10 03:57:32"
+  },
+  {
+    "user_role_id": 21,
+    "user_id": 40,
+    "role_id": 1,
+    "assigned_at": "2025-10-10 03:57:50",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2025-10-10 03:57:50",
+    "updated_at": "2025-10-10 03:57:50"
+  },
+  {
+    "user_role_id": 37,
+    "user_id": 135,
+    "role_id": 2,
+    "assigned_at": "2025-11-23 07:30:10",
+    "assigned_by": 1,
+    "is_active": 1,
+    "created_at": "2025-11-23 07:30:10",
+    "updated_at": "2025-11-23 07:30:10"
+  },
+  {
+    "user_role_id": 183,
+    "user_id": 10996,
+    "role_id": 1,
+    "assigned_at": "2026-01-09 08:59:58",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-09 08:59:58",
+    "updated_at": "2026-01-09 08:59:58"
+  },
+  {
+    "user_role_id": 184,
+    "user_id": 10997,
+    "role_id": 1,
+    "assigned_at": "2026-01-09 08:59:58",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-09 08:59:58",
+    "updated_at": "2026-01-09 08:59:58"
+  },
+  {
+    "user_role_id": 185,
+    "user_id": 10998,
+    "role_id": 1,
+    "assigned_at": "2026-01-09 08:59:58",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-09 08:59:58",
+    "updated_at": "2026-01-09 08:59:58"
+  },
+  {
+    "user_role_id": 209,
+    "user_id": 11021,
+    "role_id": 100,
+    "assigned_at": "2026-01-15 06:14:22",
+    "assigned_by": 11021,
+    "is_active": 1,
+    "created_at": "2026-01-15 06:14:22",
+    "updated_at": "2026-01-15 06:14:22"
+  },
+  {
+    "user_role_id": 319,
+    "user_id": 11114,
+    "role_id": 2,
+    "assigned_at": "2026-01-21 21:35:13",
+    "assigned_by": 135,
+    "is_active": 1,
+    "created_at": "2026-01-21 21:35:13",
+    "updated_at": "2026-01-21 21:35:13"
+  },
+  {
+    "user_role_id": 336,
+    "user_id": 11131,
+    "role_id": 1,
+    "assigned_at": "2026-01-23 04:39:22",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-23 04:39:22",
+    "updated_at": "2026-01-23 04:39:22"
+  },
+  {
+    "user_role_id": 340,
+    "user_id": 10845,
+    "role_id": 5,
+    "assigned_at": "2026-01-26 07:29:44",
+    "assigned_by": 31,
+    "is_active": 1,
+    "created_at": "2026-01-26 07:29:44",
+    "updated_at": "2026-01-26 07:29:44"
+  },
+  {
+    "user_role_id": 341,
+    "user_id": 11132,
+    "role_id": 2,
+    "assigned_at": "2026-01-26 07:31:21",
+    "assigned_by": 31,
+    "is_active": 1,
+    "created_at": "2026-01-26 07:31:21",
+    "updated_at": "2026-01-26 07:31:21"
+  },
+  {
+    "user_role_id": 347,
+    "user_id": 11131,
+    "role_id": 7,
+    "assigned_at": "2026-01-27 08:22:39",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-27 08:22:39",
+    "updated_at": "2026-01-27 08:22:39"
+  },
+  {
+    "user_role_id": 369,
+    "user_id": 11172,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 04:25:29",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-28 20:25:29",
+    "updated_at": "2026-01-28 20:25:29"
+  },
+  {
+    "user_role_id": 374,
+    "user_id": 11187,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 04:31:51",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-28 20:31:51",
+    "updated_at": "2026-01-28 20:31:51"
+  },
+  {
+    "user_role_id": 375,
+    "user_id": 11188,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 04:32:05",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-28 20:32:05",
+    "updated_at": "2026-01-28 20:32:05"
+  },
+  {
+    "user_role_id": 376,
+    "user_id": 11189,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 04:33:32",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-28 20:33:32",
+    "updated_at": "2026-01-28 20:33:32"
+  },
+  {
+    "user_role_id": 377,
+    "user_id": 11190,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 04:45:31",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-28 20:45:31",
+    "updated_at": "2026-01-28 20:45:31"
+  },
+  {
+    "user_role_id": 380,
+    "user_id": 11198,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 04:49:49",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-28 20:49:49",
+    "updated_at": "2026-01-28 20:49:49"
+  },
+  {
+    "user_role_id": 383,
+    "user_id": 11206,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 05:01:01",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-28 21:01:01",
+    "updated_at": "2026-01-28 21:01:01"
+  },
+  {
+    "user_role_id": 388,
+    "user_id": 11221,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 05:01:50",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-28 21:01:50",
+    "updated_at": "2026-01-28 21:01:50"
+  },
+  {
+    "user_role_id": 393,
+    "user_id": 11236,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 05:24:07",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-28 21:24:07",
+    "updated_at": "2026-01-28 21:24:07"
+  },
+  {
+    "user_role_id": 394,
+    "user_id": 11237,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 06:55:01",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-28 22:55:01",
+    "updated_at": "2026-01-28 22:55:01"
+  },
+  {
+    "user_role_id": 397,
+    "user_id": 11245,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 06:58:36",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-28 22:58:36",
+    "updated_at": "2026-01-28 22:58:36"
+  },
+  {
+    "user_role_id": 401,
+    "user_id": 11254,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 07:17:08",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-28 23:17:08",
+    "updated_at": "2026-01-28 23:17:08"
+  },
+  {
+    "user_role_id": 406,
+    "user_id": 11270,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 08:39:31",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-29 00:39:31",
+    "updated_at": "2026-01-29 00:39:31"
+  },
+  {
+    "user_role_id": 407,
+    "user_id": 11271,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 08:39:34",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-29 00:39:34",
+    "updated_at": "2026-01-29 00:39:34"
+  },
+  {
+    "user_role_id": 411,
+    "user_id": 11279,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 08:55:34",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-29 00:55:34",
+    "updated_at": "2026-01-29 00:55:34"
+  },
+  {
+    "user_role_id": 416,
+    "user_id": 11295,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 09:08:07",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-29 01:08:07",
+    "updated_at": "2026-01-29 01:08:07"
+  },
+  {
+    "user_role_id": 418,
+    "user_id": 11296,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 14:03:41",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-29 06:03:41",
+    "updated_at": "2026-01-29 06:03:41"
+  },
+  {
+    "user_role_id": 429,
+    "user_id": 11333,
+    "role_id": 1,
+    "assigned_at": "2026-01-29 15:24:35",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-29 07:24:35",
+    "updated_at": "2026-01-29 07:24:35"
+  },
+  {
+    "user_role_id": 440,
+    "user_id": 11373,
+    "role_id": 1,
+    "assigned_at": "2026-01-30 20:40:57",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-30 20:40:57",
+    "updated_at": "2026-01-30 20:40:57"
+  },
+  {
+    "user_role_id": 444,
+    "user_id": 11375,
+    "role_id": 1,
+    "assigned_at": "2026-01-31 05:52:51",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-30 21:52:51",
+    "updated_at": "2026-01-30 21:52:51"
+  },
+  {
+    "user_role_id": 446,
+    "user_id": 11377,
+    "role_id": 1,
+    "assigned_at": "2026-01-31 14:01:40",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-01-31 06:01:40",
+    "updated_at": "2026-01-31 06:01:40"
+  },
+  {
+    "user_role_id": 447,
+    "user_id": 11379,
+    "role_id": 1,
+    "assigned_at": "2026-02-02 04:23:40",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-02-01 20:23:40",
+    "updated_at": "2026-02-01 20:23:40"
+  },
+  {
+    "user_role_id": 452,
+    "user_id": 11393,
+    "role_id": 1,
+    "assigned_at": "2026-02-02 12:35:34",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-02-02 04:35:34",
+    "updated_at": "2026-02-02 04:35:34"
+  },
+  {
+    "user_role_id": 453,
+    "user_id": 11394,
+    "role_id": 1,
+    "assigned_at": "2026-02-02 12:38:04",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-02-02 04:38:04",
+    "updated_at": "2026-02-02 04:38:04"
+  },
+  {
+    "user_role_id": 468,
+    "user_id": 11434,
+    "role_id": 1,
+    "assigned_at": "2026-02-04 12:45:37",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-02-04 04:45:37",
+    "updated_at": "2026-02-04 04:45:37"
+  },
+  {
+    "user_role_id": 469,
+    "user_id": 11435,
+    "role_id": 1,
+    "assigned_at": "2026-02-04 12:45:49",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-02-04 04:45:49",
+    "updated_at": "2026-02-04 04:45:49"
+  },
+  {
+    "user_role_id": 478,
+    "user_id": 11460,
+    "role_id": 1,
+    "assigned_at": "2026-02-04 17:03:39",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-02-04 09:03:39",
+    "updated_at": "2026-02-04 09:03:39"
+  },
+  {
+    "user_role_id": 488,
+    "user_id": 11486,
+    "role_id": 7,
+    "assigned_at": "2026-02-06 01:42:24",
+    "assigned_by": 31,
+    "is_active": 1,
+    "created_at": "2026-02-06 01:42:24",
+    "updated_at": "2026-02-06 01:42:24"
+  },
+  {
+    "user_role_id": 490,
+    "user_id": 11493,
+    "role_id": 1,
+    "assigned_at": "2026-02-15 10:02:39",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-02-15 02:02:39",
+    "updated_at": "2026-02-15 02:02:39"
+  },
+  {
+    "user_role_id": 494,
+    "user_id": 11508,
+    "role_id": 1,
+    "assigned_at": "2026-02-19 08:55:44",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-02-19 00:55:44",
+    "updated_at": "2026-02-19 00:55:44"
+  },
+  {
+    "user_role_id": 501,
+    "user_id": 11522,
+    "role_id": 1,
+    "assigned_at": "2026-02-21 02:14:43",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-02-20 18:14:43",
+    "updated_at": "2026-02-20 18:14:43"
+  },
+  {
+    "user_role_id": 503,
+    "user_id": 11524,
+    "role_id": 1,
+    "assigned_at": "2026-02-21 05:45:49",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-02-20 21:45:49",
+    "updated_at": "2026-02-20 21:45:49"
+  },
+  {
+    "user_role_id": 508,
+    "user_id": 11538,
+    "role_id": 1,
+    "assigned_at": "2026-02-21 09:50:42",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-02-21 01:50:42",
+    "updated_at": "2026-02-21 01:50:42"
+  },
+  {
+    "user_role_id": 513,
+    "user_id": 11552,
+    "role_id": 1,
+    "assigned_at": "2026-02-22 04:06:31",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-02-21 20:06:31",
+    "updated_at": "2026-02-21 20:06:31"
+  },
+  {
+    "user_role_id": 555,
+    "user_id": 11660,
+    "role_id": 1,
+    "assigned_at": "2026-02-24 01:18:02",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-02-23 17:18:02",
+    "updated_at": "2026-02-23 17:18:02"
+  },
+  {
+    "user_role_id": 570,
+    "user_id": 11710,
+    "role_id": 1,
+    "assigned_at": "2026-02-24 11:41:59",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-02-24 03:41:59",
+    "updated_at": "2026-02-24 03:41:59"
+  },
+  {
+    "user_role_id": 586,
+    "user_id": 11760,
+    "role_id": 1,
+    "assigned_at": "2026-03-02 17:36:52",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-02 09:36:52",
+    "updated_at": "2026-03-02 09:36:52"
+  },
+  {
+    "user_role_id": 598,
+    "user_id": 11762,
+    "role_id": 1,
+    "assigned_at": "2026-03-03 11:58:52",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-03 03:58:52",
+    "updated_at": "2026-03-03 03:58:52"
+  },
+  {
+    "user_role_id": 632,
+    "user_id": 11882,
+    "role_id": 1,
+    "assigned_at": "2026-03-06 23:09:24",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-06 15:09:24",
+    "updated_at": "2026-03-06 15:09:24"
+  },
+  {
+    "user_role_id": 634,
+    "user_id": 11884,
+    "role_id": 1,
+    "assigned_at": "2026-03-06 23:11:36",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-06 15:11:36",
+    "updated_at": "2026-03-06 15:11:36"
+  },
+  {
+    "user_role_id": 639,
+    "user_id": 11898,
+    "role_id": 1,
+    "assigned_at": "2026-03-07 00:01:50",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-06 16:01:50",
+    "updated_at": "2026-03-06 16:01:50"
+  },
+  {
+    "user_role_id": 641,
+    "user_id": 11900,
+    "role_id": 1,
+    "assigned_at": "2026-03-07 01:22:20",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-06 17:22:20",
+    "updated_at": "2026-03-06 17:22:20"
+  },
+  {
+    "user_role_id": 648,
+    "user_id": 32,
+    "role_id": 2,
+    "assigned_at": "2026-03-08 06:48:07",
+    "assigned_by": 31,
+    "is_active": 1,
+    "created_at": "2026-03-08 06:48:07",
+    "updated_at": "2026-03-08 06:48:07"
+  },
+  {
+    "user_role_id": 652,
+    "user_id": 11926,
+    "role_id": 1,
+    "assigned_at": "2026-03-09 09:38:37",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-09 01:38:37",
+    "updated_at": "2026-03-09 01:38:37"
+  },
+  {
+    "user_role_id": 654,
+    "user_id": 11927,
+    "role_id": 1,
+    "assigned_at": "2026-03-09 09:38:54",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-09 01:38:54",
+    "updated_at": "2026-03-09 01:38:54"
+  },
+  {
+    "user_role_id": 659,
+    "user_id": 11940,
+    "role_id": 1,
+    "assigned_at": "2026-03-09 13:12:00",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-09 05:12:00",
+    "updated_at": "2026-03-09 05:12:00"
+  },
+  {
+    "user_role_id": 661,
+    "user_id": 11941,
+    "role_id": 1,
+    "assigned_at": "2026-03-10 14:51:45",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-10 06:51:45",
+    "updated_at": "2026-03-10 06:51:45"
+  },
+  {
+    "user_role_id": 662,
+    "user_id": 11942,
+    "role_id": 1,
+    "assigned_at": "2026-03-10 07:20:52",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-10 07:20:52",
+    "updated_at": "2026-03-10 07:20:52"
+  },
+  {
+    "user_role_id": 667,
+    "user_id": 11955,
+    "role_id": 1,
+    "assigned_at": "2026-03-10 17:11:55",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-10 09:11:55",
+    "updated_at": "2026-03-10 09:11:55"
+  },
+  {
+    "user_role_id": 669,
+    "user_id": 11957,
+    "role_id": 1,
+    "assigned_at": "2026-03-14 12:50:11",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-14 04:50:11",
+    "updated_at": "2026-03-14 04:50:11"
+  },
+  {
+    "user_role_id": 677,
+    "user_id": 11983,
+    "role_id": 1,
+    "assigned_at": "2026-03-14 13:19:16",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-14 05:19:16",
+    "updated_at": "2026-03-14 05:19:16"
+  },
+  {
+    "user_role_id": 695,
+    "user_id": 12050,
+    "role_id": 1,
+    "assigned_at": "2026-03-17 16:41:05",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-17 08:41:05",
+    "updated_at": "2026-03-17 08:41:05"
+  },
+  {
+    "user_role_id": 701,
+    "user_id": 12069,
+    "role_id": 1,
+    "assigned_at": "2026-03-17 16:54:39",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-17 08:54:39",
+    "updated_at": "2026-03-17 08:54:39"
+  },
+  {
+    "user_role_id": 708,
+    "user_id": 12090,
+    "role_id": 1,
+    "assigned_at": "2026-03-21 08:53:02",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-21 00:53:02",
+    "updated_at": "2026-03-21 00:53:02"
+  },
+  {
+    "user_role_id": 723,
+    "user_id": 12141,
+    "role_id": 1,
+    "assigned_at": "2026-03-21 15:30:24",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-21 07:30:24",
+    "updated_at": "2026-03-21 07:30:24"
+  },
+  {
+    "user_role_id": 734,
+    "user_id": 12160,
+    "role_id": 1,
+    "assigned_at": "2026-03-21 16:32:57",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-21 08:32:57",
+    "updated_at": "2026-03-21 08:32:57"
+  },
+  {
+    "user_role_id": 739,
+    "user_id": 12174,
+    "role_id": 1,
+    "assigned_at": "2026-03-22 15:14:02",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-22 07:14:02",
+    "updated_at": "2026-03-22 07:14:02"
+  },
+  {
+    "user_role_id": 744,
+    "user_id": 12188,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 08:02:52",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 00:02:52",
+    "updated_at": "2026-03-23 00:02:52"
+  },
+  {
+    "user_role_id": 745,
+    "user_id": 12189,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 08:03:23",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 00:03:23",
+    "updated_at": "2026-03-23 00:03:23"
+  },
+  {
+    "user_role_id": 754,
+    "user_id": 12216,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 13:59:13",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 05:59:13",
+    "updated_at": "2026-03-23 05:59:13"
+  },
+  {
+    "user_role_id": 755,
+    "user_id": 12217,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 14:00:52",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 06:00:52",
+    "updated_at": "2026-03-23 06:00:52"
+  },
+  {
+    "user_role_id": 756,
+    "user_id": 12218,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 16:05:31",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 08:05:31",
+    "updated_at": "2026-03-23 08:05:31"
+  },
+  {
+    "user_role_id": 757,
+    "user_id": 12219,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 16:06:54",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 08:06:54",
+    "updated_at": "2026-03-23 08:06:54"
+  },
+  {
+    "user_role_id": 758,
+    "user_id": 12220,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 16:10:04",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 08:10:04",
+    "updated_at": "2026-03-23 08:10:04"
+  },
+  {
+    "user_role_id": 762,
+    "user_id": 12233,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 16:18:44",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 08:18:44",
+    "updated_at": "2026-03-23 08:18:44"
+  },
+  {
+    "user_role_id": 767,
+    "user_id": 12246,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 16:23:26",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 08:23:26",
+    "updated_at": "2026-03-23 08:23:26"
+  },
+  {
+    "user_role_id": 769,
+    "user_id": 12247,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 16:25:51",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 08:25:51",
+    "updated_at": "2026-03-23 08:25:51"
+  },
+  {
+    "user_role_id": 770,
+    "user_id": 12248,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 16:26:35",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 08:26:35",
+    "updated_at": "2026-03-23 08:26:35"
+  },
+  {
+    "user_role_id": 771,
+    "user_id": 12249,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 16:29:56",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 08:29:56",
+    "updated_at": "2026-03-23 08:29:56"
+  },
+  {
+    "user_role_id": 772,
+    "user_id": 12250,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 16:30:35",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 08:30:35",
+    "updated_at": "2026-03-23 08:30:35"
+  },
+  {
+    "user_role_id": 776,
+    "user_id": 12263,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 16:36:33",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 08:36:33",
+    "updated_at": "2026-03-23 08:36:33"
+  },
+  {
+    "user_role_id": 778,
+    "user_id": 12265,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 16:43:00",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 08:43:00",
+    "updated_at": "2026-03-23 08:43:00"
+  },
+  {
+    "user_role_id": 779,
+    "user_id": 12266,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 17:24:20",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 09:24:20",
+    "updated_at": "2026-03-23 09:24:20"
+  },
+  {
+    "user_role_id": 780,
+    "user_id": 12267,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 17:35:48",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 09:35:48",
+    "updated_at": "2026-03-23 09:35:48"
+  },
+  {
+    "user_role_id": 781,
+    "user_id": 12268,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 17:36:13",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 09:36:13",
+    "updated_at": "2026-03-23 09:36:13"
+  },
+  {
+    "user_role_id": 786,
+    "user_id": 12282,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 17:40:41",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 09:40:41",
+    "updated_at": "2026-03-23 09:40:41"
+  },
+  {
+    "user_role_id": 787,
+    "user_id": 12283,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 17:40:48",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 09:40:48",
+    "updated_at": "2026-03-23 09:40:48"
+  },
+  {
+    "user_role_id": 788,
+    "user_id": 12284,
+    "role_id": 1,
+    "assigned_at": "2026-03-23 17:45:04",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-23 09:45:04",
+    "updated_at": "2026-03-23 09:45:04"
+  },
+  {
+    "user_role_id": 793,
+    "user_id": 12297,
+    "role_id": 1,
+    "assigned_at": "2026-03-24 10:05:26",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-24 02:05:26",
+    "updated_at": "2026-03-24 02:05:26"
+  },
+  {
+    "user_role_id": 797,
+    "user_id": 12310,
+    "role_id": 1,
+    "assigned_at": "2026-03-24 10:16:57",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-24 02:16:57",
+    "updated_at": "2026-03-24 02:16:57"
+  },
+  {
+    "user_role_id": 799,
+    "user_id": 12311,
+    "role_id": 1,
+    "assigned_at": "2026-03-24 10:19:27",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-24 02:19:27",
+    "updated_at": "2026-03-24 02:19:27"
+  },
+  {
+    "user_role_id": 809,
+    "user_id": 12338,
+    "role_id": 1,
+    "assigned_at": "2026-03-24 12:38:44",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-24 04:38:44",
+    "updated_at": "2026-03-24 04:38:44"
+  },
+  {
+    "user_role_id": 816,
+    "user_id": 12352,
+    "role_id": 1,
+    "assigned_at": "2026-03-24 12:44:34",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-24 04:44:34",
+    "updated_at": "2026-03-24 04:44:34"
+  },
+  {
+    "user_role_id": 817,
+    "user_id": 12353,
+    "role_id": 1,
+    "assigned_at": "2026-03-24 12:44:47",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-24 04:44:47",
+    "updated_at": "2026-03-24 04:44:47"
+  },
+  {
+    "user_role_id": 827,
+    "user_id": 12380,
+    "role_id": 1,
+    "assigned_at": "2026-03-24 13:16:30",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-03-24 05:16:30",
+    "updated_at": "2026-03-24 05:16:30"
+  },
+  {
+    "user_role_id": 842,
+    "user_id": 12416,
+    "role_id": 1,
+    "assigned_at": "2026-04-10 14:53:28",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-04-10 06:53:28",
+    "updated_at": "2026-04-10 06:53:28"
+  },
+  {
+    "user_role_id": 844,
+    "user_id": 12418,
+    "role_id": 1,
+    "assigned_at": "2026-04-20 07:59:12",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-04-20 07:59:12",
+    "updated_at": "2026-04-20 07:59:12"
+  },
+  {
+    "user_role_id": 847,
+    "user_id": 12419,
+    "role_id": 1,
+    "assigned_at": "2026-04-22 19:38:49",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-04-22 11:38:49",
+    "updated_at": "2026-04-22 11:38:49"
+  },
+  {
+    "user_role_id": 852,
+    "user_id": 12433,
+    "role_id": 1,
+    "assigned_at": "2026-04-22 19:41:27",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-04-22 11:41:27",
+    "updated_at": "2026-04-22 11:41:27"
+  },
+  {
+    "user_role_id": 857,
+    "user_id": 12447,
+    "role_id": 1,
+    "assigned_at": "2026-04-23 08:04:38",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-04-23 00:04:38",
+    "updated_at": "2026-04-23 00:04:38"
+  },
+  {
+    "user_role_id": 862,
+    "user_id": 12461,
+    "role_id": 1,
+    "assigned_at": "2026-04-23 10:52:09",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-04-23 02:52:09",
+    "updated_at": "2026-04-23 02:52:09"
+  },
+  {
+    "user_role_id": 867,
+    "user_id": 12475,
+    "role_id": 1,
+    "assigned_at": "2026-04-23 10:55:53",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-04-23 02:55:53",
+    "updated_at": "2026-04-23 02:55:53"
+  },
+  {
+    "user_role_id": 872,
+    "user_id": 12489,
+    "role_id": 1,
+    "assigned_at": "2026-04-23 10:59:25",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-04-23 02:59:25",
+    "updated_at": "2026-04-23 02:59:25"
+  },
+  {
+    "user_role_id": 877,
+    "user_id": 12503,
+    "role_id": 1,
+    "assigned_at": "2026-04-24 11:36:11",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-04-24 03:36:11",
+    "updated_at": "2026-04-24 03:36:11"
+  },
+  {
+    "user_role_id": 884,
+    "user_id": 12517,
+    "role_id": 1,
+    "assigned_at": "2026-04-24 15:40:44",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-04-24 07:40:44",
+    "updated_at": "2026-04-24 07:40:44"
+  },
+  {
+    "user_role_id": 892,
+    "user_id": 12548,
+    "role_id": 1,
+    "assigned_at": "2026-04-25 13:41:33",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-04-25 05:41:33",
+    "updated_at": "2026-04-25 05:41:33"
+  },
+  {
+    "user_role_id": 900,
+    "user_id": 12569,
+    "role_id": 1,
+    "assigned_at": "2026-04-25 14:32:43",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-04-25 06:32:43",
+    "updated_at": "2026-04-25 06:32:43"
+  },
+  {
+    "user_role_id": 904,
+    "user_id": 12583,
+    "role_id": 1,
+    "assigned_at": "2026-04-25 14:42:20",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-04-25 06:42:20",
+    "updated_at": "2026-04-25 06:42:20"
+  },
+  {
+    "user_role_id": 913,
+    "user_id": 12597,
+    "role_id": 1,
+    "assigned_at": "2026-04-27 08:49:07",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-04-27 08:49:07",
+    "updated_at": "2026-04-27 08:49:07"
+  },
+  {
+    "user_role_id": 914,
+    "user_id": 12598,
+    "role_id": 1,
+    "assigned_at": "2026-04-28 17:47:38",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-04-28 17:47:38",
+    "updated_at": "2026-04-28 17:47:38"
+  },
+  {
+    "user_role_id": 915,
+    "user_id": 12599,
+    "role_id": 1,
+    "assigned_at": "2026-05-14 05:35:31",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-05-14 05:35:31",
+    "updated_at": "2026-05-14 05:35:31"
+  },
+  {
+    "user_role_id": 916,
+    "user_id": 12600,
+    "role_id": 1,
+    "assigned_at": "2026-05-26 11:48:01",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-05-26 03:48:01",
+    "updated_at": "2026-05-26 03:48:01"
+  },
+  {
+    "user_role_id": 924,
+    "user_id": 12626,
+    "role_id": 1,
+    "assigned_at": "2026-06-03 08:28:46",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-06-03 00:28:46",
+    "updated_at": "2026-06-03 00:28:46"
+  },
+  {
+    "user_role_id": 933,
+    "user_id": 12652,
+    "role_id": 1,
+    "assigned_at": "2026-06-03 09:40:44",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-06-03 01:40:44",
+    "updated_at": "2026-06-03 01:40:44"
+  },
+  {
+    "user_role_id": 940,
+    "user_id": 12668,
+    "role_id": 1,
+    "assigned_at": "2026-06-03 03:07:51",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-06-03 03:07:51",
+    "updated_at": "2026-06-03 03:07:51"
+  },
+  {
+    "user_role_id": 950,
+    "user_id": 12694,
+    "role_id": 1,
+    "assigned_at": "2026-06-03 03:43:32",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-06-03 03:43:32",
+    "updated_at": "2026-06-03 03:43:32"
+  },
+  {
+    "user_role_id": 955,
+    "user_id": 12707,
+    "role_id": 1,
+    "assigned_at": "2026-06-05 05:36:08",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-06-05 05:36:08",
+    "updated_at": "2026-06-05 05:36:08"
+  },
+  {
+    "user_role_id": 956,
+    "user_id": 12708,
+    "role_id": 1,
+    "assigned_at": "2026-06-05 11:09:51",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-06-05 11:09:51",
+    "updated_at": "2026-06-05 11:09:51"
+  },
+  {
+    "user_role_id": 974,
+    "user_id": 32,
+    "role_id": 254,
+    "assigned_at": "2026-06-13 07:15:30",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-06-13 07:15:30",
+    "updated_at": "2026-06-13 07:15:30"
+  },
+  {
+    "user_role_id": 975,
+    "user_id": 31,
+    "role_id": 6,
+    "assigned_at": "2026-06-13 07:18:50",
+    "assigned_by": 32,
+    "is_active": 1,
+    "created_at": "2026-06-13 07:18:50",
+    "updated_at": "2026-06-13 07:18:50"
+  },
+  {
+    "user_role_id": 981,
+    "user_id": 10000,
+    "role_id": 1,
+    "assigned_at": "2026-06-14 06:42:31",
+    "assigned_by": 32,
+    "is_active": 1,
+    "created_at": "2026-06-14 06:42:31",
+    "updated_at": "2026-06-14 06:42:31"
+  },
+  {
+    "user_role_id": 984,
+    "user_id": 12767,
+    "role_id": 1,
+    "assigned_at": "2026-06-14 23:19:36",
+    "assigned_by": null,
+    "is_active": 1,
+    "created_at": "2026-06-14 23:19:36",
+    "updated_at": "2026-06-14 23:19:36"
+  }
+]

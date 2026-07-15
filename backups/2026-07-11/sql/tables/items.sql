@@ -1,0 +1,204 @@
+/*M!999999\- enable the sandbox mode */ 
+-- MariaDB dump 10.19  Distrib 10.11.14-MariaDB, for debian-linux-gnu (x86_64)
+--
+-- Host: test-db-12-mysql.ns-br0za7uc.svc    Database: restaurant_points_dev
+-- ------------------------------------------------------
+-- Server version	8.0.30
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `items`
+--
+
+DROP TABLE IF EXISTS `items`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `items` (
+  `item_id` bigint NOT NULL AUTO_INCREMENT COMMENT '物品ID（主键，自增）',
+  `tracking_code` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '人类可读追踪码（格式：{来源2位}{YYMMDD}{item_id补零6位}，如 LT260219028738）',
+  `owner_account_id` bigint NOT NULL COMMENT '当前持有者账户ID（从 item_ledger 派生，关联 accounts.account_id）',
+  `status` enum('available','held','used','expired','destroyed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'available' COMMENT '物品状态：available=可用, held=锁定中, used=已使用, expired=已过期, destroyed=已销毁',
+  `item_type` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '物品类型：voucher=优惠券, product=实物商品, service=服务',
+  `item_name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '物品名称（正式列，替代 meta.name）',
+  `item_description` text COLLATE utf8mb4_unicode_ci COMMENT '物品描述',
+  `item_value` int NOT NULL DEFAULT '0' COMMENT '物品价值（积分计）',
+  `prize_definition_id` int DEFAULT NULL COMMENT '奖品定义ID（来自哪个奖品定义，关联 lottery_prizes.lottery_prize_id）',
+  `rarity_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'common' COMMENT '稀有度代码（关联 rarity_defs.rarity_code）',
+  `source` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '来源：lottery=抽奖, bid_settlement=竞价结算, exchange=兑换, admin=管理员, legacy=历史数据',
+  `source_ref_id` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '来源引用ID（lottery_draw_id / bid_product_id / exchange_record_id）',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `merchant_id` int DEFAULT NULL COMMENT '来源商家ID（NULL=平台自营，关联 merchants 表）',
+  `item_template_id` bigint DEFAULT NULL COMMENT '关联物品模板（所有来源统一用此字段标识"这个物品是什么"）',
+  `instance_attributes` json DEFAULT NULL COMMENT '实例独有属性 {"quality_score":87.42,"quality_grade":"精良","pattern_id":337,"颜色":"冰蓝"}',
+  `serial_number` int DEFAULT NULL COMMENT '限量编号（按ItemTemplate计数，如42表示第42件）',
+  `edition_total` int DEFAULT NULL COMMENT '限量总数快照（铸造时从模板复制，如100）',
+  `is_viewed` tinyint NOT NULL DEFAULT '0' COMMENT '是否已查看（0=未读 1=已读，纯展示状态，不入物品三表互锁）',
+  `first_viewed_at` datetime DEFAULT NULL COMMENT '首次查看时间（UTC 存储，北京时间展示）',
+  `nfc_uid` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'NFC芯片UID(防伪,预留)',
+  `anti_fake_code` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '防伪码(扫码验真,预留)',
+  `verify_count` int NOT NULL DEFAULT '0' COMMENT '被验真次数(判断盗刷)',
+  `first_verified_at` datetime DEFAULT NULL COMMENT '首次验真时间（北京时间）',
+  `batch_id` bigint DEFAULT NULL COMMENT '所属批次(product_batches.batch_id,预留)',
+  PRIMARY KEY (`item_id`),
+  UNIQUE KEY `tracking_code` (`tracking_code`),
+  KEY `idx_items_owner` (`owner_account_id`),
+  KEY `idx_items_status` (`status`),
+  KEY `idx_items_source_ref` (`source_ref_id`),
+  KEY `idx_items_type` (`item_type`),
+  KEY `idx_items_source` (`source`),
+  KEY `idx_items_merchant_id` (`merchant_id`),
+  KEY `idx_items_item_template` (`item_template_id`),
+  KEY `idx_items_template_serial` (`item_template_id`,`serial_number`),
+  KEY `idx_items_owner_status_viewed` (`owner_account_id`,`status`,`is_viewed`),
+  KEY `idx_items_batch` (`batch_id`),
+  CONSTRAINT `items_batch_id_foreign_idx` FOREIGN KEY (`batch_id`) REFERENCES `product_batches` (`batch_id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `items_ibfk_1` FOREIGN KEY (`owner_account_id`) REFERENCES `accounts` (`account_id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `items_item_template_id_foreign_idx` FOREIGN KEY (`item_template_id`) REFERENCES `item_templates` (`item_template_id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `items_merchant_id_foreign_idx` FOREIGN KEY (`merchant_id`) REFERENCES `merchants` (`merchant_id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=45634 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='物品表（当前状态缓存，可从 item_ledger 重建）';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `items`
+--
+
+LOCK TABLES `items` WRITE;
+/*!40000 ALTER TABLE `items` DISABLE KEYS */;
+INSERT INTO `items` VALUES
+(45462,'TS782085269006',7,'available','voucher','测试优惠券2',NULL,100,NULL,'common','test',NULL,'2026-06-22 07:41:09','2026-07-10 06:05:34',NULL,172,NULL,NULL,NULL,1,'2026-06-22 05:03:22',NULL,NULL,0,NULL,NULL),
+(45463,'TS782085269056',7,'held','voucher','测试优惠券3',NULL,100,NULL,'common','test',NULL,'2026-06-22 07:41:09','2026-07-10 06:05:34',NULL,173,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45465,'TS782085269222',7,'available','voucher','测试优惠券2',NULL,100,NULL,'common','test',NULL,'2026-06-22 07:41:09','2026-07-10 06:05:34',NULL,172,NULL,NULL,NULL,1,'2026-06-22 05:03:22',NULL,NULL,0,NULL,NULL),
+(45466,'TS782085269271',7,'held','voucher','测试优惠券3',NULL,100,NULL,'common','test',NULL,'2026-06-22 07:41:09','2026-07-10 06:05:34',NULL,173,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45483,'TS782304826890',7,'available','voucher','测试优惠券2',NULL,100,NULL,'common','test',NULL,'2026-06-24 20:40:26','2026-07-10 06:05:34',NULL,172,NULL,NULL,NULL,1,'2026-06-24 14:08:38',NULL,NULL,0,NULL,NULL),
+(45484,'TS782304826942',7,'held','voucher','测试优惠券3',NULL,100,NULL,'common','test',NULL,'2026-06-24 20:40:26','2026-07-10 06:05:34',NULL,173,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45486,'TS782304827127',7,'held','voucher','测试优惠券2',NULL,100,NULL,'common','test',NULL,'2026-06-24 20:40:27','2026-07-10 06:05:34',NULL,172,NULL,NULL,NULL,1,'2026-06-24 14:08:38',NULL,NULL,0,NULL,NULL),
+(45487,'TS782304827181',7,'held','voucher','测试优惠券3',NULL,100,NULL,'common','test',NULL,'2026-06-24 20:40:27','2026-07-10 06:05:34',NULL,173,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45516,'TS783280080014',7,'available','voucher','测试优惠券2',NULL,100,NULL,'common','test',NULL,'2026-07-06 03:34:40','2026-07-10 06:05:34',NULL,172,NULL,NULL,NULL,1,'2026-07-07 20:27:35',NULL,NULL,0,NULL,NULL),
+(45517,'TS783280080067',7,'held','voucher','测试优惠券3',NULL,100,NULL,'common','test',NULL,'2026-07-06 03:34:40','2026-07-10 06:05:34',NULL,173,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45519,'TS783280080256',7,'available','voucher','测试优惠券2',NULL,100,NULL,'common','test',NULL,'2026-07-06 03:34:40','2026-07-10 06:05:34',NULL,172,NULL,NULL,NULL,1,'2026-07-07 20:27:35',NULL,NULL,0,NULL,NULL),
+(45520,'TS783280080306',7,'held','voucher','测试优惠券3',NULL,100,NULL,'common','test',NULL,'2026-07-06 03:34:40','2026-07-10 06:05:34',NULL,173,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45527,'TS260710045527',7,'used','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 06:41:29','2026-07-10 06:41:29',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45528,'TS260710045528',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 06:41:29','2026-07-10 06:41:29',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45529,'TS260710045529',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 06:41:29','2026-07-10 06:41:29',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45530,'TS260710045530',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 06:41:29','2026-07-10 06:41:29',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45531,'TS260710045531',7,'used','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-10 06:41:29','2026-07-10 06:41:30',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45532,'TS260710045532',7,'available','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-10 06:41:29','2026-07-10 06:41:29',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45533,'LG260710045533',7,'expired','voucher','1号商品','<p>11111</p>',0,NULL,'common','barter','633','2026-07-10 06:41:29','2026-07-11 01:28:29',NULL,NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45534,'TS260710045534',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 06:42:49','2026-07-10 06:42:50',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45535,'TS260710045535',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 06:42:50','2026-07-10 06:42:50',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45536,'TS260710045536',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 06:42:50','2026-07-10 06:42:50',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45537,'TS260710045537',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 06:42:50','2026-07-10 06:42:50',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45538,'TS260710045538',7,'used','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-10 06:42:50','2026-07-10 06:42:53',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45539,'TS260710045539',7,'available','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-10 06:42:50','2026-07-10 06:42:50',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45540,'TS260710045540',7,'used','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 06:43:56','2026-07-10 06:43:57',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45541,'TS260710045541',7,'used','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 06:43:56','2026-07-10 06:43:57',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45542,'TS260710045542',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 06:43:56','2026-07-10 06:43:56',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45543,'TS260710045543',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 06:43:56','2026-07-10 06:43:56',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45544,'TS260710045544',7,'used','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-10 06:43:56','2026-07-10 06:43:57',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45545,'TS260710045545',7,'available','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-10 06:43:56','2026-07-10 06:43:56',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45546,'LG260710045546',7,'expired','voucher','1号商品','<p>11111</p>',0,NULL,'common','barter','633','2026-07-10 06:43:57','2026-07-11 01:28:29',NULL,NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45547,'LG260710045547',7,'expired','voucher','1号商品','<p>11111</p>',0,NULL,'common','barter','633','2026-07-10 06:43:57','2026-07-11 01:28:29',NULL,NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45548,'TS260710045548',7,'used','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 10:35:34','2026-07-10 10:35:35',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45549,'TS260710045549',7,'used','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 10:35:34','2026-07-10 10:35:35',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45550,'TS260710045550',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 10:35:34','2026-07-10 10:35:34',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45551,'TS260710045551',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 10:35:34','2026-07-10 10:35:34',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45552,'TS260710045552',7,'used','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-10 10:35:34','2026-07-10 10:35:35',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45553,'TS260710045553',7,'available','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-10 10:35:34','2026-07-10 10:35:34',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45554,'LG260710045554',7,'expired','voucher','1号商品','<p>11111</p>',0,NULL,'common','barter','633','2026-07-10 10:35:35','2026-07-11 01:28:29',NULL,NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45555,'LG260710045555',7,'expired','voucher','1号商品','<p>11111</p>',0,NULL,'common','barter','633','2026-07-10 10:35:35','2026-07-11 01:28:29',NULL,NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45556,'TS260710045556',7,'used','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 16:03:32','2026-07-10 16:03:33',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45557,'TS260710045557',7,'used','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 16:03:32','2026-07-10 16:03:33',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45558,'TS260710045558',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 16:03:32','2026-07-10 16:03:32',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45559,'TS260710045559',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 16:03:32','2026-07-10 16:03:32',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45560,'TS260710045560',7,'used','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-10 16:03:32','2026-07-10 16:03:33',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45561,'TS260710045561',7,'available','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-10 16:03:32','2026-07-10 16:03:32',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45562,'LG260710045562',7,'expired','voucher','1号商品','<p>11111</p>',0,NULL,'common','barter','633','2026-07-10 16:03:33','2026-07-11 01:28:29',NULL,NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45563,'LG260710045563',7,'expired','voucher','1号商品','<p>11111</p>',0,NULL,'common','barter','633','2026-07-10 16:03:33','2026-07-11 01:28:29',NULL,NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45564,'TS260710045564',7,'used','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 16:06:26','2026-07-10 16:06:27',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45565,'TS260710045565',7,'used','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 16:06:27','2026-07-10 16:06:27',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45566,'TS260710045566',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 16:06:27','2026-07-10 16:06:27',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45567,'TS260710045567',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-10 16:06:27','2026-07-10 16:06:27',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45568,'TS260710045568',7,'used','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-10 16:06:27','2026-07-10 16:06:27',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45569,'TS260710045569',7,'available','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-10 16:06:27','2026-07-10 16:06:27',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45570,'LG260710045570',7,'expired','voucher','1号商品','<p>11111</p>',0,NULL,'common','barter','633','2026-07-10 16:06:27','2026-07-11 01:28:29',NULL,NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45571,'LG260710045571',7,'expired','voucher','1号商品','<p>11111</p>',0,NULL,'common','barter','633','2026-07-10 16:06:27','2026-07-11 01:28:29',NULL,NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45572,'TS260711045572',7,'used','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 00:17:16','2026-07-11 00:17:16',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45573,'TS260711045573',7,'used','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 00:17:16','2026-07-11 00:17:17',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45574,'TS260711045574',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 00:17:16','2026-07-11 00:17:16',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45575,'TS260711045575',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 00:17:16','2026-07-11 00:17:16',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45576,'TS260711045576',7,'used','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-11 00:17:16','2026-07-11 00:17:17',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45577,'TS260711045577',7,'available','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-11 00:17:16','2026-07-11 00:17:16',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45578,'LG260711045578',7,'expired','voucher','1号商品','<p>11111</p>',0,NULL,'common','barter','633','2026-07-11 00:17:16','2026-07-11 01:28:29',NULL,NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45579,'LG260711045579',7,'expired','voucher','1号商品','<p>11111</p>',0,NULL,'common','barter','633','2026-07-11 00:17:17','2026-07-11 01:28:29',NULL,NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45580,'TS260711045580',7,'used','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:01:48','2026-07-11 01:01:49',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45581,'TS260711045581',7,'used','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:01:48','2026-07-11 01:01:49',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45582,'TS260711045582',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:01:48','2026-07-11 01:01:48',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45583,'TS260711045583',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:01:48','2026-07-11 01:01:48',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45584,'TS260711045584',7,'used','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-11 01:01:48','2026-07-11 01:01:49',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45585,'TS260711045585',7,'available','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-11 01:01:48','2026-07-11 01:01:48',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45586,'LG260711045586',7,'expired','voucher','1号商品','<p>11111</p>',0,NULL,'common','barter','633','2026-07-11 01:01:49','2026-07-11 01:28:29',NULL,NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45587,'LG260711045587',7,'expired','voucher','1号商品','<p>11111</p>',0,NULL,'common','barter','633','2026-07-11 01:01:49','2026-07-11 01:28:29',NULL,NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45588,'TS260711045588',7,'used','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:15:15','2026-07-11 01:15:15',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45589,'TS260711045589',7,'used','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:15:15','2026-07-11 01:15:15',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45590,'TS260711045590',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:15:15','2026-07-11 01:15:15',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45591,'TS260711045591',7,'available','voucher','测试优惠券2','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:15:15','2026-07-11 01:15:15',NULL,172,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45592,'TS260711045592',7,'used','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-11 01:15:15','2026-07-11 01:15:16',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45593,'TS260711045593',7,'available','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-11 01:15:15','2026-07-11 01:15:15',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45594,'LG260711045594',7,'expired','voucher','1号商品','<p>11111</p>',0,NULL,'common','barter','633','2026-07-11 01:15:15','2026-07-11 01:28:29',NULL,NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45595,'LG260711045595',7,'expired','voucher','1号商品','<p>11111</p>',0,NULL,'common','barter','633','2026-07-11 01:15:15','2026-07-11 01:28:29',NULL,NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45598,'TS260711045598',7,'used','voucher','契约测试旧券','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:44:50','2026-07-11 01:44:51',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45599,'TS260711045599',7,'used','voucher','契约测试旧券','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:44:50','2026-07-11 01:44:51',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45600,'TS260711045600',7,'available','voucher','契约测试旧券','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:44:50','2026-07-11 01:44:50',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45601,'TS260711045601',7,'available','voucher','契约测试旧券','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:44:50','2026-07-11 01:44:50',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45602,'TS260711045602',7,'used','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-11 01:44:50','2026-07-11 01:44:51',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45603,'TS260711045603',7,'available','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-11 01:44:50','2026-07-11 01:44:50',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45604,'LG260711045604',7,'available','voucher','契约测试-券产出商品','换物契约测试夹具（afterAll 清理）',0,NULL,'common','barter','698','2026-07-11 01:44:51','2026-07-11 01:44:51',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45605,'LG260711045605',7,'available','voucher','契约测试-券产出商品','换物契约测试夹具（afterAll 清理）',0,NULL,'common','barter','698','2026-07-11 01:44:51','2026-07-11 01:44:51',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45609,'TS260711045609',7,'used','voucher','契约测试旧券','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:48:54','2026-07-11 01:48:54',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45610,'TS260711045610',7,'used','voucher','契约测试旧券','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:48:54','2026-07-11 01:48:54',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45611,'TS260711045611',7,'available','voucher','契约测试旧券','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:48:54','2026-07-11 01:48:54',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45612,'TS260711045612',7,'available','voucher','契约测试旧券','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:48:54','2026-07-11 01:48:54',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45613,'TS260711045613',7,'used','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-11 01:48:54','2026-07-11 01:48:55',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45614,'TS260711045614',7,'available','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-11 01:48:54','2026-07-11 01:48:54',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45615,'LG260711045615',7,'available','voucher','契约测试-券产出商品','换物契约测试夹具（afterAll 清理）',0,NULL,'common','barter','720','2026-07-11 01:48:54','2026-07-11 01:48:54',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45616,'LG260711045616',7,'available','voucher','契约测试-券产出商品','换物契约测试夹具（afterAll 清理）',0,NULL,'common','barter','720','2026-07-11 01:48:54','2026-07-11 01:48:54',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45617,'TS260711045617',7,'used','voucher','契约测试旧券','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:49:35','2026-07-11 01:49:36',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45618,'TS260711045618',7,'used','voucher','契约测试旧券','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:49:35','2026-07-11 01:49:36',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45619,'TS260711045619',7,'available','voucher','契约测试旧券','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:49:35','2026-07-11 01:49:35',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45620,'TS260711045620',7,'available','voucher','契约测试旧券','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:49:35','2026-07-11 01:49:35',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45621,'TS260711045621',7,'used','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-11 01:49:35','2026-07-11 01:49:36',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45622,'TS260711045622',7,'available','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-11 01:49:35','2026-07-11 01:49:35',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45623,'LG260711045623',7,'available','voucher','契约测试-券产出商品','换物契约测试夹具（afterAll 清理）',0,NULL,'common','barter','724','2026-07-11 01:49:36','2026-07-11 01:49:36',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45624,'LG260711045624',7,'available','voucher','契约测试-券产出商品','换物契约测试夹具（afterAll 清理）',0,NULL,'common','barter','724','2026-07-11 01:49:36','2026-07-11 01:49:36',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45625,'TS260711045625',7,'used','voucher','契约测试旧券','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:53:27','2026-07-11 01:53:28',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45626,'TS260711045626',7,'used','voucher','契约测试旧券','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:53:27','2026-07-11 01:53:28',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45627,'TS260711045627',7,'available','voucher','契约测试旧券','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:53:27','2026-07-11 01:53:27',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45628,'TS260711045628',7,'available','voucher','契约测试旧券','换物契约测试旧物',0,NULL,'common','test','barter_contract_test','2026-07-11 01:53:27','2026-07-11 01:53:27',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45629,'TS260711045629',7,'used','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-11 01:53:28','2026-07-11 01:53:29',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45630,'TS260711045630',7,'available','product','毛巾礼盒','换物契约测试旧物（实物）',100,NULL,'common','test','barter_contract_test','2026-07-11 01:53:28','2026-07-11 01:53:28',NULL,16,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45631,'LG260711045631',7,'available','voucher','契约测试-券产出商品','换物契约测试夹具（afterAll 清理）',0,NULL,'common','barter','728','2026-07-11 01:53:28','2026-07-11 01:53:28',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL),
+(45632,'LG260711045632',7,'available','voucher','契约测试-券产出商品','换物契约测试夹具（afterAll 清理）',0,NULL,'common','barter','728','2026-07-11 01:53:28','2026-07-11 01:53:28',NULL,2,NULL,NULL,NULL,0,NULL,NULL,NULL,0,NULL,NULL);
+/*!40000 ALTER TABLE `items` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2026-07-10 18:10:58

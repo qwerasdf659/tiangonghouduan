@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>物品模板 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; } .template-card { transition: all 0.3s ease; } .template-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.12); }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/item-templates-BPg2RwT8.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/asset-BmjTKnbE.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen" x-data="itemTemplatesPage()" x-init="init()">
+  
+  <!-- 页面顶部渐变横幅 -->
+  <div class="page-banner" style="background: linear-gradient(135deg, #0e4166 0%, #0891b2 50%, #22d3ee 100%);">
+    <div class="container mx-auto px-4 flex justify-between items-center">
+      <div>
+        <div class="flex items-center gap-3 mb-1">
+          <a href="/admin/workspace.html" class="text-cyan-200 hover:text-white text-sm transition">← 返回工作台</a>
+        </div>
+        <h1>📦 物品模板管理</h1>
+        <p class="text-cyan-100">管理所有物品模板的创建、编辑和配置，包含类型、稀有度和价值设置</p>
+      </div>
+      <div class="text-6xl opacity-20">🎁</div>
+    </div>
+  </div>
+
+  <div class="container mx-auto px-4 py-6" x-cloak>
+    <!-- 统计卡片 - 使用渐变卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div class="gradient-stat-card gradient-stat-cyan">
+        <div class="stat-value" x-text="stats.total">-</div>
+        <div class="stat-label">模板总数</div>
+        <span class="stat-icon">📦</span>
+      </div>
+      <div class="gradient-stat-card gradient-stat-green">
+        <div class="stat-value" x-text="stats.types">-</div>
+        <div class="stat-label">物品类型</div>
+        <span class="stat-icon">🏷️</span>
+      </div>
+      <div class="gradient-stat-card gradient-stat-blue">
+        <div class="stat-value" x-text="stats.active">-</div>
+        <div class="stat-label">已启用</div>
+        <span class="stat-icon">✅</span>
+      </div>
+      <div class="gradient-stat-card gradient-stat-indigo">
+        <div class="stat-value" x-text="stats.rarities">-</div>
+        <div class="stat-label">稀有度分布</div>
+        <span class="stat-icon">⭐</span>
+      </div>
+    </div>
+
+    <!-- 筛选和操作栏 -->
+    <div class="filter-bar">
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        <div>
+          <label class="form-label">物品类型</label>
+          <select class="form-select" x-model="filters.type" @change="loadTemplates()">
+            <option value="">全部类型</option>
+            <option value="prop">道具</option>
+            <option value="voucher">优惠券</option>
+            <option value="coupon">代金券</option>
+            <option value="points">积分</option>
+            <option value="gift">礼品</option>
+            <option value="virtual">虚拟物品</option>
+            <option value="material">材料</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">稀有度</label>
+          <select class="form-select" x-model="filters.rarity" @change="loadTemplates()">
+            <option value="">全部稀有度</option>
+            <option value="common">普通</option>
+            <option value="uncommon">稀有</option>
+            <option value="rare">精良</option>
+            <option value="epic">史诗</option>
+            <option value="legendary">传说</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">状态</label>
+          <select class="form-select" x-model="filters.status" @change="loadTemplates()">
+            <option value="">全部状态</option>
+            <option value="active">已启用</option>
+            <option value="inactive">已禁用</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">搜索</label>
+          <input type="text" class="form-input" x-model="filters.search" placeholder="名称或编码" @keyup.enter="loadTemplates()">
+        </div>
+        <div class="flex space-x-2">
+          <button @click="loadTemplates()" :disabled="loading" class="btn-primary rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
+            <span x-show="loading" class="inline-block animate-spin mr-1">⏳</span>
+            <span x-show="!loading">🔍</span> 搜索
+          </button>
+          <button @click="resetFilters()" class="btn-secondary rounded-lg" title="重置筛选条件">
+            🔄
+          </button>
+          <button @click="openCreateModal()" class="btn-success rounded-lg">
+            ➕ 新建
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模板卡片列表 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+      <template x-for="t in templates" :key="t.item_template_id">
+        <div class="template-card themed-card rounded-xl shadow-sm overflow-hidden"
+             :class="'rarity-border-' + (t.rarity_code || 'common')">
+          <!-- 卡片顶部色条 -->
+          <div class="h-1.5" :class="'rarity-' + (t.rarity_code || 'common')"></div>
+          <div class="p-4">
+            <div class="flex justify-between items-start mb-3">
+              <div class="flex items-center gap-2">
+                <!-- 类型图标（带背景圆） -->
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl"
+                     :class="{'bg-green-50': t.item_type==='prop', 'bg-cyan-50': t.item_type==='voucher' || t.item_type==='coupon', 'bg-amber-50': t.item_type==='points', 'bg-pink-50': t.item_type==='gift', 'bg-indigo-50': t.item_type==='virtual', 'bg-gray-50': t.item_type==='material'}">
+                  <span x-text="getTypeIcon(t.item_type)">📦</span>
+                </div>
+                <span class="px-2 py-0.5 rounded-full text-xs text-white font-medium shadow-sm" 
+                      :class="'rarity-' + (t.rarity_code || 'common')"
+                      x-text="getRarityLabel(t.rarity_code, t.rarity)"></span>
+              </div>
+              <span class="px-2 py-1 rounded-full text-xs font-medium"
+                    :class="t.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+                    x-text="t.is_enabled ? '✓ 启用' : '停用'"></span>
+            </div>
+            <h5 class="font-semibold themed-text text-base mb-1 line-clamp-1" x-text="t.display_name"></h5>
+            <p class="text-xs text-gray-400 font-mono mb-2 truncate" x-text="t.template_code"></p>
+            <p class="text-sm themed-text-muted mb-3 line-clamp-2 min-h-[2.5rem]" x-text="truncateText(t.description, 60) || '暂无描述'"></p>
+            <div class="flex justify-between items-center pt-3 border-t border-gray-100">
+              <span class="text-sm font-semibold"
+                    :class="(t.reference_price_points || 0) > 500 ? 'text-orange-500' : 'text-cyan-600'">
+                💰 <span x-text="(t.reference_price_points || 0).toLocaleString()"></span> 积分
+              </span>
+              <div class="flex gap-1">
+                <button class="btn-sm btn-outline rounded-md text-xs" @click="editTemplate(t.item_template_id)">
+                  ✏️ 编辑
+                </button>
+                <button class="btn-sm rounded-md text-xs text-red-500 border border-red-200 hover:bg-red-50" @click="deleteTemplate(t.item_template_id)">
+                  🗑️
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+      
+      <!-- 空状态 -->
+      <div x-show="templates.length === 0 && !loading" class="col-span-full">
+        <div class="empty-state-enhanced themed-card rounded-xl shadow-sm">
+          <div class="empty-icon">📭</div>
+          <div class="empty-title">暂无物品模板</div>
+          <div class="empty-desc">点击右上方「新建」按钮创建第一个物品模板</div>
+          <button @click="openCreateModal()" class="btn-primary rounded-lg mt-4">➕ 立即创建</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模板表单模态框 -->
+  <div x-ref="templateModal"
+       x-show="isModalShown('templateModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+       @click.self="hideModal('templateModal')">
+    <div class="themed-card rounded-xl shadow-2xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto animate-slide-in-up">
+      <div class="p-5 border-b flex justify-between items-center themed-gradient-light rounded-t-xl">
+        <h5 class="font-semibold text-cyan-900 flex items-center gap-2">
+          <span class="w-8 h-8 rounded-lg bg-cyan-100 flex items-center justify-center text-sm" x-text="form.template_id ? '✏️' : '➕'"></span>
+          <span x-text="form.template_id ? '编辑物品模板' : '新建物品模板'"></span>
+        </h5>
+        <button @click="hideModal('templateModal')" class="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">✕</button>
+      </div>
+      <div class="p-4">
+        <form @submit.prevent="submitTemplate()">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">模板名称 <span class="text-red-500">*</span></label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg" x-model="form.display_name" required>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">模板编码 <span class="text-red-500">*</span></label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg" x-model="form.template_code" required placeholder="唯一标识">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">物品类型</label>
+              <select class="w-full px-3 py-2 border rounded-lg" x-model="form.item_type">
+                <option value="prop">道具</option>
+                <option value="voucher">优惠券</option>
+                <option value="coupon">代金券</option>
+                <option value="points">积分</option>
+                <option value="gift">礼品</option>
+                <option value="virtual">虚拟物品</option>
+                <option value="material">材料</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">稀有度</label>
+              <select class="w-full px-3 py-2 border rounded-lg" x-model="form.rarity_code">
+                <option value="common">普通</option>
+                <option value="uncommon">稀有</option>
+                <option value="rare">精良</option>
+                <option value="epic">史诗</option>
+                <option value="legendary">传说</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
+              <select class="w-full px-3 py-2 border rounded-lg" x-model="form.is_enabled">
+                <option :value="true">启用</option>
+                <option :value="false">禁用</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">基础价值</label>
+              <input type="number" class="w-full px-3 py-2 border rounded-lg" x-model.number="form.reference_price_points" min="0" step="0.01">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">价值档位 <span class="text-gray-400 text-xs">(高价值实物门槛)</span></label>
+              <select class="w-full px-3 py-2 border rounded-lg" x-model="form.value_tier">
+                <option value="low">low - 日常物（碎片直兑）</option>
+                <option value="mid">mid - 中档（VIP等级轻门槛）</option>
+                <option value="high">high - 高档（VIP+多资产+消耗道具复合门槛）</option>
+              </select>
+              <p class="text-xs themed-text-muted mt-1">由运营按价值显式归类；参考价为0的精品实物也须归 mid/high，杜绝漏判</p>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">模板图片</label>
+              <div class="flex items-start gap-4">
+                <!-- 图片预览 -->
+                <div class="w-24 h-24 border-2 border-dashed rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0"
+                     :class="image_preview_url ? 'border-cyan-300' : 'border-gray-300'">
+                  <img x-show="image_preview_url" :src="image_preview_url" class="w-full h-full object-cover" alt="模板图片">
+                  <span x-show="!image_preview_url" class="text-3xl text-gray-300">📷</span>
+                </div>
+                <!-- 上传操作 -->
+                <div class="flex-1 space-y-2">
+                  <div class="flex items-center gap-2">
+                    <label class="px-3 py-1.5 text-sm themed-btn-primary rounded cursor-pointer inline-flex items-center gap-1"
+                           :class="image_uploading ? 'opacity-50 cursor-not-allowed' : ''">
+                      <span x-show="image_uploading" class="inline-block animate-spin">⏳</span>
+                      <span x-show="!image_uploading">📤</span>
+                      <span x-text="image_uploading ? '上传中...' : '选择图片'"></span>
+                      <input type="file" class="hidden" accept="image/jpeg,image/png,image/gif,image/webp"
+                             @change="uploadTemplateImage($event)" :disabled="image_uploading">
+                    </label>
+                    <button x-show="image_preview_url" type="button" @click="clearTemplateImage()"
+                            class="px-3 py-1.5 text-sm border border-red-300 text-red-500 rounded hover:bg-red-50">
+                      清除
+                    </button>
+                  </div>
+                  <p class="text-xs themed-text-muted">支持 JPG/PNG/GIF/WebP，最大 5MB</p>
+                  <p x-show="form.primary_media_id" class="text-xs font-mono themed-text-muted break-all" x-text="'媒体ID: ' + form.primary_media_id"></p>
+                </div>
+              </div>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">模板描述</label>
+              <textarea class="w-full px-3 py-2 border rounded-lg" x-model="form.description" rows="2"></textarea>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">使用操作指引文案</label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg" x-model="form.use_instructions" placeholder="覆盖该模板的默认使用提示（留空使用按类型的默认文案）">
+              <p class="text-xs themed-text-muted mt-1">用户使用该物品后显示的引导文案，留空则使用 item_type 级别的默认配置</p>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">允许操作（模板级覆盖）</label>
+              <div class="flex flex-wrap gap-3">
+                <template x-for="opt in action_options" :key="opt.value">
+                  <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" :value="opt.value" x-model="form.allowed_actions"
+                           class="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500">
+                    <span class="text-sm" x-text="opt.label"></span>
+                  </label>
+                </template>
+              </div>
+              <p class="text-xs themed-text-muted mt-1">勾选后覆盖该模板的默认操作规则（留空使用 item_type 级别的默认配置）</p>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">限量总数上限（max_edition）</label>
+              <input type="number" min="0" class="w-full px-3 py-2 border rounded-lg" x-model.number="max_edition" placeholder="留空表示不限制">
+              <p class="text-xs themed-text-muted mt-1">写入列 <code class="text-xs">item_templates.max_edition</code>（与 meta 二选一由后端归一，勿混用）</p>
+            </div>
+            <!-- 属性规则配置 → meta.attribute_rules -->
+            <div class="md:col-span-2 border rounded-lg p-4 bg-cyan-50/40 border-cyan-100">
+              <h6 class="text-sm font-semibold text-cyan-900 mb-3">属性规则配置（meta.attribute_rules）</h6>
+              <div class="space-y-4">
+                <div class="flex items-center gap-2">
+                  <input type="checkbox" id="ar_qs_en" x-model="attribute_rules.quality_score.enabled" class="rounded border-gray-300 text-cyan-600">
+                  <label for="ar_qs_en" class="text-sm font-medium themed-text-secondary">品质分规则</label>
+                </div>
+                <div x-show="attribute_rules.quality_score.enabled" class="overflow-x-auto">
+                  <table class="w-full text-xs border-collapse border border-gray-200 bg-white rounded">
+                    <thead>
+                      <tr class="bg-gray-50">
+                        <th class="border px-2 py-1 text-left">档位</th>
+                        <th class="border px-2 py-1">min</th>
+                        <th class="border px-2 py-1">max</th>
+                        <th class="border px-2 py-1">weight</th>
+                        <th class="border px-2 py-1">grade</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="(tier, ti) in attribute_rules.quality_score.tiers" :key="ti">
+                        <tr>
+                          <td class="border px-2 py-1 text-gray-500" x-text="'T' + (ti + 1)"></td>
+                          <td class="border px-1 py-0.5"><input type="number" class="w-full min-w-[4rem] px-1 border rounded" x-model.number="tier.min"></td>
+                          <td class="border px-1 py-0.5"><input type="number" class="w-full min-w-[4rem] px-1 border rounded" x-model.number="tier.max"></td>
+                          <td class="border px-1 py-0.5"><input type="number" class="w-full min-w-[4rem] px-1 border rounded" x-model.number="tier.weight"></td>
+                          <td class="border px-1 py-0.5"><input type="text" class="w-full min-w-[5rem] px-1 border rounded" x-model="tier.grade"></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="flex items-center gap-2 pt-2 border-t border-cyan-100">
+                  <input type="checkbox" id="ar_pat_en" x-model="attribute_rules.pattern_id.enabled" class="rounded border-gray-300 text-cyan-600">
+                  <label for="ar_pat_en" class="text-sm font-medium themed-text-secondary">花纹 ID（pattern_id）范围</label>
+                </div>
+                <div x-show="attribute_rules.pattern_id.enabled" class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="text-xs themed-text-muted">最小值</label>
+                    <input type="number" class="w-full px-3 py-2 border rounded-lg" x-model.number="attribute_rules.pattern_id.min" placeholder="min">
+                  </div>
+                  <div>
+                    <label class="text-xs themed-text-muted">最大值</label>
+                    <input type="number" class="w-full px-3 py-2 border rounded-lg" x-model.number="attribute_rules.pattern_id.max" placeholder="max">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium themed-text-secondary mb-1">交易冷却天数（trade_cooldown_days）</label>
+                  <input type="number" min="0" class="w-full max-w-xs px-3 py-2 border rounded-lg" x-model.number="attribute_rules.trade_cooldown_days">
+                  <p class="text-xs themed-text-muted mt-1">默认 7 天</p>
+                </div>
+              </div>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">扩展属性 (JSON格式)</label>
+              <textarea class="w-full px-3 py-2 border rounded-lg font-mono text-sm" x-model="form.meta" rows="3" placeholder='{"key": "value"}'></textarea>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="p-4 border-t flex justify-end space-x-3">
+        <button @click="hideModal('templateModal')" class="px-4 py-2 border rounded themed-hover-bg">取消</button>
+        <button @click="submitTemplate()" :disabled="is_submitting" class="px-4 py-2 themed-btn-primary rounded disabled:opacity-50">
+          <span x-show="is_submitting" class="mr-1">⏳</span>
+          保存
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩层 -->
+  <div x-show="loading" 
+       x-cloak
+       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="themed-card rounded-lg p-6 flex flex-col items-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
+      <p class="mt-3 themed-text-muted">加载中...</p>
+    </div>
+  </div>
+
+  <!-- 页面专属逻辑 -->
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+</body>
+</html>

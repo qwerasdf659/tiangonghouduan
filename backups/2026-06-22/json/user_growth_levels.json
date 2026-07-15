@@ -1,0 +1,46 @@
+[
+  {
+    "user_growth_level_id": 1,
+    "level_key": "bronze",
+    "level_name": "青铜",
+    "min_history_points": 0,
+    "sort_order": 0,
+    "status": "active",
+    "description": "成长等级最低档（累计积分 0 起）；阈值为起步占位值，需运营确认",
+    "created_at": "2026-06-05 02:06:53",
+    "updated_at": "2026-06-05 02:06:53"
+  },
+  {
+    "user_growth_level_id": 2,
+    "level_key": "silver",
+    "level_name": "白银",
+    "min_history_points": 100000,
+    "sort_order": 1,
+    "status": "active",
+    "description": "⚠️ 占位阈值 100000，需运营按真实业务规则确认",
+    "created_at": "2026-06-05 02:06:53",
+    "updated_at": "2026-06-05 02:06:53"
+  },
+  {
+    "user_growth_level_id": 3,
+    "level_key": "gold",
+    "level_name": "黄金",
+    "min_history_points": 500000,
+    "sort_order": 2,
+    "status": "active",
+    "description": "⚠️ 占位阈值 500000，需运营按真实业务规则确认",
+    "created_at": "2026-06-05 02:06:53",
+    "updated_at": "2026-06-05 02:06:53"
+  },
+  {
+    "user_growth_level_id": 4,
+    "level_key": "diamond",
+    "level_name": "钻石",
+    "min_history_points": 2000000,
+    "sort_order": 3,
+    "status": "active",
+    "description": "⚠️ 占位阈值 2000000，需运营按真实业务规则确认",
+    "created_at": "2026-06-05 02:06:53",
+    "updated_at": "2026-06-05 02:06:53"
+  }
+]

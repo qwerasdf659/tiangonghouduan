@@ -1,0 +1,22 @@
+[
+  {
+    "trade_dispute_id": "120",
+    "user_id": 32,
+    "order_type": "consumption",
+    "order_id": "3059",
+    "dispute_type": "item_not_received",
+    "title": "ttt",
+    "description": "444那我你是你是男的女的奶奶的嫩嫩多娜多娜多娜多娜",
+    "evidence": null,
+    "status": "open",
+    "priority": "high",
+    "assigned_to": null,
+    "approval_chain_instance_id": null,
+    "deadline": "2026-06-23 02:08:11",
+    "resolution": null,
+    "resolved_at": null,
+    "created_by": 32,
+    "created_at": "2026-06-16 02:08:11",
+    "updated_at": "2026-06-16 02:08:11"
+  }
+]

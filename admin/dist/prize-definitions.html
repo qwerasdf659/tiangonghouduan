@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>奖品目录管理 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/prize-definitions-DPZNWxfH.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/prize-definitions-CGHkQVpE.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
+        <span class="text-lg font-semibold">🏆 奖品目录管理</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="prizeDefinitionPage()" x-init="init()" x-cloak>
+    
+    <!-- 筛选区域 -->
+    <div class="themed-card rounded-lg shadow p-4 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">关键词</label>
+          <input type="text" x-model="filters.keyword" @keyup.enter="handleSearch()"
+            placeholder="搜索编码/名称" class="w-full px-3 py-2 border rounded-lg themed-input">
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">奖品类型</label>
+          <select x-model="filters.prize_type" @change="handleSearch()" class="w-full px-3 py-2 border rounded-lg themed-input">
+            <option value="">全部类型</option>
+            <template x-for="opt in type_options" :key="opt.value">
+              <option :value="opt.value" x-text="opt.label"></option>
+            </template>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">稀有度</label>
+          <select x-model="filters.rarity_code" @change="handleSearch()" class="w-full px-3 py-2 border rounded-lg themed-input">
+            <option value="">全部稀有度</option>
+            <template x-for="opt in rarity_options" :key="opt.value">
+              <option :value="opt.value" x-text="opt.label"></option>
+            </template>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">档位</label>
+          <select x-model="filters.reward_tier" @change="handleSearch()" class="w-full px-3 py-2 border rounded-lg themed-input">
+            <option value="">全部档位</option>
+            <template x-for="opt in tier_options" :key="opt.value">
+              <option :value="opt.value" x-text="opt.label"></option>
+            </template>
+          </select>
+        </div>
+        <div class="flex items-end gap-2">
+          <button @click="handleSearch()" class="px-4 py-2 themed-btn-primary rounded-lg">搜索</button>
+          <button @click="resetFilters()" class="px-4 py-2 themed-btn-secondary rounded-lg">重置</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 操作栏 -->
+    <div class="flex justify-between items-center mb-4">
+      <div class="themed-text-secondary">
+        共 <span x-text="total" class="font-semibold themed-text-primary"></span> 个奖品定义
+      </div>
+      <button @click="openCreateForm()" class="px-4 py-2 themed-btn-primary rounded-lg">
+        + 新建奖品定义
+      </button>
+    </div>
+
+    <!-- 数据表格 -->
+    <div class="themed-card rounded-lg shadow overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="themed-bg-subtle">
+          <tr>
+            <th class="px-4 py-3 text-left">ID</th>
+            <th class="px-4 py-3 text-left">编码</th>
+            <th class="px-4 py-3 text-left">名称</th>
+            <th class="px-4 py-3 text-left">类型</th>
+            <th class="px-4 py-3 text-left">稀有度</th>
+            <th class="px-4 py-3 text-left">档位</th>
+            <th class="px-4 py-3 text-left">材料/数量</th>
+            <th class="px-4 py-3 text-left">状态</th>
+            <th class="px-4 py-3 text-left">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="item in prize_definitions" :key="item.prize_definition_id">
+            <tr class="border-t themed-hover-bg">
+              <td class="px-4 py-3" x-text="item.prize_definition_id"></td>
+              <td class="px-4 py-3 font-mono text-xs" x-text="item.prize_code"></td>
+              <td class="px-4 py-3 font-medium" x-text="item.display_name"></td>
+              <td class="px-4 py-3" x-text="getTypeLabel(item.prize_type)"></td>
+              <td class="px-4 py-3">
+                <span :style="getRarityStyle(item.rarity_code)" x-text="getRarityLabel(item.rarity_code)"></span>
+              </td>
+              <td class="px-4 py-3" x-text="getTierLabel(item.reward_tier)"></td>
+              <td class="px-4 py-3">
+                <span x-show="item.material_asset_code" x-text="(item.material_asset_code || '') + ' ×' + (item.material_amount || '')"></span>
+                <span x-show="!item.material_asset_code" class="themed-text-muted">-</span>
+              </td>
+              <td class="px-4 py-3">
+                <span x-show="item.is_enabled" class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700">启用</span>
+                <span x-show="!item.is_enabled" class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-500">禁用</span>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex gap-2">
+                  <button @click="viewDetail(item)" class="text-blue-600 hover:underline text-xs">详情</button>
+                  <button @click="openEditForm(item)" class="text-green-600 hover:underline text-xs">编辑</button>
+                  <button @click="deleteItem(item)" class="text-red-600 hover:underline text-xs">删除</button>
+                </div>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="prize_definitions.length === 0">
+            <td colspan="9" class="px-4 py-8 text-center themed-text-muted">暂无数据</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 分页 -->
+    <div x-show="total_records > page_size" class="flex justify-center mt-4 gap-2">
+      <button @click="goToPage(current_page - 1)" :disabled="current_page <= 1"
+        class="px-3 py-1 border rounded themed-btn-secondary disabled:opacity-50">上一页</button>
+      <span class="px-3 py-1" x-text="current_page + ' / ' + total_pages"></span>
+      <button @click="goToPage(current_page + 1)" :disabled="current_page >= total_pages"
+        class="px-3 py-1 border rounded themed-btn-secondary disabled:opacity-50">下一页</button>
+    </div>
+
+    <!-- 创建/编辑表单弹窗 -->
+    <div x-show="form_visible" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div class="themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+          <h3 class="text-lg font-semibold mb-4" x-text="editing_id ? '编辑奖品定义' : '新建奖品定义'"></h3>
+          
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium mb-1">奖品编码 <span class="text-red-500">*</span></label>
+              <input type="text" x-model="form.prize_code" placeholder="如 star_stone_500"
+                class="w-full px-3 py-2 border rounded-lg themed-input" :disabled="!!editing_id">
+              <p class="text-xs themed-text-muted mt-1">格式：{material_asset_code}_{amount}，创建后不可修改</p>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium mb-1">展示名称 <span class="text-red-500">*</span></label>
+              <input type="text" x-model="form.display_name" placeholder="如 星石 ×500"
+                class="w-full px-3 py-2 border rounded-lg themed-input">
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium mb-1">奖品类型 <span class="text-red-500">*</span></label>
+                <select x-model="form.prize_type" class="w-full px-3 py-2 border rounded-lg themed-input">
+                  <template x-for="opt in type_options" :key="opt.value">
+                    <option :value="opt.value" x-text="opt.label"></option>
+                  </template>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1">稀有度</label>
+                <select x-model="form.rarity_code" class="w-full px-3 py-2 border rounded-lg themed-input">
+                  <template x-for="opt in rarity_options" :key="opt.value">
+                    <option :value="opt.value" x-text="opt.label"></option>
+                  </template>
+                </select>
+              </div>
+            </div>
+            
+            <div x-show="form.prize_type === 'material' || form.prize_type === 'points'" class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium mb-1">材料编码 <span class="text-red-500">*</span></label>
+                <input type="text" x-model="form.material_asset_code" placeholder="如 star_stone"
+                  class="w-full px-3 py-2 border rounded-lg themed-input">
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1">数量 <span class="text-red-500">*</span></label>
+                <input type="number" x-model.number="form.material_amount" min="1"
+                  class="w-full px-3 py-2 border rounded-lg themed-input">
+              </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium mb-1">默认档位</label>
+                <select x-model="form.reward_tier" class="w-full px-3 py-2 border rounded-lg themed-input">
+                  <template x-for="opt in tier_options" :key="opt.value">
+                    <option :value="opt.value" x-text="opt.label"></option>
+                  </template>
+                </select>
+              </div>
+              <div class="flex items-end">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" x-model="form.is_enabled" class="rounded">
+                  <span class="text-sm">启用</span>
+                </label>
+              </div>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium mb-1">描述</label>
+              <textarea x-model="form.description" rows="2" placeholder="可选描述"
+                class="w-full px-3 py-2 border rounded-lg themed-input"></textarea>
+            </div>
+          </div>
+          
+          <div class="flex justify-end gap-3 mt-6">
+            <button @click="form_visible = false" class="px-4 py-2 themed-btn-secondary rounded-lg">取消</button>
+            <button @click="submitForm()" class="px-4 py-2 themed-btn-primary rounded-lg" :disabled="loading">
+              <span x-show="!loading" x-text="editing_id ? '保存修改' : '创建'"></span>
+              <span x-show="loading">提交中...</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 详情弹窗 -->
+    <div x-show="detail_visible" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div class="themed-card rounded-lg shadow-xl w-full max-w-md mx-4">
+        <div class="p-6" x-show="current_detail">
+          <h3 class="text-lg font-semibold mb-4">奖品详情</h3>
+          <dl class="space-y-2 text-sm">
+            <div class="flex"><dt class="w-24 themed-text-muted">编码：</dt><dd x-text="current_detail?.prize_code" class="font-mono"></dd></div>
+            <div class="flex"><dt class="w-24 themed-text-muted">名称：</dt><dd x-text="current_detail?.display_name"></dd></div>
+            <div class="flex"><dt class="w-24 themed-text-muted">类型：</dt><dd x-text="getTypeLabel(current_detail?.prize_type)"></dd></div>
+            <div class="flex"><dt class="w-24 themed-text-muted">稀有度：</dt><dd :style="getRarityStyle(current_detail?.rarity_code)" x-text="getRarityLabel(current_detail?.rarity_code)"></dd></div>
+            <div class="flex"><dt class="w-24 themed-text-muted">档位：</dt><dd x-text="getTierLabel(current_detail?.reward_tier)"></dd></div>
+            <div class="flex"><dt class="w-24 themed-text-muted">材料：</dt><dd x-text="(current_detail?.material_asset_code || '-') + (current_detail?.material_amount ? ' ×' + current_detail.material_amount : '')"></dd></div>
+            <div class="flex"><dt class="w-24 themed-text-muted">引用活动：</dt><dd x-text="(current_detail?.campaign_count || 0) + ' 个'"></dd></div>
+            <div class="flex"><dt class="w-24 themed-text-muted">总发放：</dt><dd x-text="(current_detail?.total_wins_across_campaigns || 0) + ' 次'"></dd></div>
+          </dl>
+          <div class="flex justify-end mt-6">
+            <button @click="closeDetail()" class="px-4 py-2 themed-btn-secondary rounded-lg">关闭</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- JS 模块 -->
+</body>
+</html>

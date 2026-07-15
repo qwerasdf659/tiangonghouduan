@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>运营规则 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; } .tab-content-frame { border: none; width: 100%; min-height: calc(100vh - 180px); }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/ops-rules-DoCtoww6.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 页面顶部渐变横幅 -->
+  <div class="page-banner">
+    <div class="container mx-auto px-4 flex justify-between items-center">
+      <div>
+        <div class="flex items-center gap-3 mb-1">
+          <a href="/admin/workspace.html" class="text-blue-200 hover:text-white text-sm transition">← 返回工作台</a>
+        </div>
+        <h1>📊 运营规则</h1>
+        <p>管理积分定价、功能灰度开关和运营提醒规则，精细化控制业务运营策略</p>
+      </div>
+      <div class="text-6xl opacity-20">⚙️</div>
+    </div>
+  </div>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="opsRulesPage()" x-init="init()">
+    
+    <!-- Tab导航 -->
+    <div class="enhanced-tabs mb-6">
+      <template x-for="tab in tabs" :key="tab.id">
+        <button 
+          @click="switchTab(tab.id)"
+          :class="currentTab === tab.id ? 'tab-item active' : 'tab-item'"
+          x-text="tab.icon + ' ' + tab.name"
+        ></button>
+      </template>
+    </div>
+
+    <!-- Tab内容区域 -->
+    <div class="themed-card rounded-xl shadow-sm overflow-hidden">
+      <!-- 定价配置 -->
+      <div x-show="currentTab === 'pricing'" x-cloak>
+        <iframe 
+          src="/admin/pricing-config.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="pricingFrame"
+        ></iframe>
+      </div>
+      
+      <!-- 功能开关 -->
+      <div x-show="currentTab === 'feature-flags'" x-cloak>
+        <iframe 
+          src="/admin/feature-flags.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="featureFlagsFrame"
+        ></iframe>
+      </div>
+      
+      <!-- 提醒规则 -->
+      <div x-show="currentTab === 'reminder-rules'" x-cloak>
+        <iframe 
+          src="/admin/reminder-rules.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="reminderRulesFrame"
+        ></iframe>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+
+</body>
+</html>
+

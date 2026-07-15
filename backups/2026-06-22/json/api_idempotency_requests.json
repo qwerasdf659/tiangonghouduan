@@ -1,0 +1,986 @@
+[
+  {
+    "api_idempotency_request_id": "4032063",
+    "idempotency_key": "exchange_6_1781457473958_9a769b1e7b8fc623",
+    "api_path": "/api/v4/exchange",
+    "http_method": "POST",
+    "request_hash": "99216c35cffd5d3fe6ccef1aea015945822ef1c4e067406864c26dcc1b101671",
+    "request_params": {
+      "quantity": 1,
+      "exchange_item_id": 6
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "实物商品兑换需选择收货地址"
+    },
+    "response_code": null,
+    "created_at": "2026-06-15 01:17:54",
+    "completed_at": "2026-06-15 01:17:54",
+    "expires_at": "2026-06-22 01:17:54"
+  },
+  {
+    "api_idempotency_request_id": "4032064",
+    "idempotency_key": "exchange_6_1781457478584_e0a6060ae38378f7",
+    "api_path": "/api/v4/exchange",
+    "http_method": "POST",
+    "request_hash": "99216c35cffd5d3fe6ccef1aea015945822ef1c4e067406864c26dcc1b101671",
+    "request_params": {
+      "quantity": 1,
+      "exchange_item_id": 6
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "实物商品兑换需选择收货地址"
+    },
+    "response_code": null,
+    "created_at": "2026-06-15 01:17:59",
+    "completed_at": "2026-06-15 01:17:59",
+    "expires_at": "2026-06-22 01:17:59"
+  },
+  {
+    "api_idempotency_request_id": "4032065",
+    "idempotency_key": "exchange_6_1781457680589_343441ba01f73f80",
+    "api_path": "/api/v4/exchange",
+    "http_method": "POST",
+    "request_hash": "99216c35cffd5d3fe6ccef1aea015945822ef1c4e067406864c26dcc1b101671",
+    "request_params": {
+      "quantity": 1,
+      "exchange_item_id": 6
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "实物商品兑换需选择收货地址"
+    },
+    "response_code": null,
+    "created_at": "2026-06-15 01:21:21",
+    "completed_at": "2026-06-15 01:21:21",
+    "expires_at": "2026-06-22 01:21:21"
+  },
+  {
+    "api_idempotency_request_id": "4032066",
+    "idempotency_key": "exchange_6_1781458767701_cddbc80dd4ed27ac",
+    "api_path": "/api/v4/exchange",
+    "http_method": "POST",
+    "request_hash": "99216c35cffd5d3fe6ccef1aea015945822ef1c4e067406864c26dcc1b101671",
+    "request_params": {
+      "quantity": 1,
+      "exchange_item_id": 6
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "实物商品兑换需选择收货地址"
+    },
+    "response_code": null,
+    "created_at": "2026-06-15 01:39:28",
+    "completed_at": "2026-06-15 01:39:28",
+    "expires_at": "2026-06-22 01:39:28"
+  },
+  {
+    "api_idempotency_request_id": "4032067",
+    "idempotency_key": "exchange_6_1781458781068_b3932740da719c1b",
+    "api_path": "/api/v4/exchange",
+    "http_method": "POST",
+    "request_hash": "99216c35cffd5d3fe6ccef1aea015945822ef1c4e067406864c26dcc1b101671",
+    "request_params": {
+      "quantity": 1,
+      "exchange_item_id": 6
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "实物商品兑换需选择收货地址"
+    },
+    "response_code": null,
+    "created_at": "2026-06-15 01:39:41",
+    "completed_at": "2026-06-15 01:39:41",
+    "expires_at": "2026-06-22 01:39:41"
+  },
+  {
+    "api_idempotency_request_id": "4032068",
+    "idempotency_key": "exchange_6_1781459176930_897492a5ca2a82b6",
+    "api_path": "/api/v4/exchange",
+    "http_method": "POST",
+    "request_hash": "99216c35cffd5d3fe6ccef1aea015945822ef1c4e067406864c26dcc1b101671",
+    "request_params": {
+      "quantity": 1,
+      "exchange_item_id": 6
+    },
+    "user_id": "32",
+    "status": "completed",
+    "business_event_id": "EM260615001289B4",
+    "response_snapshot": {
+      "order": {
+        "status": "pending",
+        "order_no": "EM260615001289B4",
+        "quantity": 1,
+        "item_name": "衣服",
+        "record_id": "1289",
+        "pay_amount": 10,
+        "pay_asset_code": "red_core_shard"
+      },
+      "remaining": {},
+      "minted_item": {
+        "item_id": 45268,
+        "edition_total": 100,
+        "serial_number": 10,
+        "tracking_code": "EX260615045268",
+        "instance_attributes": {}
+      },
+      "is_duplicate": false
+    },
+    "response_code": "SUCCESS",
+    "created_at": "2026-06-15 01:46:17",
+    "completed_at": "2026-06-15 01:46:17",
+    "expires_at": "2026-06-22 01:46:17"
+  },
+  {
+    "api_idempotency_request_id": "4032069",
+    "idempotency_key": "exchange_6_1781459827334_54b5b1f9d5a34fb1",
+    "api_path": "/api/v4/exchange",
+    "http_method": "POST",
+    "request_hash": "99216c35cffd5d3fe6ccef1aea015945822ef1c4e067406864c26dcc1b101671",
+    "request_params": {
+      "quantity": 1,
+      "exchange_item_id": 6
+    },
+    "user_id": "32",
+    "status": "completed",
+    "business_event_id": "EM26061500129040",
+    "response_snapshot": {
+      "order": {
+        "status": "pending",
+        "order_no": "EM26061500129040",
+        "quantity": 1,
+        "item_name": "衣服",
+        "record_id": "1290",
+        "pay_amount": 10,
+        "pay_asset_code": "red_core_shard"
+      },
+      "remaining": {},
+      "minted_item": {
+        "item_id": 45269,
+        "edition_total": 100,
+        "serial_number": 11,
+        "tracking_code": "EX260615045269",
+        "instance_attributes": {}
+      },
+      "is_duplicate": false
+    },
+    "response_code": "SUCCESS",
+    "created_at": "2026-06-15 01:57:08",
+    "completed_at": "2026-06-15 01:57:08",
+    "expires_at": "2026-06-22 01:57:08"
+  },
+  {
+    "api_idempotency_request_id": "4032070",
+    "idempotency_key": "lottery_CAMP20250901001_1781463616309_831d67eb83f83d81",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "completed",
+    "business_event_id": "lottery_tx_1781463617053_a327d1_837",
+    "response_snapshot": {
+      "prizes": [
+        {
+          "id": "5",
+          "image": {
+            "url": "https://omqktqrtntnn.sealosbja.site/api/v4/images/uploads/1781286602633_ec1cdf67e1008539.jpg?h=d4e9a926",
+            "source": "material_asset_type_icon",
+            "thumbnail_url": "https://omqktqrtntnn.sealosbja.site/api/v4/images/uploads/1781286602633_ec1cdf67e1008539.jpg?h=d4e9a926"
+          },
+          "prize_name": "星石 ×50",
+          "prize_type": "material",
+          "sort_order": 5,
+          "prize_value": 50,
+          "rarity_code": "rare",
+          "reward_tier": "mid",
+          "reward_tier_text": "中档奖励",
+          "material_asset_code": "star_stone"
+        }
+      ],
+      "success": true,
+      "discount": 1,
+      "draw_type": "单抽",
+      "draw_count": 1,
+      "saved_points": 0,
+      "campaign_code": "CAMP20250901001",
+      "original_cost": 30,
+      "remaining_balance": 123147,
+      "total_points_cost": 30,
+      "lottery_session_id": "lottery_tx_1781463617053_a327d1_837"
+    },
+    "response_code": "SUCCESS",
+    "created_at": "2026-06-15 03:00:17",
+    "completed_at": "2026-06-15 03:00:17",
+    "expires_at": "2026-06-22 03:00:17"
+  },
+  {
+    "api_idempotency_request_id": "4032071",
+    "idempotency_key": "lottery_CAMP20250901001_1781465435382_00ec8df955a006d9",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "completed",
+    "business_event_id": "lottery_tx_1781465436113_59b32e_253",
+    "response_snapshot": {
+      "prizes": [
+        {
+          "id": "12",
+          "image": {
+            "url": "https://omqktqrtntnn.sealosbja.site/api/v4/images/materials/1771668349743_a6329ab6af399193.png?h=b238faf0",
+            "source": "material_asset_type_icon",
+            "thumbnail_url": "https://omqktqrtntnn.sealosbja.site/api/v4/images/materials/1771668349743_a6329ab6af399193.png?h=b238faf0"
+          },
+          "prize_name": "积分 +10",
+          "prize_type": "points",
+          "sort_order": 12,
+          "prize_value": 10,
+          "rarity_code": "common",
+          "reward_tier": "low",
+          "reward_tier_text": "低档奖励",
+          "material_asset_code": "points"
+        }
+      ],
+      "success": true,
+      "discount": 1,
+      "draw_type": "单抽",
+      "draw_count": 1,
+      "saved_points": 0,
+      "campaign_code": "CAMP20250901001",
+      "original_cost": 30,
+      "remaining_balance": 123117,
+      "total_points_cost": 30,
+      "lottery_session_id": "lottery_tx_1781465436113_59b32e_253"
+    },
+    "response_code": "SUCCESS",
+    "created_at": "2026-06-15 03:30:36",
+    "completed_at": "2026-06-15 03:30:36",
+    "expires_at": "2026-06-22 03:30:36"
+  },
+  {
+    "api_idempotency_request_id": "4032072",
+    "idempotency_key": "lottery_CAMP20250901001_1781466386901_75063656fe773474",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "completed",
+    "business_event_id": "lottery_tx_1781466387653_e7940c_006",
+    "response_snapshot": {
+      "prizes": [
+        {
+          "id": "10",
+          "image": {
+            "url": "https://omqktqrtntnn.sealosbja.site/api/v4/images/materials/1771668349848_7393439468341796.png?h=a5e8d50c",
+            "source": "material_asset_type_icon",
+            "thumbnail_url": "https://omqktqrtntnn.sealosbja.site/api/v4/images/materials/1771668349848_7393439468341796.png?h=a5e8d50c"
+          },
+          "prize_name": "红源晶碎片 ×8",
+          "prize_type": "material",
+          "sort_order": 10,
+          "prize_value": 8,
+          "rarity_code": "common",
+          "reward_tier": "low",
+          "reward_tier_text": "低档奖励",
+          "material_asset_code": "red_core_shard"
+        }
+      ],
+      "success": true,
+      "discount": 1,
+      "draw_type": "单抽",
+      "draw_count": 1,
+      "saved_points": 0,
+      "campaign_code": "CAMP20250901001",
+      "original_cost": 30,
+      "remaining_balance": 123097,
+      "total_points_cost": 30,
+      "lottery_session_id": "lottery_tx_1781466387653_e7940c_006"
+    },
+    "response_code": "SUCCESS",
+    "created_at": "2026-06-15 03:46:27",
+    "completed_at": "2026-06-15 03:46:27",
+    "expires_at": "2026-06-22 03:46:27"
+  },
+  {
+    "api_idempotency_request_id": "4032073",
+    "idempotency_key": "lottery_CAMP20250901001_1781466472626_61a7c459d3b6489b",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "今日抽奖次数已达上限（3次），剩余0次，请求1次"
+    },
+    "response_code": null,
+    "created_at": "2026-06-15 03:47:53",
+    "completed_at": "2026-06-15 03:47:53",
+    "expires_at": "2026-06-22 03:47:53"
+  },
+  {
+    "api_idempotency_request_id": "4032074",
+    "idempotency_key": "lottery_CAMP20250901001_1781467464731_cd014e969f9657d1",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "今日抽奖次数已达上限（3次），剩余0次，请求1次"
+    },
+    "response_code": null,
+    "created_at": "2026-06-15 04:04:25",
+    "completed_at": "2026-06-15 04:04:25",
+    "expires_at": "2026-06-22 04:04:25"
+  },
+  {
+    "api_idempotency_request_id": "4032075",
+    "idempotency_key": "lottery_CAMP20250901001_1781469341144_38b065c06250b40d",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "今日抽奖次数已达上限（3次），剩余0次，请求1次"
+    },
+    "response_code": null,
+    "created_at": "2026-06-15 04:35:41",
+    "completed_at": "2026-06-15 04:35:41",
+    "expires_at": "2026-06-22 04:35:41"
+  },
+  {
+    "api_idempotency_request_id": "4032076",
+    "idempotency_key": "lottery_CAMP20250901001_1781473712045_9a5429812d0f0060",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "今日抽奖次数已达上限（3次），剩余0次，请求1次"
+    },
+    "response_code": null,
+    "created_at": "2026-06-15 05:48:32",
+    "completed_at": "2026-06-15 05:48:32",
+    "expires_at": "2026-06-22 05:48:32"
+  },
+  {
+    "api_idempotency_request_id": "4032077",
+    "idempotency_key": "lottery_CAMP20250901001_1781479135480_7f321fec75862794",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "1083153d1ad81d2aa9a6bfacc126e5c6693238e40b0f86cc5bbae9818d6519b2",
+    "request_params": {
+      "draw_count": 5,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "今日抽奖次数已达上限（3次），剩余0次，请求5次"
+    },
+    "response_code": null,
+    "created_at": "2026-06-15 07:18:55",
+    "completed_at": "2026-06-15 07:18:55",
+    "expires_at": "2026-06-22 07:18:55"
+  },
+  {
+    "api_idempotency_request_id": "4032078",
+    "idempotency_key": "lottery_CAMP20250901001_1781479753574_2a8b13e5a032a783",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "今日抽奖次数已达上限（3次），剩余0次，请求1次"
+    },
+    "response_code": null,
+    "created_at": "2026-06-15 07:29:13",
+    "completed_at": "2026-06-15 07:29:13",
+    "expires_at": "2026-06-22 07:29:13"
+  },
+  {
+    "api_idempotency_request_id": "4032079",
+    "idempotency_key": "lottery_CAMP20250901001_1781542842000_7fbb73a01cb11b7f",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "completed",
+    "business_event_id": "lottery_tx_1781542842869_214fed_723",
+    "response_snapshot": {
+      "prizes": [
+        {
+          "id": "12",
+          "image": {
+            "url": "https://omqktqrtntnn.sealosbja.site/api/v4/images/materials/1771668349743_a6329ab6af399193.png?h=b238faf0",
+            "source": "material_asset_type_icon",
+            "thumbnail_url": "https://omqktqrtntnn.sealosbja.site/api/v4/images/materials/1771668349743_a6329ab6af399193.png?h=b238faf0"
+          },
+          "prize_name": "积分 +10",
+          "prize_type": "points",
+          "sort_order": 12,
+          "prize_value": 10,
+          "rarity_code": "common",
+          "reward_tier": "low",
+          "reward_tier_text": "低档奖励",
+          "material_asset_code": "points"
+        }
+      ],
+      "success": true,
+      "discount": 1,
+      "draw_type": "单抽",
+      "draw_count": 1,
+      "saved_points": 0,
+      "campaign_code": "CAMP20250901001",
+      "original_cost": 30,
+      "remaining_balance": 123067,
+      "total_points_cost": 30,
+      "lottery_session_id": "lottery_tx_1781542842869_214fed_723"
+    },
+    "response_code": "SUCCESS",
+    "created_at": "2026-06-16 01:00:42",
+    "completed_at": "2026-06-16 01:00:43",
+    "expires_at": "2026-06-23 01:00:42"
+  },
+  {
+    "api_idempotency_request_id": "4032080",
+    "idempotency_key": "lottery_CAMP20250901001_1781542848459_21f67510697723d4",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "26152a826439feb30c44f41714bee4f2c4926c89987bd6f614fa82a182ce6b3c",
+    "request_params": {
+      "draw_count": 3,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "今日抽奖次数已达上限（3次），剩余2次，请求3次"
+    },
+    "response_code": null,
+    "created_at": "2026-06-16 01:00:49",
+    "completed_at": "2026-06-16 01:00:49",
+    "expires_at": "2026-06-23 01:00:49"
+  },
+  {
+    "api_idempotency_request_id": "4032081",
+    "idempotency_key": "lottery_CAMP20250901001_1781542850317_ee319ea882965832",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "completed",
+    "business_event_id": "lottery_tx_1781542851242_787b16_851",
+    "response_snapshot": {
+      "prizes": [
+        {
+          "id": "12",
+          "image": {
+            "url": "https://omqktqrtntnn.sealosbja.site/api/v4/images/materials/1771668349743_a6329ab6af399193.png?h=b238faf0",
+            "source": "material_asset_type_icon",
+            "thumbnail_url": "https://omqktqrtntnn.sealosbja.site/api/v4/images/materials/1771668349743_a6329ab6af399193.png?h=b238faf0"
+          },
+          "prize_name": "积分 +10",
+          "prize_type": "points",
+          "sort_order": 12,
+          "prize_value": 10,
+          "rarity_code": "common",
+          "reward_tier": "low",
+          "reward_tier_text": "低档奖励",
+          "material_asset_code": "points"
+        }
+      ],
+      "success": true,
+      "discount": 1,
+      "draw_type": "单抽",
+      "draw_count": 1,
+      "saved_points": 0,
+      "campaign_code": "CAMP20250901001",
+      "original_cost": 30,
+      "remaining_balance": 123047,
+      "total_points_cost": 30,
+      "lottery_session_id": "lottery_tx_1781542851242_787b16_851"
+    },
+    "response_code": "SUCCESS",
+    "created_at": "2026-06-16 01:00:51",
+    "completed_at": "2026-06-16 01:00:51",
+    "expires_at": "2026-06-23 01:00:51"
+  },
+  {
+    "api_idempotency_request_id": "4032082",
+    "idempotency_key": "lottery_CAMP20250901001_1781547147408_750a738b1c52afc6",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "completed",
+    "business_event_id": "lottery_tx_1781547148284_af6b92_364",
+    "response_snapshot": {
+      "prizes": [
+        {
+          "id": "12",
+          "image": {
+            "url": "https://omqktqrtntnn.sealosbja.site/api/v4/images/materials/1771668349743_a6329ab6af399193.png?h=b238faf0",
+            "source": "material_asset_type_icon",
+            "thumbnail_url": "https://omqktqrtntnn.sealosbja.site/api/v4/images/materials/1771668349743_a6329ab6af399193.png?h=b238faf0"
+          },
+          "prize_name": "积分 +10",
+          "prize_type": "points",
+          "sort_order": 12,
+          "prize_value": 10,
+          "rarity_code": "common",
+          "reward_tier": "low",
+          "reward_tier_text": "低档奖励",
+          "material_asset_code": "points"
+        }
+      ],
+      "success": true,
+      "discount": 1,
+      "draw_type": "单抽",
+      "draw_count": 1,
+      "saved_points": 0,
+      "campaign_code": "CAMP20250901001",
+      "original_cost": 30,
+      "remaining_balance": 123027,
+      "total_points_cost": 30,
+      "lottery_session_id": "lottery_tx_1781547148284_af6b92_364"
+    },
+    "response_code": "SUCCESS",
+    "created_at": "2026-06-16 02:12:28",
+    "completed_at": "2026-06-16 02:12:28",
+    "expires_at": "2026-06-23 02:12:28"
+  },
+  {
+    "api_idempotency_request_id": "4032083",
+    "idempotency_key": "lottery_CAMP20250901001_1781554477223_d74e13749067f5bf",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "今日抽奖次数已达上限（3次），剩余0次，请求1次"
+    },
+    "response_code": null,
+    "created_at": "2026-06-16 04:14:38",
+    "completed_at": "2026-06-16 04:14:38",
+    "expires_at": "2026-06-23 04:14:38"
+  },
+  {
+    "api_idempotency_request_id": "4032084",
+    "idempotency_key": "lottery_CAMP20250901001_1781554848399_ea316cd853d81c68",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "今日抽奖次数已达上限（3次），剩余0次，请求1次"
+    },
+    "response_code": null,
+    "created_at": "2026-06-16 04:20:49",
+    "completed_at": "2026-06-16 04:20:49",
+    "expires_at": "2026-06-23 04:20:49"
+  },
+  {
+    "api_idempotency_request_id": "4032085",
+    "idempotency_key": "lottery_CAMP20250901001_1781554865818_5a4c6d89ac95b936",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "今日抽奖次数已达上限（3次），剩余0次，请求1次"
+    },
+    "response_code": null,
+    "created_at": "2026-06-16 04:21:06",
+    "completed_at": "2026-06-16 04:21:06",
+    "expires_at": "2026-06-23 04:21:06"
+  },
+  {
+    "api_idempotency_request_id": "4032086",
+    "idempotency_key": "lottery_CAMP20250901001_1781556971862_9034ee689b8a52c5",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "今日抽奖次数已达上限（3次），剩余0次，请求1次"
+    },
+    "response_code": null,
+    "created_at": "2026-06-16 04:56:12",
+    "completed_at": "2026-06-16 04:56:12",
+    "expires_at": "2026-06-23 04:56:12"
+  },
+  {
+    "api_idempotency_request_id": "4032087",
+    "idempotency_key": "lottery_CAMP20250901001_1781558737034_69a91c94424241cd",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "今日抽奖次数已达上限（3次），剩余0次，请求1次"
+    },
+    "response_code": null,
+    "created_at": "2026-06-16 05:25:37",
+    "completed_at": "2026-06-16 05:25:37",
+    "expires_at": "2026-06-23 05:25:37"
+  },
+  {
+    "api_idempotency_request_id": "4032088",
+    "idempotency_key": "lottery_CAMP20250901001_1781558753198_9ed184b3edc115aa",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "今日抽奖次数已达上限（3次），剩余0次，请求1次"
+    },
+    "response_code": null,
+    "created_at": "2026-06-16 05:25:54",
+    "completed_at": "2026-06-16 05:25:54",
+    "expires_at": "2026-06-23 05:25:54"
+  },
+  {
+    "api_idempotency_request_id": "4032089",
+    "idempotency_key": "lottery_CAMP20250901001_1781558974004_26eef1db67dd7964",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "26152a826439feb30c44f41714bee4f2c4926c89987bd6f614fa82a182ce6b3c",
+    "request_params": {
+      "draw_count": 3,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "今日抽奖次数已达上限（3次），剩余0次，请求3次"
+    },
+    "response_code": null,
+    "created_at": "2026-06-16 05:29:34",
+    "completed_at": "2026-06-16 05:29:34",
+    "expires_at": "2026-06-23 05:29:34"
+  },
+  {
+    "api_idempotency_request_id": "4032090",
+    "idempotency_key": "lottery_CAMP20250901001_1781558976336_1f74f765f00d2942",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "1083153d1ad81d2aa9a6bfacc126e5c6693238e40b0f86cc5bbae9818d6519b2",
+    "request_params": {
+      "draw_count": 5,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "今日抽奖次数已达上限（3次），剩余0次，请求5次"
+    },
+    "response_code": null,
+    "created_at": "2026-06-16 05:29:37",
+    "completed_at": "2026-06-16 05:29:37",
+    "expires_at": "2026-06-23 05:29:37"
+  },
+  {
+    "api_idempotency_request_id": "4032091",
+    "idempotency_key": "lottery_CAMP20250901001_1781558977266_bc5cc5d28ed1fbaa",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "876f990fa33a4ceb83330182f3d389f4a2e8ba764f6733c8af1188c21637240a",
+    "request_params": {
+      "draw_count": 10,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "今日抽奖次数已达上限（3次），剩余0次，请求10次"
+    },
+    "response_code": null,
+    "created_at": "2026-06-16 05:29:38",
+    "completed_at": "2026-06-16 05:29:38",
+    "expires_at": "2026-06-23 05:29:38"
+  },
+  {
+    "api_idempotency_request_id": "4032092",
+    "idempotency_key": "lottery_CAMP20250901001_1781559583729_5989444543d986d5",
+    "api_path": "/api/v4/lottery/draw",
+    "http_method": "POST",
+    "request_hash": "b769fee7c6a60dcf6dfad0ec70a540472fe49d038e50a23eda7a9a7fcd1ceaa3",
+    "request_params": {
+      "draw_count": 1,
+      "campaign_code": "CAMP20250901001"
+    },
+    "user_id": "32",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "今日抽奖次数已达上限（3次），剩余0次，请求1次"
+    },
+    "response_code": null,
+    "created_at": "2026-06-16 05:39:44",
+    "completed_at": "2026-06-16 05:39:44",
+    "expires_at": "2026-06-23 05:39:44"
+  },
+  {
+    "api_idempotency_request_id": "4032093",
+    "idempotency_key": "test_redemption_1781989341822_tkoeweh6pd9",
+    "api_path": "/api/v4/shop/redemption/orders",
+    "http_method": "POST",
+    "request_hash": "ca5c9c699516ca8bb3760f0fd90ed16808922d02250cff81053c4da9f0a86cba",
+    "request_params": {
+      "item_id": 999999999
+    },
+    "user_id": "31",
+    "status": "processing",
+    "business_event_id": null,
+    "response_snapshot": null,
+    "response_code": null,
+    "created_at": "2026-06-21 05:02:21",
+    "completed_at": null,
+    "expires_at": "2026-06-28 05:02:21"
+  },
+  {
+    "api_idempotency_request_id": "4032094",
+    "idempotency_key": "barter_test_1781989345913_4",
+    "api_path": "/api/v4/exchange/barter",
+    "http_method": "POST",
+    "request_hash": "00ba60b2bb83dee52f451de46de369bba0e5ab17f51f536df4f1d0ef39f839ce",
+    "request_params": {
+      "recipe_code": "non_existent_recipe_xyz",
+      "old_item_ids": [
+        999999999
+      ]
+    },
+    "user_id": "31",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "以物易物配方不存在或已停用：non_existent_recipe_xyz"
+    },
+    "response_code": null,
+    "created_at": "2026-06-21 05:02:25",
+    "completed_at": "2026-06-21 05:02:25",
+    "expires_at": "2026-06-28 05:02:25"
+  },
+  {
+    "api_idempotency_request_id": "4032095",
+    "idempotency_key": "test_redemption_1781989371963_e5a9cpi60vf",
+    "api_path": "/api/v4/shop/redemption/orders",
+    "http_method": "POST",
+    "request_hash": "ca5c9c699516ca8bb3760f0fd90ed16808922d02250cff81053c4da9f0a86cba",
+    "request_params": {
+      "item_id": 999999999
+    },
+    "user_id": "31",
+    "status": "processing",
+    "business_event_id": null,
+    "response_snapshot": null,
+    "response_code": null,
+    "created_at": "2026-06-21 05:02:51",
+    "completed_at": null,
+    "expires_at": "2026-06-28 05:02:51"
+  },
+  {
+    "api_idempotency_request_id": "4032096",
+    "idempotency_key": "barter_test_1781989378109_4",
+    "api_path": "/api/v4/exchange/barter",
+    "http_method": "POST",
+    "request_hash": "00ba60b2bb83dee52f451de46de369bba0e5ab17f51f536df4f1d0ef39f839ce",
+    "request_params": {
+      "recipe_code": "non_existent_recipe_xyz",
+      "old_item_ids": [
+        999999999
+      ]
+    },
+    "user_id": "31",
+    "status": "failed",
+    "business_event_id": null,
+    "response_snapshot": {
+      "error": "以物易物配方不存在或已停用：non_existent_recipe_xyz"
+    },
+    "response_code": null,
+    "created_at": "2026-06-21 05:02:58",
+    "completed_at": "2026-06-21 05:02:58",
+    "expires_at": "2026-06-28 05:02:58"
+  },
+  {
+    "api_idempotency_request_id": "4032097",
+    "idempotency_key": "exchange_536_1782063380499_bb192805f592b0cb",
+    "api_path": "/api/v4/exchange",
+    "http_method": "POST",
+    "request_hash": "9824bc79a880c9baa2ecb91ec3d330482b0152e97d6b2644bb13de03e568da81",
+    "request_params": {
+      "quantity": 1,
+      "exchange_item_id": 536
+    },
+    "user_id": "32",
+    "status": "completed",
+    "business_event_id": "EM26062200129464",
+    "response_snapshot": {
+      "order": {
+        "status": "completed",
+        "order_no": "EM26062200129464",
+        "quantity": 1,
+        "item_name": "12222",
+        "record_id": "1294",
+        "pay_amount": 1,
+        "pay_asset_code": "star_stone"
+      },
+      "remaining": {},
+      "minted_item": {
+        "item_id": 45448,
+        "edition_total": null,
+        "serial_number": null,
+        "tracking_code": "EX260622045448",
+        "instance_attributes": {}
+      },
+      "is_duplicate": false
+    },
+    "response_code": "SUCCESS",
+    "created_at": "2026-06-22 01:36:21",
+    "completed_at": "2026-06-22 01:36:21",
+    "expires_at": "2026-06-29 01:36:21"
+  },
+  {
+    "api_idempotency_request_id": "4032098",
+    "idempotency_key": "exchange_536_1782065563763_fae9ff7eea600398",
+    "api_path": "/api/v4/exchange",
+    "http_method": "POST",
+    "request_hash": "9824bc79a880c9baa2ecb91ec3d330482b0152e97d6b2644bb13de03e568da81",
+    "request_params": {
+      "quantity": 1,
+      "exchange_item_id": 536
+    },
+    "user_id": "32",
+    "status": "completed",
+    "business_event_id": "EM2606220012958B",
+    "response_snapshot": {
+      "order": {
+        "status": "completed",
+        "order_no": "EM2606220012958B",
+        "quantity": 1,
+        "item_name": "12222",
+        "record_id": "1295",
+        "pay_amount": 1,
+        "pay_asset_code": "star_stone"
+      },
+      "remaining": {},
+      "minted_item": {
+        "item_id": 45449,
+        "edition_total": null,
+        "serial_number": null,
+        "tracking_code": "EX260622045449",
+        "instance_attributes": {}
+      },
+      "is_duplicate": false
+    },
+    "response_code": "SUCCESS",
+    "created_at": "2026-06-22 02:12:44",
+    "completed_at": "2026-06-22 02:12:44",
+    "expires_at": "2026-06-29 02:12:44"
+  }
+]

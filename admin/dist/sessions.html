@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>会话管理 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; } .session-card { border-left-width: 4px; transition: all 0.3s ease; } .session-card:hover { box-shadow: 0 4px 15px rgba(0,0,0,0.1); } .session-card.active { border-left-color: #10b981; } .session-card.expired { border-left-color: #ef4444; } .session-card.revoked { border-left-color: #6b7280; } .current-session { background-color: #d1fae5 !important; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/sessions-L4IqVfKo.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <nav class="page-navbar">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="text-white/70 hover:text-white transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">🔐 会话管理</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-data x-text="Alpine.store('auth')?.user_info?.nickname ? `欢迎，${Alpine.store('auth').user_info.nickname}` : '欢迎，管理员'"></span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6" x-data="sessionsPage()" x-init="init()">
+    
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-5 mb-6">
+      <div class="gradient-stat-card gradient-stat-blue">
+        <div class="stat-icon">📊</div>
+        <div class="stat-value" x-text="total || sessions.length"></div>
+        <div class="stat-label">总会话数</div>
+        <div class="stat-trend">
+          <span>在线用户的所有会话记录</span>
+        </div>
+      </div>
+      <div class="gradient-stat-card gradient-stat-green">
+        <div class="stat-icon">✅</div>
+        <div class="stat-value" x-text="statistics.activeSessions"></div>
+        <div class="stat-label">活跃会话</div>
+        <div class="stat-trend">
+          <span>当前正在使用系统的会话</span>
+        </div>
+      </div>
+      <div class="gradient-stat-card gradient-stat-orange">
+        <div class="stat-icon">⏰</div>
+        <div class="stat-value" x-text="statistics.expiredCount || 0"></div>
+        <div class="stat-label">已过期</div>
+        <div class="stat-trend">
+          <span>超时未活动自动过期的会话</span>
+        </div>
+      </div>
+      <div class="gradient-stat-card gradient-stat-purple">
+        <div class="stat-icon">🛡️</div>
+        <div class="stat-value" x-text="statistics.adminSessions"></div>
+        <div class="stat-label">管理员会话</div>
+        <div class="stat-trend">
+          <span>管理员账号的活跃会话数</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 设备维度统计卡片（设备级多会话，决策B/方案 8.2 统计增加 device 维度） -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+      <div class="gradient-stat-card gradient-stat-blue">
+        <div class="stat-icon">📟</div>
+        <div class="stat-value" x-text="statistics.totalDevices"></div>
+        <div class="stat-label">真实设备数</div>
+        <div class="stat-trend">
+          <span>按设备标识去重的在线设备总数</span>
+        </div>
+      </div>
+      <div class="gradient-stat-card gradient-stat-orange">
+        <div class="stat-icon">🕰️</div>
+        <div class="stat-value" x-text="statistics.legacySessions"></div>
+        <div class="stat-label">旧版会话</div>
+        <div class="stat-trend">
+          <span>未携带设备标识的存量会话(legacy)</span>
+        </div>
+      </div>
+      <div class="gradient-stat-card gradient-stat-green">
+        <div class="stat-icon">👥</div>
+        <div class="stat-value" x-text="statistics.multiDeviceUsers"></div>
+        <div class="stat-label">多设备用户</div>
+        <div class="stat-trend">
+          <span>同时在多台设备在线的用户数</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选栏 -->
+    <div class="filter-toolbar">
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
+          <select class="w-full border rounded-lg px-3 py-2" x-model="filters.status" x-tooltip="'筛选会话的当前状态：活跃或已过期'">
+            <option value="">全部状态</option>
+            <option value="active">活跃</option>
+            <option value="expired">已过期/失效</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">用户类型</label>
+          <select class="w-full border rounded-lg px-3 py-2" x-model="filters.user_type" x-tooltip="'区分普通用户和管理员的会话'">
+            <option value="">全部类型</option>
+            <option value="user">普通用户</option>
+            <option value="admin">管理员</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">手机号</label>
+          <input type="text" class="w-full border rounded-lg px-3 py-2" x-model="filters.mobile" maxlength="11" placeholder="输入手机号查找用户会话" x-tooltip="'输入11位手机号精确查找用户的所有会话'">
+          <div x-show="resolvedUser" class="mt-1 text-xs text-green-600">✅ <span x-text="resolvedUser?.nickname"></span></div>
+          <div x-show="resolveError" class="mt-1 text-xs text-red-500" x-text="resolveError"></div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">登录平台</label>
+          <select class="w-full border rounded-lg px-3 py-2" x-model="filters.login_platform" x-tooltip="'按登录平台筛选会话'">
+            <option value="">全部平台</option>
+            <option value="web">Web浏览器</option>
+            <option value="wechat_mp">微信小程序</option>
+            <option value="douyin_mp">抖音小程序</option>
+            <option value="alipay_mp">支付宝小程序</option>
+            <option value="app">原生App</option>
+            <option value="unknown">未知(旧数据)</option>
+          </select>
+        </div>
+        <div>
+          <button class="w-full px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary" @click="loadData()">
+            🔍 搜索
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 批量操作 -->
+    <div class="themed-card rounded-lg shadow mb-6 p-4">
+      <div class="flex justify-between items-center">
+        <div class="flex space-x-2">
+          <button class="px-4 py-2 border border-red-500 text-red-500 rounded-lg hover:bg-red-50" @click="revokeSelected()">
+            ❌ 撤销选中
+          </button>
+          <button class="px-4 py-2 border border-yellow-500 text-yellow-600 rounded-lg hover:bg-yellow-50" @click="revokeExpired()">
+            ⏰ 清理过期
+          </button>
+          <button class="px-4 py-2 border border-gray-500 themed-text-muted rounded-lg themed-hover-bg" @click="revokeAllExceptCurrent()">
+            🚪 强制下线其他设备
+          </button>
+        </div>
+        <button class="px-4 py-2 border themed-border-primary themed-text-primary rounded-lg hover:bg-blue-50" @click="refreshData()">
+          🔄 刷新
+        </button>
+      </div>
+    </div>
+
+    <!-- 加载状态 -->
+    <template x-if="loading">
+      <div class="text-center py-10">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 themed-border-primary mx-auto"></div>
+        <p class="mt-4 themed-text-muted">正在加载会话数据...</p>
+      </div>
+    </template>
+
+    <!-- 会话列表 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" x-show="!loading">
+      <!-- 空状态 -->
+      <div class="col-span-3" x-show="sessions.length === 0 && !loading">
+        <div class="themed-card rounded-lg shadow p-10 text-center themed-text-muted">
+          <span class="text-5xl">🔗</span>
+          <p class="mt-4">暂无会话数据</p>
+        </div>
+      </div>
+
+      <!-- 会话卡片 -->
+      <template x-for="(session, sessionIdx) in sessions" :key="session.authentication_session_id || sessionIdx">
+        <div 
+          class="themed-card rounded-lg shadow session-card border-l-4"
+          :class="[getSessionStatus(session), isCurrentSession(session) ? 'current-session' : '']"
+        >
+          <div class="p-4">
+            <div class="flex items-start">
+              <div class="mr-3">
+                <input 
+                  type="checkbox" 
+                  class="w-4 h-4 rounded"
+                  :value="session.authentication_session_id"
+                  :disabled="isCurrentSession(session)"
+                  x-model="selectedSessions"
+                >
+              </div>
+              <div class="text-2xl mr-3" x-text="session.user_type === 'admin' ? '🛡️' : '👤'"></div>
+              <div class="flex-grow">
+                <div class="flex justify-between">
+                  <h6 class="font-semibold">
+                    用户 <span x-text="session.user_id"></span>
+                    <span x-show="isCurrentSession(session)" class="ml-2 px-2 py-1 themed-bg-primary text-white text-xs rounded">当前会话</span>
+                  </h6>
+                  <span 
+                    class="px-2 py-1 text-xs rounded"
+                    :class="{
+                      'bg-green-100 themed-text-success': getSessionStatus(session) === 'active',
+                      'bg-yellow-100 text-yellow-800': getSessionStatus(session) === 'expired',
+                      'bg-red-100 text-red-800': getSessionStatus(session) === 'revoked'
+                    }"
+                    x-text="getStatusLabel(getSessionStatus(session))"
+                  ></span>
+                </div>
+                <p class="text-sm themed-text-muted mt-1">
+                  🌐 <span x-text="session.login_ip || session.ip_address || '-'"></span>
+                  <span class="ml-1" x-show="session.login_location" x-text="'· ' + formatLocation(session.login_location)"></span>
+                </p>
+                <p class="text-sm themed-text-muted">
+                  <span x-text="getPlatformIcon(session.login_platform)"></span> <span x-text="getPlatformLabel(session.login_platform)"></span>
+                  <span class="ml-2 text-xs themed-text-muted">📟 <code x-text="formatDeviceId(session.device_id)"></code></span>
+                  <span x-show="session.is_current" class="ml-2 px-1.5 py-0.5 text-xs rounded bg-blue-100 text-blue-700">本设备</span>
+                </p>
+                <p class="text-sm themed-text-muted">
+                  👤 <span x-text="session.user_type === 'admin' ? '管理员' : '普通用户'"></span>
+                </p>
+                <p class="text-sm themed-text-muted">
+                  ⏰ 最后活动：<span x-text="formatRelativeTime(session.last_activity || session.last_active_at)"></span>
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="px-4 py-3 themed-bg-base flex justify-between items-center border-t">
+            <small class="themed-text-muted">创建：<span x-text="formatDateTime(session.created_at)"></span></small>
+            <div class="flex space-x-2">
+              <button class="px-2 py-1 themed-text-primary themed-hover-bg rounded" @click="viewSessionDetail(session)">
+                👁️
+              </button>
+              <button 
+                x-show="!isCurrentSession(session) && getSessionStatus(session) === 'active'"
+                class="px-2 py-1 text-red-500 hover:bg-red-50 rounded"
+                @click="revokeSession(session.authentication_session_id)"
+              >
+                ✖️
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- 分页 -->
+    <nav class="mt-6 flex justify-center" x-show="total_pages > 1">
+      <div class="flex space-x-2">
+        <button 
+          class="px-4 py-2 border rounded-lg" 
+          :class="current_page === 1 ? 'themed-bg-subtle text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
+          :disabled="current_page === 1"
+          @click="loadData(current_page - 1)"
+        >上一页</button>
+        <template x-for="page in visiblePages" :key="page">
+          <button 
+            class="px-4 py-2 border rounded-lg"
+            :class="page === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'"
+            @click="page !== '...' && loadData(page)"
+            x-text="page"
+          ></button>
+        </template>
+        <button 
+          class="px-4 py-2 border rounded-lg"
+          :class="current_page === total_pages ? 'themed-bg-subtle text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
+          :disabled="current_page === total_pages"
+          @click="loadData(current_page + 1)"
+        >下一页</button>
+      </div>
+    </nav>
+
+    <!-- 会话详情模态框 (在主 x-data 作用域内) -->
+    <div x-show="showDetailModal" x-transition class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+      <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black opacity-50" @click="showDetailModal = false"></div>
+        <div class="themed-card rounded-lg shadow-xl z-10 w-full max-w-lg relative">
+          <div class="px-6 py-4 border-b flex justify-between items-center">
+            <h5 class="text-lg font-semibold">ℹ️ 会话详情</h5>
+            <button @click="showDetailModal = false" class="themed-text-muted hover:themed-text-secondary">&times;</button>
+          </div>
+          <div class="p-6" x-show="selectedSession">
+            <table class="w-full text-sm">
+              <tr class="border-b"><th class="py-2 text-left w-1/3 themed-text-muted">会话ID</th><td class="py-2"><code class="text-xs" x-text="selectedSession?.authentication_session_id"></code></td></tr>
+              <tr class="border-b"><th class="py-2 text-left themed-text-muted">用户ID</th><td class="py-2" x-text="selectedSession?.user_id"></td></tr>
+              <tr class="border-b"><th class="py-2 text-left themed-text-muted">用户昵称</th><td class="py-2" x-text="selectedSession?.user_info?.nickname || '-'"></td></tr>
+              <tr class="border-b"><th class="py-2 text-left themed-text-muted">用户类型</th><td class="py-2" x-text="selectedSession?.user_type === 'admin' ? '管理员' : '普通用户'"></td></tr>
+              <tr class="border-b"><th class="py-2 text-left themed-text-muted">状态</th><td class="py-2"><span class="px-2 py-1 text-xs rounded" :class="{ 'bg-green-100 themed-text-success': getSessionStatus(selectedSession) === 'active', 'bg-yellow-100 text-yellow-800': getSessionStatus(selectedSession) === 'expired', 'bg-red-100 text-red-800': getSessionStatus(selectedSession) === 'revoked' }" x-text="getStatusLabel(getSessionStatus(selectedSession))"></span></td></tr>
+              <tr class="border-b"><th class="py-2 text-left themed-text-muted">IP地址</th><td class="py-2" x-text="selectedSession?.login_ip || selectedSession?.ip_address || '-'"></td></tr>
+              <tr class="border-b"><th class="py-2 text-left themed-text-muted">登录地</th><td class="py-2" x-text="formatLocation(selectedSession?.login_location)"></td></tr>
+              <tr class="border-b"><th class="py-2 text-left themed-text-muted">设备标识</th><td class="py-2"><code class="text-xs" x-text="selectedSession?.device_id || '未知设备(旧)'"></code> <span x-show="selectedSession?.is_current" class="ml-2 px-1.5 py-0.5 text-xs rounded bg-blue-100 text-blue-700">本设备</span></td></tr>
+              <tr class="border-b"><th class="py-2 text-left themed-text-muted">登录平台</th><td class="py-2"><span x-text="getPlatformIcon(selectedSession?.login_platform)"></span> <span x-text="getPlatformLabel(selectedSession?.login_platform)"></span></td></tr>
+              <tr class="border-b"><th class="py-2 text-left themed-text-muted">是否过期</th><td class="py-2" x-text="selectedSession?.is_expired ? '是' : '否'"></td></tr>
+              <tr class="border-b"><th class="py-2 text-left themed-text-muted">是否有效</th><td class="py-2" x-text="selectedSession?.is_valid ? '是' : '否'"></td></tr>
+              <tr class="border-b"><th class="py-2 text-left themed-text-muted">创建时间</th><td class="py-2" x-text="formatDateTime(selectedSession?.created_at)"></td></tr>
+              <tr class="border-b"><th class="py-2 text-left themed-text-muted">最后活动</th><td class="py-2" x-text="formatDateTime(selectedSession?.last_activity || selectedSession?.last_active_at)"></td></tr>
+              <tr><th class="py-2 text-left themed-text-muted">过期时间</th><td class="py-2" x-text="formatDateTime(selectedSession?.expires_at)"></td></tr>
+            </table>
+            <div x-show="isCurrentSession(selectedSession)" class="mt-4 p-3 themed-bg-primary-light themed-text-primary rounded">
+              ℹ️ 这是您当前的会话，无法撤销
+            </div>
+          </div>
+          <div class="px-6 py-4 border-t flex justify-end space-x-2">
+            <button 
+              type="button"
+              class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+              x-show="selectedSession && !isCurrentSession(selectedSession) && getSessionStatus(selectedSession) === 'active'"
+              @click="revokeSession(selectedSession.authentication_session_id); showDetailModal = false"
+            >撤销会话</button>
+            <button type="button" class="px-4 py-2 border rounded themed-hover-bg" @click="showDetailModal = false">关闭</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 全局加载遮罩 (在主 x-data 作用域内) -->
+    <div x-show="globalLoading" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" style="display: none;">
+      <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-white"></div>
+    </div>
+  </div>
+
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+
+
+
+</body>
+</html>

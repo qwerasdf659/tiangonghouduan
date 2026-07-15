@@ -1,0 +1,906 @@
+[
+  {
+    "ad_dau_daily_stat_id": "1",
+    "stat_date": "2026-03-01",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-02 21:01:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "2",
+    "stat_date": "2026-02-28",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-02 21:01:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "3",
+    "stat_date": "2026-02-27",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-02 21:01:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "4",
+    "stat_date": "2026-02-26",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-02 21:01:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "5",
+    "stat_date": "2026-02-25",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-02 21:01:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "6",
+    "stat_date": "2026-02-24",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-02 21:01:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "7",
+    "stat_date": "2026-02-23",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-02 21:01:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "8",
+    "stat_date": "2026-03-02",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-04 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "9",
+    "stat_date": "2026-03-03",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-05 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "10",
+    "stat_date": "2026-03-04",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-06 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "11",
+    "stat_date": "2026-03-06",
+    "dau_count": 4,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-08 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "12",
+    "stat_date": "2026-03-07",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-09 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "13",
+    "stat_date": "2026-03-08",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-10 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "14",
+    "stat_date": "2026-03-09",
+    "dau_count": 4,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-11 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "15",
+    "stat_date": "2026-03-10",
+    "dau_count": 5,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-12 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "16",
+    "stat_date": "2026-03-11",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-13 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "17",
+    "stat_date": "2026-03-12",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-14 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "18",
+    "stat_date": "2026-03-13",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-15 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "19",
+    "stat_date": "2026-03-14",
+    "dau_count": 2,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-16 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "20",
+    "stat_date": "2026-03-15",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-17 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "21",
+    "stat_date": "2026-03-16",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-18 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "22",
+    "stat_date": "2026-03-17",
+    "dau_count": 2,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-19 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "23",
+    "stat_date": "2026-03-18",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-20 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "24",
+    "stat_date": "2026-03-19",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-21 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "25",
+    "stat_date": "2026-03-20",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-22 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "26",
+    "stat_date": "2026-03-21",
+    "dau_count": 3,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-23 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "27",
+    "stat_date": "2026-03-22",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-24 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "28",
+    "stat_date": "2026-03-23",
+    "dau_count": 21,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-25 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "29",
+    "stat_date": "2026-03-24",
+    "dau_count": 7,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-26 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "30",
+    "stat_date": "2026-03-25",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-27 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "31",
+    "stat_date": "2026-03-26",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-28 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "32",
+    "stat_date": "2026-03-27",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-29 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "33",
+    "stat_date": "2026-03-28",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-30 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "34",
+    "stat_date": "2026-03-29",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-03-31 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "35",
+    "stat_date": "2026-03-30",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-01 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "36",
+    "stat_date": "2026-03-31",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-02 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "37",
+    "stat_date": "2026-04-01",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-03 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "38",
+    "stat_date": "2026-04-02",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-04 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "39",
+    "stat_date": "2026-04-03",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-05 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "40",
+    "stat_date": "2026-04-04",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-06 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "41",
+    "stat_date": "2026-04-05",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-07 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "42",
+    "stat_date": "2026-04-06",
+    "dau_count": 3,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-08 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "43",
+    "stat_date": "2026-04-07",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-09 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "44",
+    "stat_date": "2026-04-08",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-10 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "45",
+    "stat_date": "2026-04-09",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-11 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "46",
+    "stat_date": "2026-04-10",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-12 00:30:01"
+  },
+  {
+    "ad_dau_daily_stat_id": "47",
+    "stat_date": "2026-04-11",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-13 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "48",
+    "stat_date": "2026-04-12",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-14 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "49",
+    "stat_date": "2026-04-13",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-15 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "50",
+    "stat_date": "2026-04-14",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-16 00:30:01"
+  },
+  {
+    "ad_dau_daily_stat_id": "51",
+    "stat_date": "2026-04-15",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-17 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "52",
+    "stat_date": "2026-04-19",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-21 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "53",
+    "stat_date": "2026-04-20",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-22 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "54",
+    "stat_date": "2026-04-21",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-23 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "55",
+    "stat_date": "2026-04-22",
+    "dau_count": 2,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-24 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "56",
+    "stat_date": "2026-04-23",
+    "dau_count": 4,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-25 00:30:01"
+  },
+  {
+    "ad_dau_daily_stat_id": "57",
+    "stat_date": "2026-04-24",
+    "dau_count": 2,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-26 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "58",
+    "stat_date": "2026-04-25",
+    "dau_count": 4,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-27 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "59",
+    "stat_date": "2026-04-26",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-28 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "60",
+    "stat_date": "2026-04-27",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-29 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "61",
+    "stat_date": "2026-04-28",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-04-30 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "62",
+    "stat_date": "2026-04-29",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-01 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "63",
+    "stat_date": "2026-04-30",
+    "dau_count": 2,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-02 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "64",
+    "stat_date": "2026-05-01",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-03 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "65",
+    "stat_date": "2026-05-02",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-04 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "66",
+    "stat_date": "2026-05-03",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-05 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "67",
+    "stat_date": "2026-05-04",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-06 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "68",
+    "stat_date": "2026-05-05",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-07 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "69",
+    "stat_date": "2026-05-06",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-08 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "70",
+    "stat_date": "2026-05-07",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-09 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "71",
+    "stat_date": "2026-05-08",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-10 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "72",
+    "stat_date": "2026-05-09",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-11 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "73",
+    "stat_date": "2026-05-10",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-12 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "74",
+    "stat_date": "2026-05-11",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-13 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "75",
+    "stat_date": "2026-05-12",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-14 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "76",
+    "stat_date": "2026-05-13",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-15 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "77",
+    "stat_date": "2026-05-14",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-16 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "78",
+    "stat_date": "2026-05-15",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-17 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "79",
+    "stat_date": "2026-05-16",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-18 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "80",
+    "stat_date": "2026-05-17",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-19 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "81",
+    "stat_date": "2026-05-18",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-20 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "82",
+    "stat_date": "2026-05-19",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-21 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "83",
+    "stat_date": "2026-05-20",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-22 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "84",
+    "stat_date": "2026-05-21",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-23 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "85",
+    "stat_date": "2026-05-22",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-24 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "86",
+    "stat_date": "2026-05-23",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-25 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "87",
+    "stat_date": "2026-05-24",
+    "dau_count": 2,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-26 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "88",
+    "stat_date": "2026-05-25",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-27 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "89",
+    "stat_date": "2026-05-26",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-28 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "90",
+    "stat_date": "2026-05-28",
+    "dau_count": 2,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-30 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "91",
+    "stat_date": "2026-05-29",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-05-31 00:30:01"
+  },
+  {
+    "ad_dau_daily_stat_id": "92",
+    "stat_date": "2026-05-30",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-01 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "93",
+    "stat_date": "2026-05-31",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-02 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "94",
+    "stat_date": "2026-06-01",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-03 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "95",
+    "stat_date": "2026-06-02",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-04 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "96",
+    "stat_date": "2026-06-03",
+    "dau_count": 5,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-05 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "97",
+    "stat_date": "2026-06-04",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-06 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "98",
+    "stat_date": "2026-06-05",
+    "dau_count": 2,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-07 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "99",
+    "stat_date": "2026-06-06",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-08 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "100",
+    "stat_date": "2026-06-07",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-09 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "101",
+    "stat_date": "2026-06-08",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-10 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "102",
+    "stat_date": "2026-06-09",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-11 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "103",
+    "stat_date": "2026-06-10",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-12 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "104",
+    "stat_date": "2026-06-11",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-13 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "105",
+    "stat_date": "2026-06-12",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-14 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "106",
+    "stat_date": "2026-06-13",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-15 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "107",
+    "stat_date": "2026-06-14",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-16 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "108",
+    "stat_date": "2026-06-15",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-17 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "109",
+    "stat_date": "2026-06-16",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-18 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "110",
+    "stat_date": "2026-06-17",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-19 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "111",
+    "stat_date": "2026-06-18",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-20 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "112",
+    "stat_date": "2026-06-19",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-21 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": "113",
+    "stat_date": "2026-06-20",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-22 00:30:00"
+  }
+]

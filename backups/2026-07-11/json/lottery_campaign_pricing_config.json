@@ -1,0 +1,604 @@
+[
+  {
+    "lottery_campaign_pricing_config_id": "pricing_1768782496093_kbh30u",
+    "lottery_campaign_id": 1,
+    "version": 1,
+    "pricing_config": {
+      "draw_buttons": [
+        {
+          "count": 1,
+          "label": "单抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 1
+        },
+        {
+          "count": 3,
+          "label": "3连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 3
+        },
+        {
+          "count": 5,
+          "label": "5连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 5
+        },
+        {
+          "count": 10,
+          "label": "10连抽(九折)",
+          "enabled": true,
+          "discount": 0.9,
+          "sort_order": 10
+        }
+      ]
+    },
+    "status": "archived",
+    "effective_at": null,
+    "expired_at": null,
+    "created_by": 32,
+    "updated_by": null,
+    "created_at": "2026-01-19 08:28:16",
+    "updated_at": "2026-06-22 05:38:26"
+  },
+  {
+    "lottery_campaign_pricing_config_id": "pricing_1768804670373_eumkyz",
+    "lottery_campaign_id": 1,
+    "version": 2,
+    "pricing_config": {
+      "draw_buttons": [
+        {
+          "count": 1,
+          "label": "单抽V2",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 1
+        },
+        {
+          "count": 10,
+          "label": "10连抽(85折)",
+          "enabled": true,
+          "discount": 0.85,
+          "sort_order": 10
+        }
+      ]
+    },
+    "status": "archived",
+    "effective_at": null,
+    "expired_at": null,
+    "created_by": 32,
+    "updated_by": null,
+    "created_at": "2026-01-19 14:37:50",
+    "updated_at": "2026-06-22 05:38:26"
+  },
+  {
+    "lottery_campaign_pricing_config_id": "pricing_1768804733242_q4l5s3",
+    "lottery_campaign_id": 1,
+    "version": 3,
+    "pricing_config": {
+      "draw_buttons": [
+        {
+          "count": 1,
+          "label": "单抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 1
+        },
+        {
+          "count": 3,
+          "label": "3连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 3
+        },
+        {
+          "count": 5,
+          "label": "5连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 5
+        },
+        {
+          "count": 10,
+          "label": "10连抽(九折)",
+          "enabled": true,
+          "discount": 0.9,
+          "sort_order": 10
+        }
+      ],
+      "_rollback_metadata": {
+        "rollback_at": "2026-01-19T06:38:53.240Z",
+        "rollback_by": 31,
+        "rollback_reason": "测试回滚功能",
+        "rollback_from_version": 1
+      }
+    },
+    "status": "archived",
+    "effective_at": null,
+    "expired_at": null,
+    "created_by": 32,
+    "updated_by": null,
+    "created_at": "2026-01-19 14:38:53",
+    "updated_at": "2026-06-22 05:38:26"
+  },
+  {
+    "lottery_campaign_pricing_config_id": "pricing_1768804748256_10pndr",
+    "lottery_campaign_id": 1,
+    "version": 4,
+    "pricing_config": {
+      "draw_buttons": [
+        {
+          "count": 1,
+          "label": "单抽定时版",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 1
+        }
+      ]
+    },
+    "status": "draft",
+    "effective_at": null,
+    "expired_at": null,
+    "created_by": 32,
+    "updated_by": null,
+    "created_at": "2026-01-19 14:39:08",
+    "updated_at": "2026-06-22 05:38:26"
+  },
+  {
+    "lottery_campaign_pricing_config_id": "pricing_1769007667357_cp5agf",
+    "lottery_campaign_id": 1,
+    "version": 5,
+    "pricing_config": {
+      "draw_buttons": [
+        {
+          "count": 1,
+          "label": "单抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 1
+        },
+        {
+          "count": 3,
+          "label": "3连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 3
+        },
+        {
+          "count": 5,
+          "label": "5连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 5
+        },
+        {
+          "count": 10,
+          "label": "10连抽(九折)",
+          "enabled": true,
+          "discount": 0.9,
+          "sort_order": 10
+        }
+      ],
+      "_rollback_metadata": {
+        "rollback_at": "2026-01-19T06:38:53.240Z",
+        "rollback_by": 31,
+        "rollback_reason": "测试回滚功能",
+        "rollback_from_version": 1
+      }
+    },
+    "status": "archived",
+    "effective_at": null,
+    "expired_at": null,
+    "created_by": 32,
+    "updated_by": null,
+    "created_at": "2026-01-21 23:01:07",
+    "updated_at": "2026-06-22 05:38:26"
+  },
+  {
+    "lottery_campaign_pricing_config_id": "pricing_1769292509620_0745dd",
+    "lottery_campaign_id": 1,
+    "version": 6,
+    "pricing_config": {
+      "base_cost": 10,
+      "draw_buttons": [
+        {
+          "count": 1,
+          "label": "单抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 1
+        },
+        {
+          "count": 3,
+          "label": "3连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 3
+        },
+        {
+          "count": 5,
+          "label": "5连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 5
+        },
+        {
+          "count": 10,
+          "label": "10连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 10
+        }
+      ]
+    },
+    "status": "archived",
+    "effective_at": null,
+    "expired_at": null,
+    "created_by": 32,
+    "updated_by": null,
+    "created_at": "2026-01-25 06:08:29",
+    "updated_at": "2026-06-22 05:38:26"
+  },
+  {
+    "lottery_campaign_pricing_config_id": "pricing_1769292851904_ipapxd",
+    "lottery_campaign_id": 1,
+    "version": 7,
+    "pricing_config": {
+      "base_cost": 10,
+      "draw_buttons": [
+        {
+          "count": 1,
+          "label": "单抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 1
+        },
+        {
+          "count": 3,
+          "label": "3连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 3
+        },
+        {
+          "count": 5,
+          "label": "5连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 5
+        },
+        {
+          "count": 10,
+          "label": "10连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 10
+        }
+      ]
+    },
+    "status": "archived",
+    "effective_at": null,
+    "expired_at": null,
+    "created_by": 32,
+    "updated_by": null,
+    "created_at": "2026-01-25 06:14:11",
+    "updated_at": "2026-06-22 05:38:26"
+  },
+  {
+    "lottery_campaign_pricing_config_id": "pricing_1769292856349_6urrj7",
+    "lottery_campaign_id": 1,
+    "version": 8,
+    "pricing_config": {
+      "base_cost": 10,
+      "draw_buttons": [
+        {
+          "count": 1,
+          "label": "单抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 1
+        },
+        {
+          "count": 3,
+          "label": "3连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 3
+        },
+        {
+          "count": 5,
+          "label": "5连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 5
+        },
+        {
+          "count": 10,
+          "label": "10连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 10
+        }
+      ]
+    },
+    "status": "archived",
+    "effective_at": null,
+    "expired_at": null,
+    "created_by": 32,
+    "updated_by": null,
+    "created_at": "2026-01-25 06:14:16",
+    "updated_at": "2026-06-22 05:38:26"
+  },
+  {
+    "lottery_campaign_pricing_config_id": "pricing_1769293444633_x6l1dw",
+    "lottery_campaign_id": 1,
+    "version": 9,
+    "pricing_config": {
+      "base_cost": 10,
+      "draw_buttons": [
+        {
+          "count": 1,
+          "label": "单抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 1
+        },
+        {
+          "count": 3,
+          "label": "3连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 3
+        },
+        {
+          "count": 5,
+          "label": "5连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 5
+        },
+        {
+          "count": 10,
+          "label": "10连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 10
+        }
+      ]
+    },
+    "status": "archived",
+    "effective_at": null,
+    "expired_at": null,
+    "created_by": 32,
+    "updated_by": null,
+    "created_at": "2026-01-25 06:24:04",
+    "updated_at": "2026-06-22 05:38:26"
+  },
+  {
+    "lottery_campaign_pricing_config_id": "pricing_1769351870468_yxf3u1",
+    "lottery_campaign_id": 1,
+    "version": 10,
+    "pricing_config": {
+      "base_cost": 10,
+      "draw_buttons": [
+        {
+          "count": 1,
+          "label": "单抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 1
+        },
+        {
+          "count": 3,
+          "label": "3连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 3
+        },
+        {
+          "count": 5,
+          "label": "5连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 5
+        },
+        {
+          "count": 10,
+          "label": "10连抽(8折)",
+          "enabled": true,
+          "discount": 0.8,
+          "sort_order": 10
+        }
+      ]
+    },
+    "status": "archived",
+    "effective_at": null,
+    "expired_at": null,
+    "created_by": 32,
+    "updated_by": null,
+    "created_at": "2026-01-25 22:37:50",
+    "updated_at": "2026-06-22 05:38:26"
+  },
+  {
+    "lottery_campaign_pricing_config_id": "pricing_1771338114178_p732j2",
+    "lottery_campaign_id": 1,
+    "version": 11,
+    "pricing_config": {
+      "base_cost": 100,
+      "draw_buttons": [
+        {
+          "count": 1,
+          "label": "单抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 1
+        },
+        {
+          "count": 3,
+          "label": "3连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 3
+        },
+        {
+          "count": 5,
+          "label": "5连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 5
+        },
+        {
+          "count": 10,
+          "label": "10连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 10
+        }
+      ]
+    },
+    "status": "archived",
+    "effective_at": null,
+    "expired_at": null,
+    "created_by": 32,
+    "updated_by": null,
+    "created_at": "2026-02-17 22:21:54",
+    "updated_at": "2026-06-22 05:38:26"
+  },
+  {
+    "lottery_campaign_pricing_config_id": "pricing_1771436306775_b0z83e",
+    "lottery_campaign_id": 1,
+    "version": 12,
+    "pricing_config": {
+      "base_cost": 100,
+      "draw_buttons": [
+        {
+          "count": 1,
+          "label": "单抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 1
+        },
+        {
+          "count": 3,
+          "label": "3连抽(九五折)",
+          "enabled": true,
+          "discount": 0.95,
+          "sort_order": 3
+        },
+        {
+          "count": 5,
+          "label": "5连抽(九三折)",
+          "enabled": true,
+          "discount": 0.93,
+          "sort_order": 5
+        },
+        {
+          "count": 10,
+          "label": "10连抽(九折)",
+          "enabled": true,
+          "discount": 0.9,
+          "sort_order": 10
+        }
+      ]
+    },
+    "status": "archived",
+    "effective_at": null,
+    "expired_at": null,
+    "created_by": 32,
+    "updated_by": null,
+    "created_at": "2026-02-19 01:38:26",
+    "updated_at": "2026-06-22 05:38:26"
+  },
+  {
+    "lottery_campaign_pricing_config_id": "pricing_1771436674750_e2qztp",
+    "lottery_campaign_id": 1,
+    "version": 13,
+    "pricing_config": {
+      "base_cost": 100,
+      "draw_buttons": [
+        {
+          "count": 1,
+          "label": "单抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 1
+        },
+        {
+          "count": 3,
+          "label": "3连抽(9.5折)",
+          "enabled": true,
+          "discount": 0.95,
+          "sort_order": 3
+        },
+        {
+          "count": 5,
+          "label": "5连抽(9.3折)",
+          "enabled": true,
+          "discount": 0.93,
+          "sort_order": 5
+        },
+        {
+          "count": 10,
+          "label": "10连抽(9折)",
+          "enabled": true,
+          "discount": 0.9,
+          "sort_order": 10
+        }
+      ]
+    },
+    "status": "archived",
+    "effective_at": null,
+    "expired_at": null,
+    "created_by": 32,
+    "updated_by": null,
+    "created_at": "2026-02-19 01:44:34",
+    "updated_at": "2026-06-22 05:38:26"
+  },
+  {
+    "lottery_campaign_pricing_config_id": "pricing_1772788125155_new12",
+    "lottery_campaign_id": 1,
+    "version": 14,
+    "pricing_config": {
+      "base_cost": 30,
+      "draw_buttons": [
+        {
+          "count": 1,
+          "label": "单抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 1
+        },
+        {
+          "count": 3,
+          "label": "3连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 3
+        },
+        {
+          "count": 5,
+          "label": "5连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 5
+        },
+        {
+          "count": 10,
+          "label": "10连抽",
+          "enabled": true,
+          "discount": 1,
+          "sort_order": 10
+        }
+      ]
+    },
+    "status": "active",
+    "effective_at": null,
+    "expired_at": null,
+    "created_by": 32,
+    "updated_by": null,
+    "created_at": "2026-03-06 09:08:45",
+    "updated_at": "2026-06-22 05:38:26"
+  }
+]

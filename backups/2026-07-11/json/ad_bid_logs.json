@@ -1,0 +1,3562 @@
+[
+  {
+    "ad_bid_log_id": 155,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:12:19"
+  },
+  {
+    "ad_bid_log_id": 156,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:12:39"
+  },
+  {
+    "ad_bid_log_id": 157,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:19:57"
+  },
+  {
+    "ad_bid_log_id": 158,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:20:06"
+  },
+  {
+    "ad_bid_log_id": 159,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:39:50"
+  },
+  {
+    "ad_bid_log_id": 160,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:40:15"
+  },
+  {
+    "ad_bid_log_id": 161,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:42:31"
+  },
+  {
+    "ad_bid_log_id": 162,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:42:31"
+  },
+  {
+    "ad_bid_log_id": 163,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:42:32"
+  },
+  {
+    "ad_bid_log_id": 164,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:42:42"
+  },
+  {
+    "ad_bid_log_id": 165,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:46:40"
+  },
+  {
+    "ad_bid_log_id": 166,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:52:07"
+  },
+  {
+    "ad_bid_log_id": 167,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:52:08"
+  },
+  {
+    "ad_bid_log_id": 168,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:52:09"
+  },
+  {
+    "ad_bid_log_id": 169,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:52:10"
+  },
+  {
+    "ad_bid_log_id": 170,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:52:11"
+  },
+  {
+    "ad_bid_log_id": 171,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:52:29"
+  },
+  {
+    "ad_bid_log_id": 172,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:52:29"
+  },
+  {
+    "ad_bid_log_id": 173,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 13:54:19"
+  },
+  {
+    "ad_bid_log_id": 174,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 16:24:56"
+  },
+  {
+    "ad_bid_log_id": 175,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 16:25:23"
+  },
+  {
+    "ad_bid_log_id": 176,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 20:37:28"
+  },
+  {
+    "ad_bid_log_id": 177,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 20:37:51"
+  },
+  {
+    "ad_bid_log_id": 178,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 20:38:03"
+  },
+  {
+    "ad_bid_log_id": 179,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 22:29:57"
+  },
+  {
+    "ad_bid_log_id": 180,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12797,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 22:30:35"
+  },
+  {
+    "ad_bid_log_id": 181,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12797,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 22:31:38"
+  },
+  {
+    "ad_bid_log_id": 182,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 22:31:55"
+  },
+  {
+    "ad_bid_log_id": 183,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12797,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 22:37:08"
+  },
+  {
+    "ad_bid_log_id": 184,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12797,
+    "lose_reason": null,
+    "bid_at": "2026-06-22 22:37:17"
+  },
+  {
+    "ad_bid_log_id": 185,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 01:39:04"
+  },
+  {
+    "ad_bid_log_id": 186,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 01:41:32"
+  },
+  {
+    "ad_bid_log_id": 187,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 01:41:44"
+  },
+  {
+    "ad_bid_log_id": 188,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 01:42:45"
+  },
+  {
+    "ad_bid_log_id": 189,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 01:59:12"
+  },
+  {
+    "ad_bid_log_id": 190,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 02:15:27"
+  },
+  {
+    "ad_bid_log_id": 191,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 02:45:33"
+  },
+  {
+    "ad_bid_log_id": 192,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 02:45:43"
+  },
+  {
+    "ad_bid_log_id": 193,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 03:12:03"
+  },
+  {
+    "ad_bid_log_id": 194,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 03:12:27"
+  },
+  {
+    "ad_bid_log_id": 195,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 03:20:43"
+  },
+  {
+    "ad_bid_log_id": 196,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 03:42:58"
+  },
+  {
+    "ad_bid_log_id": 197,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 03:43:15"
+  },
+  {
+    "ad_bid_log_id": 198,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 05:09:52"
+  },
+  {
+    "ad_bid_log_id": 199,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 05:10:04"
+  },
+  {
+    "ad_bid_log_id": 200,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 05:32:22"
+  },
+  {
+    "ad_bid_log_id": 201,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 05:32:32"
+  },
+  {
+    "ad_bid_log_id": 202,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 05:36:12"
+  },
+  {
+    "ad_bid_log_id": 203,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 05:36:31"
+  },
+  {
+    "ad_bid_log_id": 204,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 05:36:42"
+  },
+  {
+    "ad_bid_log_id": 205,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 05:39:28"
+  },
+  {
+    "ad_bid_log_id": 206,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 05:39:40"
+  },
+  {
+    "ad_bid_log_id": 207,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 05:48:23"
+  },
+  {
+    "ad_bid_log_id": 208,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 05:48:38"
+  },
+  {
+    "ad_bid_log_id": 209,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 05:55:26"
+  },
+  {
+    "ad_bid_log_id": 210,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 05:55:39"
+  },
+  {
+    "ad_bid_log_id": 211,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 06:46:19"
+  },
+  {
+    "ad_bid_log_id": 212,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 06:47:31"
+  },
+  {
+    "ad_bid_log_id": 213,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 06:47:41"
+  },
+  {
+    "ad_bid_log_id": 214,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 06:57:28"
+  },
+  {
+    "ad_bid_log_id": 215,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 06:57:37"
+  },
+  {
+    "ad_bid_log_id": 216,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 06:57:42"
+  },
+  {
+    "ad_bid_log_id": 217,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 06:57:51"
+  },
+  {
+    "ad_bid_log_id": 218,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 06:58:14"
+  },
+  {
+    "ad_bid_log_id": 219,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 06:58:53"
+  },
+  {
+    "ad_bid_log_id": 220,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 06:59:05"
+  },
+  {
+    "ad_bid_log_id": 221,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 07:00:10"
+  },
+  {
+    "ad_bid_log_id": 222,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 07:00:20"
+  },
+  {
+    "ad_bid_log_id": 223,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 07:15:50"
+  },
+  {
+    "ad_bid_log_id": 224,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 07:16:08"
+  },
+  {
+    "ad_bid_log_id": 225,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 07:16:14"
+  },
+  {
+    "ad_bid_log_id": 226,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 07:16:23"
+  },
+  {
+    "ad_bid_log_id": 227,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 07:18:38"
+  },
+  {
+    "ad_bid_log_id": 228,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 07:18:49"
+  },
+  {
+    "ad_bid_log_id": 229,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 07:37:38"
+  },
+  {
+    "ad_bid_log_id": 230,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 07:37:47"
+  },
+  {
+    "ad_bid_log_id": 231,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 07:38:06"
+  },
+  {
+    "ad_bid_log_id": 232,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 07:38:13"
+  },
+  {
+    "ad_bid_log_id": 233,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 07:38:24"
+  },
+  {
+    "ad_bid_log_id": 234,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 07:38:35"
+  },
+  {
+    "ad_bid_log_id": 235,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 08:39:32"
+  },
+  {
+    "ad_bid_log_id": 236,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 08:39:59"
+  },
+  {
+    "ad_bid_log_id": 237,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 08:56:36"
+  },
+  {
+    "ad_bid_log_id": 238,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 08:56:47"
+  },
+  {
+    "ad_bid_log_id": 239,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 10:34:41"
+  },
+  {
+    "ad_bid_log_id": 240,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 22:05:59"
+  },
+  {
+    "ad_bid_log_id": 241,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 22:06:15"
+  },
+  {
+    "ad_bid_log_id": 242,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 22:06:44"
+  },
+  {
+    "ad_bid_log_id": 243,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 22:06:54"
+  },
+  {
+    "ad_bid_log_id": 244,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 22:08:27"
+  },
+  {
+    "ad_bid_log_id": 245,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-24 22:08:36"
+  },
+  {
+    "ad_bid_log_id": 246,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 00:46:23"
+  },
+  {
+    "ad_bid_log_id": 247,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 00:46:34"
+  },
+  {
+    "ad_bid_log_id": 248,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 00:55:33"
+  },
+  {
+    "ad_bid_log_id": 249,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 00:55:43"
+  },
+  {
+    "ad_bid_log_id": 250,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 00:56:06"
+  },
+  {
+    "ad_bid_log_id": 251,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 00:56:13"
+  },
+  {
+    "ad_bid_log_id": 252,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 00:56:18"
+  },
+  {
+    "ad_bid_log_id": 253,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12799,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 00:56:44"
+  },
+  {
+    "ad_bid_log_id": 254,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 01:09:01"
+  },
+  {
+    "ad_bid_log_id": 255,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 01:09:23"
+  },
+  {
+    "ad_bid_log_id": 256,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 01:36:37"
+  },
+  {
+    "ad_bid_log_id": 257,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 01:36:48"
+  },
+  {
+    "ad_bid_log_id": 258,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 01:43:10"
+  },
+  {
+    "ad_bid_log_id": 259,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 02:28:46"
+  },
+  {
+    "ad_bid_log_id": 260,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 02:28:59"
+  },
+  {
+    "ad_bid_log_id": 261,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 03:08:11"
+  },
+  {
+    "ad_bid_log_id": 262,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 03:08:16"
+  },
+  {
+    "ad_bid_log_id": 263,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 03:08:23"
+  },
+  {
+    "ad_bid_log_id": 264,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12799,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 03:08:41"
+  },
+  {
+    "ad_bid_log_id": 265,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 03:09:36"
+  },
+  {
+    "ad_bid_log_id": 266,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 03:09:47"
+  },
+  {
+    "ad_bid_log_id": 267,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 03:10:38"
+  },
+  {
+    "ad_bid_log_id": 268,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 03:10:46"
+  },
+  {
+    "ad_bid_log_id": 269,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 03:14:28"
+  },
+  {
+    "ad_bid_log_id": 270,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 03:14:36"
+  },
+  {
+    "ad_bid_log_id": 271,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 03:37:30"
+  },
+  {
+    "ad_bid_log_id": 272,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12798,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 03:37:40"
+  },
+  {
+    "ad_bid_log_id": 273,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12799,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 04:31:44"
+  },
+  {
+    "ad_bid_log_id": 274,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 04:31:50"
+  },
+  {
+    "ad_bid_log_id": 275,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 04:32:03"
+  },
+  {
+    "ad_bid_log_id": 276,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 05:00:03"
+  },
+  {
+    "ad_bid_log_id": 277,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 358,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12798,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 05:01:04"
+  },
+  {
+    "ad_bid_log_id": 278,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 08:39:17"
+  },
+  {
+    "ad_bid_log_id": 279,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 08:39:28"
+  },
+  {
+    "ad_bid_log_id": 280,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 09:00:00"
+  },
+  {
+    "ad_bid_log_id": 281,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 09:00:00"
+  },
+  {
+    "ad_bid_log_id": 282,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 09:00:00"
+  },
+  {
+    "ad_bid_log_id": 283,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 09:00:10"
+  },
+  {
+    "ad_bid_log_id": 284,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 09:00:36"
+  },
+  {
+    "ad_bid_log_id": 285,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 09:48:50"
+  },
+  {
+    "ad_bid_log_id": 286,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 09:49:00"
+  },
+  {
+    "ad_bid_log_id": 287,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12799,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 09:49:15"
+  },
+  {
+    "ad_bid_log_id": 288,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-25 12:42:14"
+  },
+  {
+    "ad_bid_log_id": 289,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 00:01:34"
+  },
+  {
+    "ad_bid_log_id": 290,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 00:01:52"
+  },
+  {
+    "ad_bid_log_id": 291,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12798,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 00:04:08"
+  },
+  {
+    "ad_bid_log_id": 292,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12797,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 00:04:55"
+  },
+  {
+    "ad_bid_log_id": 293,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 00:10:54"
+  },
+  {
+    "ad_bid_log_id": 294,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 00:12:01"
+  },
+  {
+    "ad_bid_log_id": 295,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 00:14:43"
+  },
+  {
+    "ad_bid_log_id": 296,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 00:17:53"
+  },
+  {
+    "ad_bid_log_id": 297,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 00:18:29"
+  },
+  {
+    "ad_bid_log_id": 298,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12800,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 00:18:41"
+  },
+  {
+    "ad_bid_log_id": 299,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 00:20:08"
+  },
+  {
+    "ad_bid_log_id": 300,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 00:20:15"
+  },
+  {
+    "ad_bid_log_id": 301,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 01:02:46"
+  },
+  {
+    "ad_bid_log_id": 302,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 01:04:25"
+  },
+  {
+    "ad_bid_log_id": 303,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 06:17:16"
+  },
+  {
+    "ad_bid_log_id": 304,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 06:17:30"
+  },
+  {
+    "ad_bid_log_id": 305,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 06:20:30"
+  },
+  {
+    "ad_bid_log_id": 306,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 06:20:47"
+  },
+  {
+    "ad_bid_log_id": 307,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 06:20:59"
+  },
+  {
+    "ad_bid_log_id": 308,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 06:21:25"
+  },
+  {
+    "ad_bid_log_id": 309,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 06:23:43"
+  },
+  {
+    "ad_bid_log_id": 310,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 06:23:44"
+  },
+  {
+    "ad_bid_log_id": 311,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 06:23:54"
+  },
+  {
+    "ad_bid_log_id": 312,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 06:24:24"
+  },
+  {
+    "ad_bid_log_id": 313,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 06:26:20"
+  },
+  {
+    "ad_bid_log_id": 314,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 06:26:44"
+  },
+  {
+    "ad_bid_log_id": 315,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 06:28:44"
+  },
+  {
+    "ad_bid_log_id": 316,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 06:56:37"
+  },
+  {
+    "ad_bid_log_id": 317,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12801,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 06:59:19"
+  },
+  {
+    "ad_bid_log_id": 318,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 06:59:57"
+  },
+  {
+    "ad_bid_log_id": 319,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12801,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 07:00:06"
+  },
+  {
+    "ad_bid_log_id": 320,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 07:01:02"
+  },
+  {
+    "ad_bid_log_id": 321,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12802,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 07:01:13"
+  },
+  {
+    "ad_bid_log_id": 322,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 07:02:30"
+  },
+  {
+    "ad_bid_log_id": 323,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12798,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 07:02:42"
+  },
+  {
+    "ad_bid_log_id": 324,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 07:03:47"
+  },
+  {
+    "ad_bid_log_id": 325,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 07:04:27"
+  },
+  {
+    "ad_bid_log_id": 326,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12798,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 07:04:34"
+  },
+  {
+    "ad_bid_log_id": 327,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 07:06:39"
+  },
+  {
+    "ad_bid_log_id": 328,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 07:06:46"
+  },
+  {
+    "ad_bid_log_id": 329,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 11:29:17"
+  },
+  {
+    "ad_bid_log_id": 330,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 12:47:46"
+  },
+  {
+    "ad_bid_log_id": 331,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 16:32:14"
+  },
+  {
+    "ad_bid_log_id": 332,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 16:32:29"
+  },
+  {
+    "ad_bid_log_id": 333,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 16:32:54"
+  },
+  {
+    "ad_bid_log_id": 334,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 16:34:44"
+  },
+  {
+    "ad_bid_log_id": 335,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 16:34:57"
+  },
+  {
+    "ad_bid_log_id": 336,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 16:35:27"
+  },
+  {
+    "ad_bid_log_id": 337,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 16:35:52"
+  },
+  {
+    "ad_bid_log_id": 338,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 16:36:00"
+  },
+  {
+    "ad_bid_log_id": 339,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 16:36:08"
+  },
+  {
+    "ad_bid_log_id": 340,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 16:36:34"
+  },
+  {
+    "ad_bid_log_id": 341,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 16:36:49"
+  },
+  {
+    "ad_bid_log_id": 342,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 16:37:10"
+  },
+  {
+    "ad_bid_log_id": 343,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-26 16:37:21"
+  },
+  {
+    "ad_bid_log_id": 344,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12802,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 06:27:12"
+  },
+  {
+    "ad_bid_log_id": 345,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 06:27:25"
+  },
+  {
+    "ad_bid_log_id": 346,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 06:27:34"
+  },
+  {
+    "ad_bid_log_id": 347,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 06:27:43"
+  },
+  {
+    "ad_bid_log_id": 348,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 06:28:13"
+  },
+  {
+    "ad_bid_log_id": 349,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12801,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 06:28:25"
+  },
+  {
+    "ad_bid_log_id": 350,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 06:29:06"
+  },
+  {
+    "ad_bid_log_id": 351,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12798,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 06:29:33"
+  },
+  {
+    "ad_bid_log_id": 352,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 06:31:25"
+  },
+  {
+    "ad_bid_log_id": 353,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 06:31:51"
+  },
+  {
+    "ad_bid_log_id": 354,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 06:31:59"
+  },
+  {
+    "ad_bid_log_id": 355,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 06:32:08"
+  },
+  {
+    "ad_bid_log_id": 356,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 07:29:12"
+  },
+  {
+    "ad_bid_log_id": 357,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 07:29:52"
+  },
+  {
+    "ad_bid_log_id": 358,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12796,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 07:30:00"
+  },
+  {
+    "ad_bid_log_id": 359,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 07:30:45"
+  },
+  {
+    "ad_bid_log_id": 360,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 08:02:06"
+  },
+  {
+    "ad_bid_log_id": 361,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12803,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 08:02:17"
+  },
+  {
+    "ad_bid_log_id": 362,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12803,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 08:03:19"
+  },
+  {
+    "ad_bid_log_id": 363,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12803,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 08:05:22"
+  },
+  {
+    "ad_bid_log_id": 364,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 15:32:24"
+  },
+  {
+    "ad_bid_log_id": 365,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 23:56:37"
+  },
+  {
+    "ad_bid_log_id": 366,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 23:56:51"
+  },
+  {
+    "ad_bid_log_id": 367,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-27 23:59:59"
+  },
+  {
+    "ad_bid_log_id": 368,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 00:02:11"
+  },
+  {
+    "ad_bid_log_id": 369,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 01:52:37"
+  },
+  {
+    "ad_bid_log_id": 370,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 01:54:02"
+  },
+  {
+    "ad_bid_log_id": 371,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12803,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 01:54:12"
+  },
+  {
+    "ad_bid_log_id": 372,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 01:58:55"
+  },
+  {
+    "ad_bid_log_id": 373,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 02:35:07"
+  },
+  {
+    "ad_bid_log_id": 374,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 03:04:42"
+  },
+  {
+    "ad_bid_log_id": 375,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12804,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 03:05:46"
+  },
+  {
+    "ad_bid_log_id": 376,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 03:05:52"
+  },
+  {
+    "ad_bid_log_id": 377,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 03:05:55"
+  },
+  {
+    "ad_bid_log_id": 378,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 03:26:48"
+  },
+  {
+    "ad_bid_log_id": 379,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 03:41:39"
+  },
+  {
+    "ad_bid_log_id": 380,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 03:42:50"
+  },
+  {
+    "ad_bid_log_id": 381,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 04:46:15"
+  },
+  {
+    "ad_bid_log_id": 382,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 04:47:12"
+  },
+  {
+    "ad_bid_log_id": 383,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 04:47:21"
+  },
+  {
+    "ad_bid_log_id": 384,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 04:48:01"
+  },
+  {
+    "ad_bid_log_id": 385,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 05:03:49"
+  },
+  {
+    "ad_bid_log_id": 386,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 05:23:39"
+  },
+  {
+    "ad_bid_log_id": 387,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 05:30:47"
+  },
+  {
+    "ad_bid_log_id": 388,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 05:32:30"
+  },
+  {
+    "ad_bid_log_id": 389,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 06:46:48"
+  },
+  {
+    "ad_bid_log_id": 390,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 06:47:05"
+  },
+  {
+    "ad_bid_log_id": 391,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 07:37:07"
+  },
+  {
+    "ad_bid_log_id": 392,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 07:37:21"
+  },
+  {
+    "ad_bid_log_id": 393,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 07:56:50"
+  },
+  {
+    "ad_bid_log_id": 394,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 07:57:01"
+  },
+  {
+    "ad_bid_log_id": 395,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 07:59:25"
+  },
+  {
+    "ad_bid_log_id": 396,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12805,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 07:59:36"
+  },
+  {
+    "ad_bid_log_id": 397,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 08:48:02"
+  },
+  {
+    "ad_bid_log_id": 398,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12805,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 08:48:15"
+  },
+  {
+    "ad_bid_log_id": 399,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 08:58:15"
+  },
+  {
+    "ad_bid_log_id": 400,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 09:00:06"
+  },
+  {
+    "ad_bid_log_id": 401,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12803,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 09:00:18"
+  },
+  {
+    "ad_bid_log_id": 402,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 09:00:23"
+  },
+  {
+    "ad_bid_log_id": 403,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12805,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 09:00:31"
+  },
+  {
+    "ad_bid_log_id": 404,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 10:07:24"
+  },
+  {
+    "ad_bid_log_id": 405,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 10:09:18"
+  },
+  {
+    "ad_bid_log_id": 406,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 10:11:08"
+  },
+  {
+    "ad_bid_log_id": 407,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 14:38:31"
+  },
+  {
+    "ad_bid_log_id": 408,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12805,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 14:38:41"
+  },
+  {
+    "ad_bid_log_id": 409,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 14:41:01"
+  },
+  {
+    "ad_bid_log_id": 410,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 14:41:01"
+  },
+  {
+    "ad_bid_log_id": 411,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 14:41:03"
+  },
+  {
+    "ad_bid_log_id": 412,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 14:41:10"
+  },
+  {
+    "ad_bid_log_id": 413,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 16:23:41"
+  },
+  {
+    "ad_bid_log_id": 414,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12805,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 20:22:57"
+  },
+  {
+    "ad_bid_log_id": 415,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12805,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 20:35:32"
+  },
+  {
+    "ad_bid_log_id": 416,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12805,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 20:35:54"
+  },
+  {
+    "ad_bid_log_id": 417,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 20:36:18"
+  },
+  {
+    "ad_bid_log_id": 418,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 20:37:45"
+  },
+  {
+    "ad_bid_log_id": 419,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 20:45:04"
+  },
+  {
+    "ad_bid_log_id": 420,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 20:45:19"
+  },
+  {
+    "ad_bid_log_id": 421,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 20:46:03"
+  },
+  {
+    "ad_bid_log_id": 422,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 20:54:08"
+  },
+  {
+    "ad_bid_log_id": 423,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 20:54:18"
+  },
+  {
+    "ad_bid_log_id": 424,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12805,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 20:54:30"
+  },
+  {
+    "ad_bid_log_id": 425,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 21:03:42"
+  },
+  {
+    "ad_bid_log_id": 426,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12805,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 21:03:52"
+  },
+  {
+    "ad_bid_log_id": 427,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 21:05:40"
+  },
+  {
+    "ad_bid_log_id": 428,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 21:05:50"
+  },
+  {
+    "ad_bid_log_id": 429,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 21:11:20"
+  },
+  {
+    "ad_bid_log_id": 430,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 21:11:30"
+  },
+  {
+    "ad_bid_log_id": 431,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 22:10:43"
+  },
+  {
+    "ad_bid_log_id": 432,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 22:11:02"
+  },
+  {
+    "ad_bid_log_id": 433,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 22:33:44"
+  },
+  {
+    "ad_bid_log_id": 434,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 22:33:53"
+  },
+  {
+    "ad_bid_log_id": 435,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 22:49:09"
+  },
+  {
+    "ad_bid_log_id": 436,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 22:49:16"
+  },
+  {
+    "ad_bid_log_id": 437,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 22:57:09"
+  },
+  {
+    "ad_bid_log_id": 438,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 22:57:23"
+  },
+  {
+    "ad_bid_log_id": 439,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 23:45:59"
+  },
+  {
+    "ad_bid_log_id": 440,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12805,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 23:46:06"
+  },
+  {
+    "ad_bid_log_id": 441,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 23:54:32"
+  },
+  {
+    "ad_bid_log_id": 442,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12805,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 23:54:48"
+  },
+  {
+    "ad_bid_log_id": 443,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 23:58:03"
+  },
+  {
+    "ad_bid_log_id": 444,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12806,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 23:58:11"
+  },
+  {
+    "ad_bid_log_id": 445,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 23:58:20"
+  },
+  {
+    "ad_bid_log_id": 446,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 12803,
+    "lose_reason": null,
+    "bid_at": "2026-06-28 23:58:28"
+  },
+  {
+    "ad_bid_log_id": 447,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 00:16:23"
+  },
+  {
+    "ad_bid_log_id": 448,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 00:16:30"
+  },
+  {
+    "ad_bid_log_id": 449,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 01:13:17"
+  },
+  {
+    "ad_bid_log_id": 450,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 01:13:32"
+  },
+  {
+    "ad_bid_log_id": 451,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 01:24:09"
+  },
+  {
+    "ad_bid_log_id": 452,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 01:24:21"
+  },
+  {
+    "ad_bid_log_id": 453,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 02:40:58"
+  },
+  {
+    "ad_bid_log_id": 454,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 02:41:13"
+  },
+  {
+    "ad_bid_log_id": 455,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 03:11:46"
+  },
+  {
+    "ad_bid_log_id": 456,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 03:11:55"
+  },
+  {
+    "ad_bid_log_id": 457,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 06:07:41"
+  },
+  {
+    "ad_bid_log_id": 458,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 06:07:51"
+  },
+  {
+    "ad_bid_log_id": 459,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 06:50:05"
+  },
+  {
+    "ad_bid_log_id": 460,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 06:50:05"
+  },
+  {
+    "ad_bid_log_id": 461,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 06:50:05"
+  },
+  {
+    "ad_bid_log_id": 462,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 06:50:16"
+  },
+  {
+    "ad_bid_log_id": 463,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 06:50:40"
+  },
+  {
+    "ad_bid_log_id": 464,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 09:47:31"
+  },
+  {
+    "ad_bid_log_id": 465,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 09:48:02"
+  },
+  {
+    "ad_bid_log_id": 466,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 16:38:52"
+  },
+  {
+    "ad_bid_log_id": 467,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 16:38:53"
+  },
+  {
+    "ad_bid_log_id": 468,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 16:39:00"
+  },
+  {
+    "ad_bid_log_id": 469,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 16:54:48"
+  },
+  {
+    "ad_bid_log_id": 470,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 359,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-06-29 20:25:45"
+  },
+  {
+    "ad_bid_log_id": 471,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-07 03:53:01"
+  },
+  {
+    "ad_bid_log_id": 472,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-07-07 22:03:29"
+  },
+  {
+    "ad_bid_log_id": 473,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-07-08 04:27:28"
+  },
+  {
+    "ad_bid_log_id": 474,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-08 04:57:39"
+  },
+  {
+    "ad_bid_log_id": 475,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-07-08 04:57:52"
+  },
+  {
+    "ad_bid_log_id": 476,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-07-08 06:26:27"
+  },
+  {
+    "ad_bid_log_id": 477,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-07-08 06:27:11"
+  },
+  {
+    "ad_bid_log_id": 478,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-08 06:46:59"
+  },
+  {
+    "ad_bid_log_id": 479,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-07-08 22:45:54"
+  },
+  {
+    "ad_bid_log_id": 480,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-08 22:46:18"
+  },
+  {
+    "ad_bid_log_id": 481,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-07-08 22:46:31"
+  },
+  {
+    "ad_bid_log_id": 482,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-09 02:19:33"
+  },
+  {
+    "ad_bid_log_id": 483,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-09 02:42:01"
+  },
+  {
+    "ad_bid_log_id": 484,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-07-09 02:42:29"
+  },
+  {
+    "ad_bid_log_id": 485,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-09 04:04:08"
+  },
+  {
+    "ad_bid_log_id": 486,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-09 04:30:40"
+  },
+  {
+    "ad_bid_log_id": 487,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-09 04:53:30"
+  },
+  {
+    "ad_bid_log_id": 488,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-09 05:44:53"
+  },
+  {
+    "ad_bid_log_id": 489,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-09 06:07:07"
+  },
+  {
+    "ad_bid_log_id": 490,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-09 07:26:19"
+  },
+  {
+    "ad_bid_log_id": 491,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-09 09:11:28"
+  },
+  {
+    "ad_bid_log_id": 492,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-09 09:27:38"
+  },
+  {
+    "ad_bid_log_id": 493,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-09 09:45:09"
+  },
+  {
+    "ad_bid_log_id": 494,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-09 21:54:33"
+  },
+  {
+    "ad_bid_log_id": 495,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-10 02:04:10"
+  },
+  {
+    "ad_bid_log_id": 496,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-10 02:14:47"
+  },
+  {
+    "ad_bid_log_id": 497,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-10 02:48:09"
+  },
+  {
+    "ad_bid_log_id": 498,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-10 02:54:41"
+  },
+  {
+    "ad_bid_log_id": 499,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-10 02:59:38"
+  },
+  {
+    "ad_bid_log_id": 500,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-10 03:31:03"
+  },
+  {
+    "ad_bid_log_id": 501,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-10 03:58:36"
+  },
+  {
+    "ad_bid_log_id": 502,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-10 04:14:49"
+  },
+  {
+    "ad_bid_log_id": 503,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-10 04:35:06"
+  },
+  {
+    "ad_bid_log_id": 504,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-10 04:54:51"
+  },
+  {
+    "ad_bid_log_id": 505,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-07-11 01:49:02"
+  },
+  {
+    "ad_bid_log_id": 506,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-11 01:49:02"
+  },
+  {
+    "ad_bid_log_id": 507,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-07-11 01:49:41"
+  },
+  {
+    "ad_bid_log_id": 508,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-11 01:49:41"
+  },
+  {
+    "ad_bid_log_id": 509,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": 32,
+    "lose_reason": null,
+    "bid_at": "2026-07-11 01:53:36"
+  },
+  {
+    "ad_bid_log_id": 510,
+    "ad_slot_id": 16,
+    "ad_campaign_id": 366,
+    "bid_amount_star_stone": 0,
+    "is_winner": 1,
+    "target_user_id": null,
+    "lose_reason": null,
+    "bid_at": "2026-07-11 01:53:36"
+  }
+]

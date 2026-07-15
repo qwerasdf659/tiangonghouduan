@@ -1,0 +1,15 @@
+[
+  {
+    "preset_debt_limit_id": 1,
+    "limit_level": "global",
+    "reference_id": null,
+    "inventory_debt_limit": 1000,
+    "budget_debt_limit": 1000000,
+    "status": "active",
+    "description": "全局默认欠账上限：库存1000件，预算10000元",
+    "created_by": null,
+    "updated_by": null,
+    "created_at": "2026-01-18 05:10:40",
+    "updated_at": "2026-01-18 05:10:40"
+  }
+]

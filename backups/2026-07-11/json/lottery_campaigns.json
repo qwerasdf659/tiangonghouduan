@@ -1,0 +1,89 @@
+[
+  {
+    "lottery_campaign_id": 1,
+    "campaign_name": "餐厅消费回馈",
+    "campaign_code": "CAMP20250901001",
+    "campaign_type": "event",
+    "max_draws_per_user_daily": 500,
+    "max_draws_per_user_total": null,
+    "total_prize_pool": "10000.00",
+    "remaining_prize_pool": "10000.00",
+    "prize_distribution_config": {
+      "tiers": [
+        {
+          "weight": 1000,
+          "tier_id": 1,
+          "tier_name": "头号好礼"
+        },
+        {
+          "weight": 9000,
+          "tier_id": 2,
+          "tier_name": "尊享回馈"
+        },
+        {
+          "weight": 90000,
+          "tier_id": 3,
+          "tier_name": "优享回馈"
+        },
+        {
+          "weight": 400000,
+          "tier_id": 4,
+          "tier_name": "常享回馈"
+        },
+        {
+          "weight": 500000,
+          "tier_id": 5,
+          "tier_name": "基础礼遇"
+        }
+      ]
+    },
+    "start_time": "2025-07-30 08:00:00",
+    "end_time": "2026-12-09 07:59:00",
+    "daily_reset_time": "00:00:00",
+    "description": "",
+    "rules_text": "回馈好礼在您的消费回馈额度内随机发放，分高 / 中 / 低三档。实际可得档位受您的累计消费额度与近期获取情况影响，消费越多越有机会获得高档回馈。每次参与均会获得回馈，不存在\"未获得\"的情况。未成年人请在监护人指导下参与。",
+    "status": "active",
+    "budget_mode": "user",
+    "pick_method": "tier_first",
+    "tier_weight_scale": 1000000,
+    "pool_budget_total": 10000,
+    "pool_budget_remaining": 10000,
+    "allowed_campaign_ids": [
+      "CONSUMPTION_DEFAULT"
+    ],
+    "total_participants": 0,
+    "total_draws": 786,
+    "total_prizes_awarded": 5781,
+    "created_at": "2025-08-20 03:55:06",
+    "updated_at": "2026-07-06 08:46:07",
+    "participation_conditions": {
+      "user_points": {
+        "value": 100,
+        "operator": ">="
+      }
+    },
+    "condition_error_messages": {
+      "user_points": "您的积分不足100分，快去消费获取积分吧！"
+    },
+    "preset_budget_policy": "user_first",
+    "default_quota": "0.00",
+    "quota_init_mode": "on_demand",
+    "public_pool_remaining": null,
+    "reserved_pool_remaining": null,
+    "max_budget_debt": "0.00",
+    "max_inventory_debt_quantity": 0,
+    "daily_budget_limit": null,
+    "display_mode": "golden_egg",
+    "grid_cols": 4,
+    "effect_theme": "purple_mystery",
+    "rarity_effects_enabled": 1,
+    "win_animation": "simple",
+    "sort_order": 0,
+    "is_featured": 0,
+    "is_hidden": 0,
+    "display_tags": null,
+    "display_start_time": null,
+    "display_end_time": null,
+    "entry_asset_code": "points"
+  }
+]

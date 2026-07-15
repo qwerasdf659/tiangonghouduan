@@ -1,0 +1,5674 @@
+[
+  {
+    "admin_operation_log_id": 9309,
+    "operator_id": 11021,
+    "operation_type": "data_cleanup",
+    "target_type": "data_management",
+    "target_id": 0,
+    "action": "上线前一次性清行为（保配置/清行为/归零统计）",
+    "before_data": null,
+    "after_data": {
+      "media": {
+        "kept": "materials/categories 图标保留",
+        "status": "success",
+        "media_files_deleted": 0,
+        "media_attachments_deleted": 0
+      },
+      "zeroed": {
+        "lottery_campaigns": 0,
+        "lottery_campaign_prizes": 0
+      },
+      "test_users": {
+        "status": "success",
+        "users_deleted": 0,
+        "accounts_deleted": 0,
+        "user_roles_deleted": 0,
+        "store_staff_orphans_deleted": 0,
+        "account_asset_balances_deleted": 0,
+        "pricing_created_by_reattributed": 0
+      },
+      "reconcile_after": {
+        "item_owner": "PASS",
+        "asset_balance": "PASS",
+        "item_conservation": "PASS"
+      },
+      "behavior_deleted": 1,
+      "duration_seconds": 0.2,
+      "financial_deleted": 0
+    },
+    "changed_fields": [
+      {
+        "field": "behavior_deleted",
+        "new_value": 1,
+        "old_value": null
+      },
+      {
+        "field": "financial_deleted",
+        "new_value": 0,
+        "old_value": null
+      },
+      {
+        "field": "test_users",
+        "new_value": {
+          "status": "success",
+          "users_deleted": 0,
+          "accounts_deleted": 0,
+          "user_roles_deleted": 0,
+          "store_staff_orphans_deleted": 0,
+          "account_asset_balances_deleted": 0,
+          "pricing_created_by_reattributed": 0
+        },
+        "old_value": null
+      },
+      {
+        "field": "media",
+        "new_value": {
+          "kept": "materials/categories 图标保留",
+          "status": "success",
+          "media_files_deleted": 0,
+          "media_attachments_deleted": 0
+        },
+        "old_value": null
+      },
+      {
+        "field": "zeroed",
+        "new_value": {
+          "lottery_campaigns": 0,
+          "lottery_campaign_prizes": 0
+        },
+        "old_value": null
+      },
+      {
+        "field": "reconcile_after",
+        "new_value": {
+          "item_owner": "PASS",
+          "asset_balance": "PASS",
+          "item_conservation": "PASS"
+        },
+        "old_value": null
+      },
+      {
+        "field": "duration_seconds",
+        "new_value": 0.2,
+        "old_value": null
+      }
+    ],
+    "reason": "上线前清测试数据（一次性治理任务）",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "pre_launch_behavior_1782078340314",
+    "created_at": "2026-06-22 05:45:40",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9310,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782078630097",
+    "created_at": "2026-06-22 05:50:30",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9311,
+    "operator_id": 32,
+    "operation_type": "asset_adjustment",
+    "target_type": "asset_transaction",
+    "target_id": 155121,
+    "action": "increase",
+    "before_data": {
+      "balance": "0",
+      "user_id": 32,
+      "asset_code": "star_stone"
+    },
+    "after_data": {
+      "balance": "5000",
+      "user_id": 32,
+      "asset_code": "star_stone",
+      "delta_amount": 5000
+    },
+    "changed_fields": [
+      {
+        "field": "balance",
+        "new_value": "5000",
+        "old_value": "0"
+      },
+      {
+        "field": "delta_amount",
+        "new_value": 5000
+      }
+    ],
+    "reason": "[error_correction] 1",
+    "ip_address": "14.24.176.216",
+    "user_agent": null,
+    "idempotency_key": "admin_adjust_32_32_star_stone_69b2dba4-b5d8-4984-ae12-34c34fb162ce",
+    "created_at": "2026-06-22 13:13:44",
+    "target_type_raw": "AssetTransaction",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9312,
+    "operator_id": 32,
+    "operation_type": "asset_adjustment",
+    "target_type": "asset_transaction",
+    "target_id": 155123,
+    "action": "increase",
+    "before_data": {
+      "balance": "0",
+      "user_id": 32,
+      "asset_code": "star_stone_quota"
+    },
+    "after_data": {
+      "balance": "50000",
+      "user_id": 32,
+      "asset_code": "star_stone_quota",
+      "delta_amount": 50000
+    },
+    "changed_fields": [
+      {
+        "field": "balance",
+        "new_value": "50000",
+        "old_value": "0"
+      },
+      {
+        "field": "delta_amount",
+        "new_value": 50000
+      }
+    ],
+    "reason": "[error_correction] 1",
+    "ip_address": "14.24.176.216",
+    "user_agent": null,
+    "idempotency_key": "admin_adjust_32_32_star_stone_quota_b89c1751-b43b-4596-a1c4-5dae9b1c9d8c",
+    "created_at": "2026-06-22 13:13:54",
+    "target_type_raw": "AssetTransaction",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9313,
+    "operator_id": 32,
+    "operation_type": "asset_adjustment",
+    "target_type": "asset_transaction",
+    "target_id": 155125,
+    "action": "increase",
+    "before_data": {
+      "balance": "0",
+      "user_id": 32,
+      "asset_code": "budget_points"
+    },
+    "after_data": {
+      "balance": "60000",
+      "user_id": 32,
+      "asset_code": "budget_points",
+      "delta_amount": 60000
+    },
+    "changed_fields": [
+      {
+        "field": "balance",
+        "new_value": "60000",
+        "old_value": "0"
+      },
+      {
+        "field": "delta_amount",
+        "new_value": 60000
+      }
+    ],
+    "reason": "[error_correction] 1",
+    "ip_address": "14.24.176.216",
+    "user_agent": null,
+    "idempotency_key": "admin_adjust_32_32_budget_points_f2d620d2-4939-4d01-ba39-7b614f893e66",
+    "created_at": "2026-06-22 13:14:12",
+    "target_type_raw": "AssetTransaction",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9314,
+    "operator_id": 32,
+    "operation_type": "asset_adjustment",
+    "target_type": "asset_transaction",
+    "target_id": 155127,
+    "action": "increase",
+    "before_data": {
+      "balance": "0",
+      "user_id": 32,
+      "asset_code": "red_core_shard"
+    },
+    "after_data": {
+      "balance": "80000",
+      "user_id": 32,
+      "asset_code": "red_core_shard",
+      "delta_amount": 80000
+    },
+    "changed_fields": [
+      {
+        "field": "balance",
+        "new_value": "80000",
+        "old_value": "0"
+      },
+      {
+        "field": "delta_amount",
+        "new_value": 80000
+      }
+    ],
+    "reason": "[error_correction] 1",
+    "ip_address": "14.24.176.216",
+    "user_agent": null,
+    "idempotency_key": "admin_adjust_32_32_red_core_shard_82c2c3a5-b892-48fc-aca2-025d78bad0c5",
+    "created_at": "2026-06-22 13:14:22",
+    "target_type_raw": "AssetTransaction",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9315,
+    "operator_id": 32,
+    "operation_type": "asset_adjustment",
+    "target_type": "asset_transaction",
+    "target_id": 155129,
+    "action": "increase",
+    "before_data": {
+      "balance": "0",
+      "user_id": 32,
+      "asset_code": "points"
+    },
+    "after_data": {
+      "balance": "90000",
+      "user_id": 32,
+      "asset_code": "points",
+      "delta_amount": 90000
+    },
+    "changed_fields": [
+      {
+        "field": "balance",
+        "new_value": "90000",
+        "old_value": "0"
+      },
+      {
+        "field": "delta_amount",
+        "new_value": 90000
+      }
+    ],
+    "reason": "[customer_service] 1",
+    "ip_address": "14.24.176.216",
+    "user_agent": null,
+    "idempotency_key": "admin_adjust_32_32_points_5b212e33-40ad-449c-9dcf-66893fcb9f34",
+    "created_at": "2026-06-22 13:14:30",
+    "target_type_raw": "AssetTransaction",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9316,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782236504380",
+    "created_at": "2026-06-24 01:41:44",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9317,
+    "operator_id": 32,
+    "operation_type": "asset_adjustment",
+    "target_type": "asset_transaction",
+    "target_id": 155297,
+    "action": "increase",
+    "before_data": {
+      "balance": "540",
+      "user_id": 32,
+      "asset_code": "star_stone"
+    },
+    "after_data": {
+      "balance": "9540",
+      "user_id": 32,
+      "asset_code": "star_stone",
+      "delta_amount": 9000
+    },
+    "changed_fields": [
+      {
+        "field": "balance",
+        "new_value": "9540",
+        "old_value": "540"
+      },
+      {
+        "field": "delta_amount",
+        "new_value": 9000
+      }
+    ],
+    "reason": "[error_correction] 1",
+    "ip_address": "223.104.79.142",
+    "user_agent": null,
+    "idempotency_key": "admin_adjust_32_32_star_stone_6f8594dd-2dd0-44ba-833c-780ddf8c3403",
+    "created_at": "2026-06-24 05:10:39",
+    "target_type_raw": "AssetTransaction",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9318,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782250572196",
+    "created_at": "2026-06-24 05:36:12",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9319,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12796,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "员工入职",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12796_1782254827385",
+    "created_at": "2026-06-24 06:47:07",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9320,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782254851345",
+    "created_at": "2026-06-24 06:47:31",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9321,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782255462843",
+    "created_at": "2026-06-24 06:57:42",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9322,
+    "operator_id": 12796,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12796,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12796_1782255493778",
+    "created_at": "2026-06-24 06:58:13",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9323,
+    "operator_id": 12796,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12796,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12796_1782255610542",
+    "created_at": "2026-06-24 07:00:10",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9324,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782256574023",
+    "created_at": "2026-06-24 07:16:14",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9325,
+    "operator_id": 12796,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12796,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12796_1782256717890",
+    "created_at": "2026-06-24 07:18:37",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9326,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782257857937",
+    "created_at": "2026-06-24 07:37:37",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9327,
+    "operator_id": 12796,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12796,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12796_1782257886335",
+    "created_at": "2026-06-24 07:38:06",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9328,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782257904796",
+    "created_at": "2026-06-24 07:38:24",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9329,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782263506902",
+    "created_at": "2026-06-24 09:11:46",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9330,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "manual_refresh",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782263507051",
+    "created_at": "2026-06-24 09:11:47",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9331,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782310004464",
+    "created_at": "2026-06-24 22:06:44",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9332,
+    "operator_id": 12796,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12796,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12796_1782310107789",
+    "created_at": "2026-06-24 22:08:27",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9333,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782320166185",
+    "created_at": "2026-06-25 00:56:06",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9334,
+    "operator_id": 12796,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12796,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12796_1782320178648",
+    "created_at": "2026-06-25 00:56:18",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9335,
+    "operator_id": 32,
+    "operation_type": "premium_extend",
+    "target_type": "user_premium_status",
+    "target_id": 12798,
+    "action": "extend",
+    "before_data": null,
+    "after_data": {
+      "expires_at": "2026-06-25T18:15:15.000Z",
+      "extended_days": 1
+    },
+    "changed_fields": [
+      {
+        "field": "expires_at",
+        "new_value": "2026-06-25T18:15:15.000Z",
+        "old_value": null
+      },
+      {
+        "field": "extended_days",
+        "new_value": 1,
+        "old_value": null
+      }
+    ],
+    "reason": "管理员手动延长高级空间 1 天",
+    "ip_address": "127.0.0.1",
+    "user_agent": "curl/7.88.1",
+    "idempotency_key": "premium_extend:12798:32:1782324915274",
+    "created_at": "2026-06-25 02:15:15",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9336,
+    "operator_id": 32,
+    "operation_type": "premium_revoke",
+    "target_type": "user_premium_status",
+    "target_id": 12798,
+    "action": "revoke",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "管理员撤销用户高级空间",
+    "ip_address": "127.0.0.1",
+    "user_agent": "curl/7.88.1",
+    "idempotency_key": "premium_revoke:12798:32:1782324915330",
+    "created_at": "2026-06-25 02:15:15",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9337,
+    "operator_id": 32,
+    "operation_type": "premium_extend",
+    "target_type": "user_premium_status",
+    "target_id": 32,
+    "action": "extend",
+    "before_data": null,
+    "after_data": {
+      "expires_at": "2026-06-25T18:18:42.000Z",
+      "extended_days": 1
+    },
+    "changed_fields": [
+      {
+        "field": "expires_at",
+        "new_value": "2026-06-25T18:18:42.000Z",
+        "old_value": null
+      },
+      {
+        "field": "extended_days",
+        "new_value": 1,
+        "old_value": null
+      }
+    ],
+    "reason": "管理员手动延长高级空间 1 天",
+    "ip_address": "::ffff:127.0.0.1",
+    "user_agent": null,
+    "idempotency_key": "premium_extend:32:32:1782325122159",
+    "created_at": "2026-06-25 02:18:42",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9338,
+    "operator_id": 32,
+    "operation_type": "premium_revoke",
+    "target_type": "user_premium_status",
+    "target_id": 32,
+    "action": "revoke",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "管理员撤销用户高级空间",
+    "ip_address": "::ffff:127.0.0.1",
+    "user_agent": null,
+    "idempotency_key": "premium_revoke:32:32:1782325122249",
+    "created_at": "2026-06-25 02:18:42",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9339,
+    "operator_id": 32,
+    "operation_type": "premium_extend",
+    "target_type": "user_premium_status",
+    "target_id": 32,
+    "action": "extend",
+    "before_data": null,
+    "after_data": {
+      "expires_at": "2026-06-25T18:20:44.000Z",
+      "extended_days": 1
+    },
+    "changed_fields": [
+      {
+        "field": "expires_at",
+        "new_value": "2026-06-25T18:20:44.000Z",
+        "old_value": null
+      },
+      {
+        "field": "extended_days",
+        "new_value": 1,
+        "old_value": null
+      }
+    ],
+    "reason": "管理员手动延长高级空间 1 天",
+    "ip_address": "::ffff:127.0.0.1",
+    "user_agent": null,
+    "idempotency_key": "premium_extend:32:32:1782325244575",
+    "created_at": "2026-06-25 02:20:44",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9340,
+    "operator_id": 32,
+    "operation_type": "premium_revoke",
+    "target_type": "user_premium_status",
+    "target_id": 32,
+    "action": "revoke",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "管理员撤销用户高级空间",
+    "ip_address": "::ffff:127.0.0.1",
+    "user_agent": null,
+    "idempotency_key": "premium_revoke:32:32:1782325244665",
+    "created_at": "2026-06-25 02:20:44",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9341,
+    "operator_id": 12796,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12796,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12796_1782328176789",
+    "created_at": "2026-06-25 03:09:36",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9342,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782328238010",
+    "created_at": "2026-06-25 03:10:38",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9343,
+    "operator_id": 12796,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12796,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12796_1782328467865",
+    "created_at": "2026-06-25 03:14:27",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9344,
+    "operator_id": 32,
+    "operation_type": "consumption_audit",
+    "target_type": "content_review_record",
+    "target_id": 6322,
+    "action": "approve",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "核实无误，审核通过",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "consumption_audit:chain_approve:3080",
+    "created_at": "2026-06-25 03:16:10",
+    "target_type_raw": "ContentReviewRecord",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9345,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12798,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "员工入职",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12798_1782329821966",
+    "created_at": "2026-06-25 03:37:01",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9346,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782329850423",
+    "created_at": "2026-06-25 03:37:30",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9347,
+    "operator_id": 12799,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12799,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12799_1782333109962",
+    "created_at": "2026-06-25 04:31:49",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9348,
+    "operator_id": 32,
+    "operation_type": "consumption_audit",
+    "target_type": "content_review_record",
+    "target_id": 6302,
+    "action": "approve",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "核实无误，审核通过",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "consumption_audit:chain_approve:3060",
+    "created_at": "2026-06-25 04:32:17",
+    "target_type_raw": "ContentReviewRecord",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9349,
+    "operator_id": 32,
+    "operation_type": "consumption_audit",
+    "target_type": "content_review_record",
+    "target_id": 6303,
+    "action": "approve",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "核实无误，审核通过",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "consumption_audit:chain_approve:3061",
+    "created_at": "2026-06-25 04:32:19",
+    "target_type_raw": "ContentReviewRecord",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9350,
+    "operator_id": 32,
+    "operation_type": "consumption_audit",
+    "target_type": "content_review_record",
+    "target_id": 6323,
+    "action": "approve",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "核实无误，审核通过",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "consumption_audit:chain_approve:3081",
+    "created_at": "2026-06-25 04:32:48",
+    "target_type_raw": "ContentReviewRecord",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9351,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782352139948",
+    "created_at": "2026-06-25 09:48:59",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9352,
+    "operator_id": 12798,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12798,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12798_1782404083472",
+    "created_at": "2026-06-26 00:14:43",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9353,
+    "operator_id": 32,
+    "operation_type": "consumption_audit",
+    "target_type": "content_review_record",
+    "target_id": 6324,
+    "action": "approve",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "核实无误，审核通过",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "consumption_audit:chain_approve:3084",
+    "created_at": "2026-06-26 00:18:01",
+    "target_type_raw": "ContentReviewRecord",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9354,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782404308990",
+    "created_at": "2026-06-26 00:18:28",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9355,
+    "operator_id": 12796,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12796,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12796_1782404408108",
+    "created_at": "2026-06-26 00:20:08",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9356,
+    "operator_id": 32,
+    "operation_type": "consumption_audit",
+    "target_type": "content_review_record",
+    "target_id": 6325,
+    "action": "approve",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "核实无误，审核通过",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "consumption_audit:chain_approve:3085",
+    "created_at": "2026-06-26 00:20:30",
+    "target_type_raw": "ContentReviewRecord",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9357,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782426030562",
+    "created_at": "2026-06-26 06:20:30",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9358,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12801,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "员工入职",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12801_1782428371178",
+    "created_at": "2026-06-26 06:59:31",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9359,
+    "operator_id": 12801,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12801,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12801_1782428397607",
+    "created_at": "2026-06-26 06:59:57",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9360,
+    "operator_id": 12801,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12801,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12801_1782428550746",
+    "created_at": "2026-06-26 07:02:30",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9361,
+    "operator_id": 12798,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12798,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12798_1782428627754",
+    "created_at": "2026-06-26 07:03:47",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9362,
+    "operator_id": 12798,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12798,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12798_1782428799207",
+    "created_at": "2026-06-26 07:06:39",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9363,
+    "operator_id": 32,
+    "operation_type": "consumption_audit",
+    "target_type": "content_review_record",
+    "target_id": 6326,
+    "action": "approve",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "核实无误，审核通过",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "consumption_audit:chain_approve:3086",
+    "created_at": "2026-06-26 07:06:48",
+    "target_type_raw": "ContentReviewRecord",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9364,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782462951960",
+    "created_at": "2026-06-26 16:35:51",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9365,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782512854526",
+    "created_at": "2026-06-27 06:27:34",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9366,
+    "operator_id": 12796,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12796,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12796_1782512893072",
+    "created_at": "2026-06-27 06:28:13",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9367,
+    "operator_id": 12801,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12801,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12801_1782512946626",
+    "created_at": "2026-06-27 06:29:06",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9368,
+    "operator_id": 12798,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12798,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12798_1782513083792",
+    "created_at": "2026-06-27 06:31:23",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9369,
+    "operator_id": 12796,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12796,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12796_1782513119360",
+    "created_at": "2026-06-27 06:31:59",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9370,
+    "operator_id": 32,
+    "operation_type": "consumption_audit",
+    "target_type": "content_review_record",
+    "target_id": 6327,
+    "action": "approve",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "审核通过",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "consumption_audit:chain_approve:3087",
+    "created_at": "2026-06-27 06:32:21",
+    "target_type_raw": "ContentReviewRecord",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9371,
+    "operator_id": 12796,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12796,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12796_1782516591919",
+    "created_at": "2026-06-27 07:29:51",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9372,
+    "operator_id": 32,
+    "operation_type": "consumption_audit",
+    "target_type": "content_review_record",
+    "target_id": 6328,
+    "action": "approve",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "核实无误，审核通过",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "consumption_audit:chain_approve:3088",
+    "created_at": "2026-06-27 07:30:54",
+    "target_type_raw": "ContentReviewRecord",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9373,
+    "operator_id": 32,
+    "operation_type": "consumption_audit",
+    "target_type": "content_review_record",
+    "target_id": 6329,
+    "action": "approve",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "核实无误，审核通过",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "consumption_audit:chain_approve:3089",
+    "created_at": "2026-06-27 07:53:28",
+    "target_type_raw": "ContentReviewRecord",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9374,
+    "operator_id": 12802,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12802,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12802_1782518526239",
+    "created_at": "2026-06-27 08:02:06",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9375,
+    "operator_id": 32,
+    "operation_type": "consumption_audit",
+    "target_type": "content_review_record",
+    "target_id": 6330,
+    "action": "approve",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "核实无误，审核通过",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "consumption_audit:chain_approve:3090",
+    "created_at": "2026-06-27 08:02:57",
+    "target_type_raw": "ContentReviewRecord",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9376,
+    "operator_id": 32,
+    "operation_type": "consumption_audit",
+    "target_type": "content_review_record",
+    "target_id": 6331,
+    "action": "approve",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "核实无误，审核通过",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "consumption_audit:chain_approve:3091",
+    "created_at": "2026-06-28 01:56:24",
+    "target_type_raw": "ContentReviewRecord",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9377,
+    "operator_id": 32,
+    "operation_type": "consumption_audit",
+    "target_type": "content_review_record",
+    "target_id": 6332,
+    "action": "approve",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "核实无误，审核通过",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "consumption_audit:chain_approve:3092",
+    "created_at": "2026-06-28 02:35:31",
+    "target_type_raw": "ContentReviewRecord",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9378,
+    "operator_id": 12803,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12803,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12803_1782587082258",
+    "created_at": "2026-06-28 03:04:42",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9379,
+    "operator_id": 32,
+    "operation_type": "consumption_audit",
+    "target_type": "content_review_record",
+    "target_id": 6333,
+    "action": "approve",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "核实无误，审核通过",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "consumption_audit:chain_approve:3093",
+    "created_at": "2026-06-28 03:06:42",
+    "target_type_raw": "ContentReviewRecord",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9380,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782604765350",
+    "created_at": "2026-06-28 07:59:25",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9381,
+    "operator_id": 12805,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12805,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12805_1782608295402",
+    "created_at": "2026-06-28 08:58:15",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9382,
+    "operator_id": 12803,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12803,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12803_1782608423451",
+    "created_at": "2026-06-28 09:00:23",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9383,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782651258264",
+    "created_at": "2026-06-28 20:54:18",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9384,
+    "operator_id": 12805,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12805,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12805_1782651939876",
+    "created_at": "2026-06-28 21:05:39",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9385,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1782661559387",
+    "created_at": "2026-06-28 23:45:59",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9386,
+    "operator_id": 12805,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12805,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12805_1782662283768",
+    "created_at": "2026-06-28 23:58:03",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9387,
+    "operator_id": 12806,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12806,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12806_1782662300382",
+    "created_at": "2026-06-28 23:58:20",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9388,
+    "operator_id": 12803,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12803,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12803_1782663383305",
+    "created_at": "2026-06-29 00:16:23",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9389,
+    "operator_id": 11021,
+    "operation_type": "data_cleanup",
+    "target_type": "data_management",
+    "target_id": 0,
+    "action": "定时自动清理",
+    "before_data": null,
+    "after_data": {
+      "results": [
+        {
+          "table": "api_idempotency_requests",
+          "status": "success",
+          "deleted_count": 10,
+          "retention_days": 6
+        },
+        {
+          "table": "websocket_startup_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 7
+        },
+        {
+          "table": "authentication_sessions",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 30
+        },
+        {
+          "table": "admin_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_impression_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_click_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_interaction_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "error": "Unknown column 'created_at' in 'where clause'",
+          "table": "ad_bid_logs",
+          "status": "error",
+          "deleted_count": 0
+        },
+        {
+          "table": "ad_antifraud_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_attribution_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "reminder_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "merchant_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "batch_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "risk_alerts",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_report_daily_snapshots",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_dau_daily_stats",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "alert_silence_rules",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "system_dictionary_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_billing_records",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 365
+        }
+      ],
+      "total_deleted": 10
+    },
+    "changed_fields": [
+      {
+        "field": "total_deleted",
+        "new_value": 10,
+        "old_value": null
+      },
+      {
+        "field": "results",
+        "new_value": [
+          {
+            "table": "api_idempotency_requests",
+            "status": "success",
+            "deleted_count": 10,
+            "retention_days": 6
+          },
+          {
+            "table": "websocket_startup_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 7
+          },
+          {
+            "table": "authentication_sessions",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 30
+          },
+          {
+            "table": "admin_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_impression_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_click_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_interaction_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "error": "Unknown column 'created_at' in 'where clause'",
+            "table": "ad_bid_logs",
+            "status": "error",
+            "deleted_count": 0
+          },
+          {
+            "table": "ad_antifraud_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_attribution_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "reminder_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "merchant_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "batch_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "risk_alerts",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_report_daily_snapshots",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_dau_daily_stats",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "alert_silence_rules",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "system_dictionary_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_billing_records",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 365
+          }
+        ],
+        "old_value": null
+      }
+    ],
+    "reason": "定时自动清理任务",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "auto_cleanup_1782673801106",
+    "created_at": "2026-06-29 03:10:01",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9390,
+    "operator_id": 11021,
+    "operation_type": "data_cleanup",
+    "target_type": "data_management",
+    "target_id": 0,
+    "action": "定时自动清理",
+    "before_data": null,
+    "after_data": {
+      "results": [
+        {
+          "table": "api_idempotency_requests",
+          "status": "success",
+          "deleted_count": 5,
+          "retention_days": 6
+        },
+        {
+          "table": "websocket_startup_logs",
+          "status": "success",
+          "deleted_count": 16,
+          "retention_days": 7
+        },
+        {
+          "table": "authentication_sessions",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 30
+        },
+        {
+          "table": "admin_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_impression_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_click_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_interaction_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "error": "Unknown column 'created_at' in 'where clause'",
+          "table": "ad_bid_logs",
+          "status": "error",
+          "deleted_count": 0
+        },
+        {
+          "table": "ad_antifraud_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_attribution_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "reminder_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "merchant_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "batch_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "risk_alerts",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_report_daily_snapshots",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_dau_daily_stats",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "alert_silence_rules",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "system_dictionary_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_billing_records",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 365
+        }
+      ],
+      "total_deleted": 21
+    },
+    "changed_fields": [
+      {
+        "field": "total_deleted",
+        "new_value": 21,
+        "old_value": null
+      },
+      {
+        "field": "results",
+        "new_value": [
+          {
+            "table": "api_idempotency_requests",
+            "status": "success",
+            "deleted_count": 5,
+            "retention_days": 6
+          },
+          {
+            "table": "websocket_startup_logs",
+            "status": "success",
+            "deleted_count": 16,
+            "retention_days": 7
+          },
+          {
+            "table": "authentication_sessions",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 30
+          },
+          {
+            "table": "admin_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_impression_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_click_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_interaction_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "error": "Unknown column 'created_at' in 'where clause'",
+            "table": "ad_bid_logs",
+            "status": "error",
+            "deleted_count": 0
+          },
+          {
+            "table": "ad_antifraud_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_attribution_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "reminder_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "merchant_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "batch_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "risk_alerts",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_report_daily_snapshots",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_dau_daily_stats",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "alert_silence_rules",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "system_dictionary_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_billing_records",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 365
+          }
+        ],
+        "old_value": null
+      }
+    ],
+    "reason": "定时自动清理任务",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "auto_cleanup_1782760200501",
+    "created_at": "2026-06-30 03:10:00",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9391,
+    "operator_id": 11021,
+    "operation_type": "data_cleanup",
+    "target_type": "data_management",
+    "target_id": 0,
+    "action": "定时自动清理",
+    "before_data": null,
+    "after_data": {
+      "results": [
+        {
+          "table": "api_idempotency_requests",
+          "status": "success",
+          "deleted_count": 24,
+          "retention_days": 6
+        },
+        {
+          "table": "websocket_startup_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 7
+        },
+        {
+          "table": "authentication_sessions",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 30
+        },
+        {
+          "table": "admin_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_impression_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_click_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_interaction_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "error": "Unknown column 'created_at' in 'where clause'",
+          "table": "ad_bid_logs",
+          "status": "error",
+          "deleted_count": 0
+        },
+        {
+          "table": "ad_antifraud_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_attribution_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "reminder_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "merchant_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "batch_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "risk_alerts",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_report_daily_snapshots",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_dau_daily_stats",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "alert_silence_rules",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "system_dictionary_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_billing_records",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 365
+        }
+      ],
+      "total_deleted": 24
+    },
+    "changed_fields": [
+      {
+        "field": "total_deleted",
+        "new_value": 24,
+        "old_value": null
+      },
+      {
+        "field": "results",
+        "new_value": [
+          {
+            "table": "api_idempotency_requests",
+            "status": "success",
+            "deleted_count": 24,
+            "retention_days": 6
+          },
+          {
+            "table": "websocket_startup_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 7
+          },
+          {
+            "table": "authentication_sessions",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 30
+          },
+          {
+            "table": "admin_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_impression_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_click_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_interaction_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "error": "Unknown column 'created_at' in 'where clause'",
+            "table": "ad_bid_logs",
+            "status": "error",
+            "deleted_count": 0
+          },
+          {
+            "table": "ad_antifraud_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_attribution_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "reminder_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "merchant_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "batch_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "risk_alerts",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_report_daily_snapshots",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_dau_daily_stats",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "alert_silence_rules",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "system_dictionary_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_billing_records",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 365
+          }
+        ],
+        "old_value": null
+      }
+    ],
+    "reason": "定时自动清理任务",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "auto_cleanup_1782846600992",
+    "created_at": "2026-07-01 03:10:00",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9392,
+    "operator_id": 11021,
+    "operation_type": "data_cleanup",
+    "target_type": "data_management",
+    "target_id": 0,
+    "action": "定时自动清理",
+    "before_data": null,
+    "after_data": {
+      "results": [
+        {
+          "table": "api_idempotency_requests",
+          "status": "success",
+          "deleted_count": 19,
+          "retention_days": 6
+        },
+        {
+          "table": "websocket_startup_logs",
+          "status": "success",
+          "deleted_count": 56,
+          "retention_days": 7
+        },
+        {
+          "table": "authentication_sessions",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 30
+        },
+        {
+          "table": "admin_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_impression_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_click_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_interaction_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "error": "Unknown column 'created_at' in 'where clause'",
+          "table": "ad_bid_logs",
+          "status": "error",
+          "deleted_count": 0
+        },
+        {
+          "table": "ad_antifraud_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_attribution_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "reminder_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "merchant_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "batch_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "risk_alerts",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_report_daily_snapshots",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_dau_daily_stats",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "alert_silence_rules",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "system_dictionary_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_billing_records",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 365
+        }
+      ],
+      "total_deleted": 75
+    },
+    "changed_fields": [
+      {
+        "field": "total_deleted",
+        "new_value": 75,
+        "old_value": null
+      },
+      {
+        "field": "results",
+        "new_value": [
+          {
+            "table": "api_idempotency_requests",
+            "status": "success",
+            "deleted_count": 19,
+            "retention_days": 6
+          },
+          {
+            "table": "websocket_startup_logs",
+            "status": "success",
+            "deleted_count": 56,
+            "retention_days": 7
+          },
+          {
+            "table": "authentication_sessions",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 30
+          },
+          {
+            "table": "admin_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_impression_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_click_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_interaction_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "error": "Unknown column 'created_at' in 'where clause'",
+            "table": "ad_bid_logs",
+            "status": "error",
+            "deleted_count": 0
+          },
+          {
+            "table": "ad_antifraud_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_attribution_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "reminder_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "merchant_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "batch_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "risk_alerts",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_report_daily_snapshots",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_dau_daily_stats",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "alert_silence_rules",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "system_dictionary_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_billing_records",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 365
+          }
+        ],
+        "old_value": null
+      }
+    ],
+    "reason": "定时自动清理任务",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "auto_cleanup_1782933000916",
+    "created_at": "2026-07-02 03:10:00",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9393,
+    "operator_id": 11021,
+    "operation_type": "data_cleanup",
+    "target_type": "data_management",
+    "target_id": 0,
+    "action": "定时自动清理",
+    "before_data": null,
+    "after_data": {
+      "results": [
+        {
+          "table": "api_idempotency_requests",
+          "status": "success",
+          "deleted_count": 8,
+          "retention_days": 6
+        },
+        {
+          "table": "websocket_startup_logs",
+          "status": "success",
+          "deleted_count": 36,
+          "retention_days": 7
+        },
+        {
+          "table": "authentication_sessions",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 30
+        },
+        {
+          "table": "admin_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_impression_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_click_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_interaction_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "error": "Unknown column 'created_at' in 'where clause'",
+          "table": "ad_bid_logs",
+          "status": "error",
+          "deleted_count": 0
+        },
+        {
+          "table": "ad_antifraud_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_attribution_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "reminder_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "merchant_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "batch_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "risk_alerts",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_report_daily_snapshots",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_dau_daily_stats",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "alert_silence_rules",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "system_dictionary_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_billing_records",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 365
+        }
+      ],
+      "total_deleted": 44
+    },
+    "changed_fields": [
+      {
+        "field": "total_deleted",
+        "new_value": 44,
+        "old_value": null
+      },
+      {
+        "field": "results",
+        "new_value": [
+          {
+            "table": "api_idempotency_requests",
+            "status": "success",
+            "deleted_count": 8,
+            "retention_days": 6
+          },
+          {
+            "table": "websocket_startup_logs",
+            "status": "success",
+            "deleted_count": 36,
+            "retention_days": 7
+          },
+          {
+            "table": "authentication_sessions",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 30
+          },
+          {
+            "table": "admin_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_impression_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_click_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_interaction_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "error": "Unknown column 'created_at' in 'where clause'",
+            "table": "ad_bid_logs",
+            "status": "error",
+            "deleted_count": 0
+          },
+          {
+            "table": "ad_antifraud_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_attribution_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "reminder_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "merchant_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "batch_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "risk_alerts",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_report_daily_snapshots",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_dau_daily_stats",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "alert_silence_rules",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "system_dictionary_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_billing_records",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 365
+          }
+        ],
+        "old_value": null
+      }
+    ],
+    "reason": "定时自动清理任务",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "auto_cleanup_1783019400294",
+    "created_at": "2026-07-03 03:10:00",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9394,
+    "operator_id": 11021,
+    "operation_type": "data_cleanup",
+    "target_type": "data_management",
+    "target_id": 0,
+    "action": "定时自动清理",
+    "before_data": null,
+    "after_data": {
+      "results": [
+        {
+          "table": "api_idempotency_requests",
+          "status": "success",
+          "deleted_count": 29,
+          "retention_days": 6
+        },
+        {
+          "table": "websocket_startup_logs",
+          "status": "success",
+          "deleted_count": 12,
+          "retention_days": 7
+        },
+        {
+          "table": "authentication_sessions",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 30
+        },
+        {
+          "table": "admin_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_impression_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_click_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_interaction_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "error": "Unknown column 'created_at' in 'where clause'",
+          "table": "ad_bid_logs",
+          "status": "error",
+          "deleted_count": 0
+        },
+        {
+          "table": "ad_antifraud_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_attribution_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "reminder_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "merchant_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "batch_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "risk_alerts",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_report_daily_snapshots",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_dau_daily_stats",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "alert_silence_rules",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "system_dictionary_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_billing_records",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 365
+        }
+      ],
+      "total_deleted": 41
+    },
+    "changed_fields": [
+      {
+        "field": "total_deleted",
+        "new_value": 41,
+        "old_value": null
+      },
+      {
+        "field": "results",
+        "new_value": [
+          {
+            "table": "api_idempotency_requests",
+            "status": "success",
+            "deleted_count": 29,
+            "retention_days": 6
+          },
+          {
+            "table": "websocket_startup_logs",
+            "status": "success",
+            "deleted_count": 12,
+            "retention_days": 7
+          },
+          {
+            "table": "authentication_sessions",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 30
+          },
+          {
+            "table": "admin_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_impression_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_click_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_interaction_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "error": "Unknown column 'created_at' in 'where clause'",
+            "table": "ad_bid_logs",
+            "status": "error",
+            "deleted_count": 0
+          },
+          {
+            "table": "ad_antifraud_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_attribution_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "reminder_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "merchant_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "batch_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "risk_alerts",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_report_daily_snapshots",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_dau_daily_stats",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "alert_silence_rules",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "system_dictionary_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_billing_records",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 365
+          }
+        ],
+        "old_value": null
+      }
+    ],
+    "reason": "定时自动清理任务",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "auto_cleanup_1783105800344",
+    "created_at": "2026-07-04 03:10:00",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9395,
+    "operator_id": 11021,
+    "operation_type": "data_cleanup",
+    "target_type": "data_management",
+    "target_id": 0,
+    "action": "定时自动清理",
+    "before_data": null,
+    "after_data": {
+      "results": [
+        {
+          "table": "api_idempotency_requests",
+          "status": "success",
+          "deleted_count": 19,
+          "retention_days": 6
+        },
+        {
+          "table": "websocket_startup_logs",
+          "status": "success",
+          "deleted_count": 4,
+          "retention_days": 7
+        },
+        {
+          "table": "authentication_sessions",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 30
+        },
+        {
+          "table": "admin_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_impression_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_click_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_interaction_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "error": "Unknown column 'created_at' in 'where clause'",
+          "table": "ad_bid_logs",
+          "status": "error",
+          "deleted_count": 0
+        },
+        {
+          "table": "ad_antifraud_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_attribution_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "reminder_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "merchant_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "batch_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "risk_alerts",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_report_daily_snapshots",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_dau_daily_stats",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "alert_silence_rules",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "system_dictionary_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_billing_records",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 365
+        }
+      ],
+      "total_deleted": 23
+    },
+    "changed_fields": [
+      {
+        "field": "total_deleted",
+        "new_value": 23,
+        "old_value": null
+      },
+      {
+        "field": "results",
+        "new_value": [
+          {
+            "table": "api_idempotency_requests",
+            "status": "success",
+            "deleted_count": 19,
+            "retention_days": 6
+          },
+          {
+            "table": "websocket_startup_logs",
+            "status": "success",
+            "deleted_count": 4,
+            "retention_days": 7
+          },
+          {
+            "table": "authentication_sessions",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 30
+          },
+          {
+            "table": "admin_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_impression_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_click_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_interaction_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "error": "Unknown column 'created_at' in 'where clause'",
+            "table": "ad_bid_logs",
+            "status": "error",
+            "deleted_count": 0
+          },
+          {
+            "table": "ad_antifraud_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_attribution_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "reminder_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "merchant_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "batch_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "risk_alerts",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_report_daily_snapshots",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_dau_daily_stats",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "alert_silence_rules",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "system_dictionary_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_billing_records",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 365
+          }
+        ],
+        "old_value": null
+      }
+    ],
+    "reason": "定时自动清理任务",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "auto_cleanup_1783192200816",
+    "created_at": "2026-07-05 03:10:00",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9396,
+    "operator_id": 11021,
+    "operation_type": "data_cleanup",
+    "target_type": "data_management",
+    "target_id": 0,
+    "action": "定时自动清理",
+    "before_data": null,
+    "after_data": {
+      "results": [
+        {
+          "table": "api_idempotency_requests",
+          "status": "success",
+          "deleted_count": 18,
+          "retention_days": 6
+        },
+        {
+          "table": "websocket_startup_logs",
+          "status": "success",
+          "deleted_count": 40,
+          "retention_days": 7
+        },
+        {
+          "table": "authentication_sessions",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 30
+        },
+        {
+          "table": "admin_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_impression_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_click_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_interaction_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "error": "Unknown column 'created_at' in 'where clause'",
+          "table": "ad_bid_logs",
+          "status": "error",
+          "deleted_count": 0
+        },
+        {
+          "table": "ad_antifraud_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_attribution_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "reminder_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "merchant_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "batch_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "risk_alerts",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_report_daily_snapshots",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_dau_daily_stats",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "alert_silence_rules",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "system_dictionary_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_billing_records",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 365
+        }
+      ],
+      "total_deleted": 58
+    },
+    "changed_fields": [
+      {
+        "field": "total_deleted",
+        "new_value": 58,
+        "old_value": null
+      },
+      {
+        "field": "results",
+        "new_value": [
+          {
+            "table": "api_idempotency_requests",
+            "status": "success",
+            "deleted_count": 18,
+            "retention_days": 6
+          },
+          {
+            "table": "websocket_startup_logs",
+            "status": "success",
+            "deleted_count": 40,
+            "retention_days": 7
+          },
+          {
+            "table": "authentication_sessions",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 30
+          },
+          {
+            "table": "admin_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_impression_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_click_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_interaction_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "error": "Unknown column 'created_at' in 'where clause'",
+            "table": "ad_bid_logs",
+            "status": "error",
+            "deleted_count": 0
+          },
+          {
+            "table": "ad_antifraud_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_attribution_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "reminder_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "merchant_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "batch_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "risk_alerts",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_report_daily_snapshots",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_dau_daily_stats",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "alert_silence_rules",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "system_dictionary_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_billing_records",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 365
+          }
+        ],
+        "old_value": null
+      }
+    ],
+    "reason": "定时自动清理任务",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "auto_cleanup_1783278600280",
+    "created_at": "2026-07-06 03:10:00",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9397,
+    "operator_id": 32,
+    "operation_type": "simulation_apply",
+    "target_type": "lottery_simulation_record",
+    "target_id": 635,
+    "action": "schedule",
+    "before_data": null,
+    "after_data": {
+      "changes": [],
+      "scheduled_at": "2026-07-06T19:19:28.295Z"
+    },
+    "changed_fields": null,
+    "reason": "定时应用模拟记录 #635，计划生效时间: 2026-07-06T19:19:28.295Z",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "simulation_schedule_635_1783279168319",
+    "created_at": "2026-07-06 03:19:28",
+    "target_type_raw": null,
+    "is_reversible": 1,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "high",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9398,
+    "operator_id": 32,
+    "operation_type": "simulation_apply",
+    "target_type": "lottery_simulation_record",
+    "target_id": 636,
+    "action": "update",
+    "before_data": {
+      "lottery_campaign_id": 1
+    },
+    "after_data": {
+      "changes": [],
+      "lottery_campaign_id": 1
+    },
+    "changed_fields": null,
+    "reason": "应用模拟记录 #636 的配置到活动 #1",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "simulation_apply_636_1783279168446",
+    "created_at": "2026-07-06 03:19:28",
+    "target_type_raw": null,
+    "is_reversible": 1,
+    "reversal_data": {},
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "high",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9399,
+    "operator_id": 32,
+    "operation_type": "premium_extend",
+    "target_type": "user_premium_status",
+    "target_id": 32,
+    "action": "extend",
+    "before_data": null,
+    "after_data": {
+      "expires_at": "2026-07-06T19:34:56.000Z",
+      "extended_days": 1
+    },
+    "changed_fields": [
+      {
+        "field": "expires_at",
+        "new_value": "2026-07-06T19:34:56.000Z",
+        "old_value": null
+      },
+      {
+        "field": "extended_days",
+        "new_value": 1,
+        "old_value": null
+      }
+    ],
+    "reason": "管理员手动延长高级空间 1 天",
+    "ip_address": "::ffff:127.0.0.1",
+    "user_agent": null,
+    "idempotency_key": "premium_extend:32:32:1783280096387",
+    "created_at": "2026-07-06 03:34:56",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9400,
+    "operator_id": 32,
+    "operation_type": "premium_revoke",
+    "target_type": "user_premium_status",
+    "target_id": 32,
+    "action": "revoke",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "管理员撤销用户高级空间",
+    "ip_address": "::ffff:127.0.0.1",
+    "user_agent": null,
+    "idempotency_key": "premium_revoke:32:32:1783280096491",
+    "created_at": "2026-07-06 03:34:56",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9401,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1783280117780",
+    "created_at": "2026-07-06 03:35:17",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9402,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1783280119438",
+    "created_at": "2026-07-06 03:35:19",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9403,
+    "operator_id": 32,
+    "operation_type": "asset_adjustment",
+    "target_type": "asset_transaction",
+    "target_id": 158943,
+    "action": "increase",
+    "before_data": {
+      "balance": "49920",
+      "user_id": 32,
+      "asset_code": "points"
+    },
+    "after_data": {
+      "balance": "54920",
+      "user_id": 32,
+      "asset_code": "points",
+      "delta_amount": 5000
+    },
+    "changed_fields": [
+      {
+        "field": "balance",
+        "new_value": "54920",
+        "old_value": "49920"
+      },
+      {
+        "field": "delta_amount",
+        "new_value": 5000
+      }
+    ],
+    "reason": "测试任务11.3-保底链路测试积分补充",
+    "ip_address": "::ffff:127.0.0.1",
+    "user_agent": null,
+    "idempotency_key": "pity_grant_1783280121718_0_eded03c5",
+    "created_at": "2026-07-06 03:35:21",
+    "target_type_raw": "AssetTransaction",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9404,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1783280131276",
+    "created_at": "2026-07-06 03:35:31",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9405,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "manual_refresh",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1783280131418",
+    "created_at": "2026-07-06 03:35:31",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9406,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 12798,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "员工离职",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_12798_1783280167589",
+    "created_at": "2026-07-06 03:36:07",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9407,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1783280184708",
+    "created_at": "2026-07-06 03:36:24",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9408,
+    "operator_id": 32,
+    "operation_type": "system_config",
+    "target_type": "user",
+    "target_id": 32,
+    "action": "invalidate_permissions_cache",
+    "before_data": null,
+    "after_data": null,
+    "changed_fields": [],
+    "reason": "user_logout",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "permissions_cache_invalidate_32_1783280185498",
+    "created_at": "2026-07-06 03:36:25",
+    "target_type_raw": "User",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9409,
+    "operator_id": 32,
+    "operation_type": "asset_adjustment",
+    "target_type": "asset_transaction",
+    "target_id": 159030,
+    "action": "increase",
+    "before_data": {
+      "balance": "54960",
+      "user_id": 32,
+      "asset_code": "points"
+    },
+    "after_data": {
+      "balance": "55960",
+      "user_id": 32,
+      "asset_code": "points",
+      "delta_amount": 1000
+    },
+    "changed_fields": [
+      {
+        "field": "balance",
+        "new_value": "55960",
+        "old_value": "54960"
+      },
+      {
+        "field": "delta_amount",
+        "new_value": 1000
+      }
+    ],
+    "reason": "测试任务11.1-积分发放链路测试",
+    "ip_address": "::ffff:127.0.0.1",
+    "user_agent": null,
+    "idempotency_key": "admin_grant_1783280214614_e8a94fe3",
+    "created_at": "2026-07-06 03:36:54",
+    "target_type_raw": "AssetTransaction",
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9410,
+    "operator_id": 32,
+    "operation_type": "simulation_apply",
+    "target_type": "lottery_simulation_record",
+    "target_id": 638,
+    "action": "schedule",
+    "before_data": null,
+    "after_data": {
+      "changes": [],
+      "scheduled_at": "2026-07-06T19:38:33.463Z"
+    },
+    "changed_fields": null,
+    "reason": "定时应用模拟记录 #638，计划生效时间: 2026-07-06T19:38:33.463Z",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "simulation_schedule_638_1783280313490",
+    "created_at": "2026-07-06 03:38:33",
+    "target_type_raw": null,
+    "is_reversible": 1,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "high",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9411,
+    "operator_id": 32,
+    "operation_type": "simulation_apply",
+    "target_type": "lottery_simulation_record",
+    "target_id": 639,
+    "action": "update",
+    "before_data": {
+      "lottery_campaign_id": 1
+    },
+    "after_data": {
+      "changes": [],
+      "lottery_campaign_id": 1
+    },
+    "changed_fields": null,
+    "reason": "应用模拟记录 #639 的配置到活动 #1",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "simulation_apply_639_1783280313573",
+    "created_at": "2026-07-06 03:38:33",
+    "target_type_raw": null,
+    "is_reversible": 1,
+    "reversal_data": {},
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "high",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9412,
+    "operator_id": 32,
+    "operation_type": "simulation_apply",
+    "target_type": "lottery_simulation_record",
+    "target_id": 641,
+    "action": "schedule",
+    "before_data": null,
+    "after_data": {
+      "changes": [],
+      "scheduled_at": "2026-07-06T19:39:07.130Z"
+    },
+    "changed_fields": null,
+    "reason": "定时应用模拟记录 #641，计划生效时间: 2026-07-06T19:39:07.130Z",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "simulation_schedule_641_1783280347161",
+    "created_at": "2026-07-06 03:39:07",
+    "target_type_raw": null,
+    "is_reversible": 1,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "high",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9413,
+    "operator_id": 32,
+    "operation_type": "simulation_apply",
+    "target_type": "lottery_simulation_record",
+    "target_id": 642,
+    "action": "update",
+    "before_data": {
+      "lottery_campaign_id": 1
+    },
+    "after_data": {
+      "changes": [],
+      "lottery_campaign_id": 1
+    },
+    "changed_fields": null,
+    "reason": "应用模拟记录 #642 的配置到活动 #1",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "simulation_apply_642_1783280347244",
+    "created_at": "2026-07-06 03:39:07",
+    "target_type_raw": null,
+    "is_reversible": 1,
+    "reversal_data": {},
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "high",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9414,
+    "operator_id": 11021,
+    "operation_type": "data_cleanup",
+    "target_type": "data_management",
+    "target_id": 0,
+    "action": "定时自动清理",
+    "before_data": null,
+    "after_data": {
+      "results": [
+        {
+          "table": "api_idempotency_requests",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 6
+        },
+        {
+          "table": "websocket_startup_logs",
+          "status": "success",
+          "deleted_count": 20,
+          "retention_days": 7
+        },
+        {
+          "table": "authentication_sessions",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 30
+        },
+        {
+          "table": "admin_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_impression_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_click_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_interaction_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "error": "Unknown column 'created_at' in 'where clause'",
+          "table": "ad_bid_logs",
+          "status": "error",
+          "deleted_count": 0
+        },
+        {
+          "table": "ad_antifraud_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_attribution_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "reminder_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "merchant_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "batch_operation_logs",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "risk_alerts",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "ad_report_daily_snapshots",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_dau_daily_stats",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "alert_silence_rules",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 90
+        },
+        {
+          "table": "system_dictionary_history",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 180
+        },
+        {
+          "table": "ad_billing_records",
+          "status": "success",
+          "deleted_count": 0,
+          "retention_days": 365
+        }
+      ],
+      "total_deleted": 20
+    },
+    "changed_fields": [
+      {
+        "field": "total_deleted",
+        "new_value": 20,
+        "old_value": null
+      },
+      {
+        "field": "results",
+        "new_value": [
+          {
+            "table": "api_idempotency_requests",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 6
+          },
+          {
+            "table": "websocket_startup_logs",
+            "status": "success",
+            "deleted_count": 20,
+            "retention_days": 7
+          },
+          {
+            "table": "authentication_sessions",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 30
+          },
+          {
+            "table": "admin_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_impression_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_click_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_interaction_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "error": "Unknown column 'created_at' in 'where clause'",
+            "table": "ad_bid_logs",
+            "status": "error",
+            "deleted_count": 0
+          },
+          {
+            "table": "ad_antifraud_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_attribution_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "reminder_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "merchant_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "batch_operation_logs",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "risk_alerts",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "ad_report_daily_snapshots",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_dau_daily_stats",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "alert_silence_rules",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 90
+          },
+          {
+            "table": "system_dictionary_history",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 180
+          },
+          {
+            "table": "ad_billing_records",
+            "status": "success",
+            "deleted_count": 0,
+            "retention_days": 365
+          }
+        ],
+        "old_value": null
+      }
+    ],
+    "reason": "定时自动清理任务",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "auto_cleanup_1783365001093",
+    "created_at": "2026-07-07 03:10:01",
+    "target_type_raw": null,
+    "is_reversible": 0,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "low",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9415,
+    "operator_id": 32,
+    "operation_type": "simulation_apply",
+    "target_type": "lottery_simulation_record",
+    "target_id": 644,
+    "action": "schedule",
+    "before_data": null,
+    "after_data": {
+      "changes": [],
+      "scheduled_at": "2026-07-11T17:49:01.298Z"
+    },
+    "changed_fields": null,
+    "reason": "定时应用模拟记录 #644，计划生效时间: 2026-07-11T17:49:01.298Z",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "simulation_schedule_644_1783705741322",
+    "created_at": "2026-07-11 01:49:01",
+    "target_type_raw": null,
+    "is_reversible": 1,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "high",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9416,
+    "operator_id": 32,
+    "operation_type": "simulation_apply",
+    "target_type": "lottery_simulation_record",
+    "target_id": 645,
+    "action": "update",
+    "before_data": {
+      "lottery_campaign_id": 1
+    },
+    "after_data": {
+      "changes": [],
+      "lottery_campaign_id": 1
+    },
+    "changed_fields": null,
+    "reason": "应用模拟记录 #645 的配置到活动 #1",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "simulation_apply_645_1783705741403",
+    "created_at": "2026-07-11 01:49:01",
+    "target_type_raw": null,
+    "is_reversible": 1,
+    "reversal_data": {},
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "high",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9417,
+    "operator_id": 32,
+    "operation_type": "simulation_apply",
+    "target_type": "lottery_simulation_record",
+    "target_id": 647,
+    "action": "schedule",
+    "before_data": null,
+    "after_data": {
+      "changes": [],
+      "scheduled_at": "2026-07-11T17:49:34.335Z"
+    },
+    "changed_fields": null,
+    "reason": "定时应用模拟记录 #647，计划生效时间: 2026-07-11T17:49:34.335Z",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "simulation_schedule_647_1783705774374",
+    "created_at": "2026-07-11 01:49:34",
+    "target_type_raw": null,
+    "is_reversible": 1,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "high",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9418,
+    "operator_id": 32,
+    "operation_type": "simulation_apply",
+    "target_type": "lottery_simulation_record",
+    "target_id": 648,
+    "action": "update",
+    "before_data": {
+      "lottery_campaign_id": 1
+    },
+    "after_data": {
+      "changes": [],
+      "lottery_campaign_id": 1
+    },
+    "changed_fields": null,
+    "reason": "应用模拟记录 #648 的配置到活动 #1",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "simulation_apply_648_1783705774462",
+    "created_at": "2026-07-11 01:49:34",
+    "target_type_raw": null,
+    "is_reversible": 1,
+    "reversal_data": {},
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "high",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9419,
+    "operator_id": 32,
+    "operation_type": "simulation_apply",
+    "target_type": "lottery_simulation_record",
+    "target_id": 650,
+    "action": "schedule",
+    "before_data": null,
+    "after_data": {
+      "changes": [],
+      "scheduled_at": "2026-07-11T17:53:31.312Z"
+    },
+    "changed_fields": null,
+    "reason": "定时应用模拟记录 #650，计划生效时间: 2026-07-11T17:53:31.312Z",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "simulation_schedule_650_1783706011335",
+    "created_at": "2026-07-11 01:53:31",
+    "target_type_raw": null,
+    "is_reversible": 1,
+    "reversal_data": null,
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "high",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  },
+  {
+    "admin_operation_log_id": 9420,
+    "operator_id": 32,
+    "operation_type": "simulation_apply",
+    "target_type": "lottery_simulation_record",
+    "target_id": 651,
+    "action": "update",
+    "before_data": {
+      "lottery_campaign_id": 1
+    },
+    "after_data": {
+      "changes": [],
+      "lottery_campaign_id": 1
+    },
+    "changed_fields": null,
+    "reason": "应用模拟记录 #651 的配置到活动 #1",
+    "ip_address": null,
+    "user_agent": null,
+    "idempotency_key": "simulation_apply_651_1783706011418",
+    "created_at": "2026-07-11 01:53:31",
+    "target_type_raw": null,
+    "is_reversible": 1,
+    "reversal_data": {},
+    "is_reversed": 0,
+    "reversed_at": null,
+    "reversed_by": null,
+    "risk_level": "high",
+    "requires_approval": 0,
+    "approval_status": "not_required",
+    "affected_users": 0,
+    "affected_amount": 0,
+    "rollback_deadline": null
+  }
+]

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>运营分析 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+
+
+  <!-- ECharts 已通过 main.js 统一导入，无需 CDN -->
+  <script type="module" crossorigin src="/admin/assets/analytics-BH-Tx3jb.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/analytics-DkSxC_wQ.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/core-CTP2NuwM.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/advanced-ChmRjD2s.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-CjaK2zlZ.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
+        <span class="text-lg font-semibold">📈 运营分析</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="analyticsPage()" x-init="init()">
+    
+    <!-- 时间筛选 -->
+    <div class="themed-card rounded-lg shadow p-4 mb-6">
+      <div class="flex items-center space-x-4">
+        <span class="themed-text-muted">时间范围：</span>
+        <button @click="setDateRange('today')" :class="filters.time_range === '1' ? 'themed-btn-primary' : 'themed-bg-subtle'" class="px-4 py-2 rounded">今日</button>
+        <button @click="setDateRange('week')" :class="filters.time_range === '7' ? 'themed-btn-primary' : 'themed-bg-subtle'" class="px-4 py-2 rounded">本周</button>
+        <button @click="setDateRange('month')" :class="filters.time_range === '30' ? 'themed-btn-primary' : 'themed-bg-subtle'" class="px-4 py-2 rounded">本月</button>
+        <input type="date" x-model="filters.start_date" class="px-3 py-2 border rounded">
+        <span>至</span>
+        <input type="date" x-model="filters.end_date" class="px-3 py-2 border rounded">
+        <button @click="loadAllData()" class="px-4 py-2 themed-btn-primary rounded">查询</button>
+      </div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <h6 class="themed-text-muted mb-2">总回馈次数</h6>
+        <h2 class="text-3xl font-bold text-purple-600" x-text="stats.total_draws"></h2>
+      </div>
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <h6 class="themed-text-muted mb-2">高档回馈次数</h6>
+        <h2 class="text-3xl font-bold text-green-600" x-text="stats.high_tier_draws"></h2>
+      </div>
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <h6 class="themed-text-muted mb-2">活跃用户</h6>
+        <h2 class="text-3xl font-bold themed-text-primary" x-text="stats.active_users"></h2>
+      </div>
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <h6 class="themed-text-muted mb-2">积分消耗</h6>
+        <h2 class="text-3xl font-bold text-yellow-600" x-text="stats.points_consumed"></h2>
+      </div>
+    </div>
+
+    <!-- 图表区域 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="themed-card rounded-lg shadow p-6">
+        <h5 class="font-semibold mb-4">用户活跃趋势</h5>
+        <div id="userTrendChart" class="h-80" x-ref="userTrendChart"></div>
+      </div>
+      <div class="themed-card rounded-lg shadow p-6">
+        <h5 class="font-semibold mb-4">回馈趋势</h5>
+        <div id="lotteryTrendChart" class="h-80" x-ref="lotteryTrendChart"></div>
+      </div>
+      <div class="themed-card rounded-lg shadow p-6">
+        <h5 class="font-semibold mb-4">积分流转趋势</h5>
+        <div id="pointsFlowChart" class="h-80" x-ref="pointsFlowChart"></div>
+      </div>
+      <div class="themed-card rounded-lg shadow p-6">
+        <h5 class="font-semibold mb-4">用户类型分布</h5>
+        <div id="userSourceChart" class="h-80" x-ref="userSourceChart"></div>
+      </div>
+      <div class="themed-card rounded-lg shadow p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h5 class="font-semibold">预算分层分布</h5>
+          <select x-model="filters.lottery_campaign_id" @change="onCampaignChange()"
+                  class="px-3 py-1.5 border rounded text-sm">
+            <template x-for="c in campaignOptions" :key="c.lottery_campaign_id">
+              <option :value="c.lottery_campaign_id" x-text="c.campaign_name"></option>
+            </template>
+          </select>
+        </div>
+        <div id="tierDistChart" class="h-80" x-ref="tierDistChart"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 页面专属逻辑 -->
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+
+
+</body>
+</html>
+

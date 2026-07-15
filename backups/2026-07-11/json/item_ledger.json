@@ -1,0 +1,5324 @@
+[
+  {
+    "ledger_entry_id": 31889,
+    "item_id": 45527,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636885194_v0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:41:29"
+  },
+  {
+    "ledger_entry_id": 31890,
+    "item_id": 45527,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636885194_v0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:41:29"
+  },
+  {
+    "ledger_entry_id": 31891,
+    "item_id": 45528,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636885194_v1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:41:29"
+  },
+  {
+    "ledger_entry_id": 31892,
+    "item_id": 45528,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636885194_v1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:41:29"
+  },
+  {
+    "ledger_entry_id": 31893,
+    "item_id": 45529,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636885194_v2:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:41:29"
+  },
+  {
+    "ledger_entry_id": 31894,
+    "item_id": 45529,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636885194_v2:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:41:29"
+  },
+  {
+    "ledger_entry_id": 31895,
+    "item_id": 45530,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636885194_v3:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:41:29"
+  },
+  {
+    "ledger_entry_id": 31896,
+    "item_id": 45530,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636885194_v3:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:41:29"
+  },
+  {
+    "ledger_entry_id": 31897,
+    "item_id": 45531,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636885194_p0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:41:29"
+  },
+  {
+    "ledger_entry_id": 31898,
+    "item_id": 45531,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636885194_p0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:41:29"
+  },
+  {
+    "ledger_entry_id": 31899,
+    "item_id": 45532,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636885194_p1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:41:29"
+  },
+  {
+    "ledger_entry_id": 31900,
+    "item_id": 45532,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636885194_p1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:41:29"
+  },
+  {
+    "ledger_entry_id": 31901,
+    "item_id": 45527,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783636885194_success_45527:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783636885194",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 06:41:29"
+  },
+  {
+    "ledger_entry_id": 31902,
+    "item_id": 45527,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783636885194_success_45527:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783636885194",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 06:41:29"
+  },
+  {
+    "ledger_entry_id": 31903,
+    "item_id": 45533,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783636885194_success:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783636885194",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45527"
+      ]
+    },
+    "created_at": "2026-07-10 06:41:29"
+  },
+  {
+    "ledger_entry_id": 31904,
+    "item_id": 45533,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783636885194_success:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783636885194",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45527"
+      ]
+    },
+    "created_at": "2026-07-10 06:41:29"
+  },
+  {
+    "ledger_entry_id": 31905,
+    "item_id": 45531,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783636885194_physical_45531:out",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783636885194",
+      "output_exchange_item_id": 672
+    },
+    "created_at": "2026-07-10 06:41:30"
+  },
+  {
+    "ledger_entry_id": 31906,
+    "item_id": 45531,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783636885194_physical_45531:in",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783636885194",
+      "output_exchange_item_id": 672
+    },
+    "created_at": "2026-07-10 06:41:30"
+  },
+  {
+    "ledger_entry_id": 31907,
+    "item_id": 45534,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636967967_v0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:42:50"
+  },
+  {
+    "ledger_entry_id": 31908,
+    "item_id": 45534,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636967967_v0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:42:50"
+  },
+  {
+    "ledger_entry_id": 31909,
+    "item_id": 45535,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636967967_v1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:42:50"
+  },
+  {
+    "ledger_entry_id": 31910,
+    "item_id": 45535,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636967967_v1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:42:50"
+  },
+  {
+    "ledger_entry_id": 31911,
+    "item_id": 45536,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636967967_v2:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:42:50"
+  },
+  {
+    "ledger_entry_id": 31912,
+    "item_id": 45536,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636967967_v2:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:42:50"
+  },
+  {
+    "ledger_entry_id": 31913,
+    "item_id": 45537,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636967967_v3:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:42:50"
+  },
+  {
+    "ledger_entry_id": 31914,
+    "item_id": 45537,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636967967_v3:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:42:50"
+  },
+  {
+    "ledger_entry_id": 31915,
+    "item_id": 45538,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636967967_p0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:42:50"
+  },
+  {
+    "ledger_entry_id": 31916,
+    "item_id": 45538,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636967967_p0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:42:50"
+  },
+  {
+    "ledger_entry_id": 31917,
+    "item_id": 45539,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636967967_p1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:42:50"
+  },
+  {
+    "ledger_entry_id": 31918,
+    "item_id": 45539,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783636967967_p1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:42:50"
+  },
+  {
+    "ledger_entry_id": 31919,
+    "item_id": 45538,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783636967967_physical_45538:out",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783636967967",
+      "output_exchange_item_id": 674
+    },
+    "created_at": "2026-07-10 06:42:53"
+  },
+  {
+    "ledger_entry_id": 31920,
+    "item_id": 45538,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783636967967_physical_45538:in",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783636967967",
+      "output_exchange_item_id": 674
+    },
+    "created_at": "2026-07-10 06:42:53"
+  },
+  {
+    "ledger_entry_id": 31921,
+    "item_id": 45540,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783637034635_v0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:43:56"
+  },
+  {
+    "ledger_entry_id": 31922,
+    "item_id": 45540,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783637034635_v0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:43:56"
+  },
+  {
+    "ledger_entry_id": 31923,
+    "item_id": 45541,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783637034635_v1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:43:56"
+  },
+  {
+    "ledger_entry_id": 31924,
+    "item_id": 45541,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783637034635_v1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:43:56"
+  },
+  {
+    "ledger_entry_id": 31925,
+    "item_id": 45542,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783637034635_v2:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:43:56"
+  },
+  {
+    "ledger_entry_id": 31926,
+    "item_id": 45542,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783637034635_v2:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:43:56"
+  },
+  {
+    "ledger_entry_id": 31927,
+    "item_id": 45543,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783637034635_v3:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:43:56"
+  },
+  {
+    "ledger_entry_id": 31928,
+    "item_id": 45543,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783637034635_v3:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:43:56"
+  },
+  {
+    "ledger_entry_id": 31929,
+    "item_id": 45544,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783637034635_p0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:43:56"
+  },
+  {
+    "ledger_entry_id": 31930,
+    "item_id": 45544,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783637034635_p0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:43:56"
+  },
+  {
+    "ledger_entry_id": 31931,
+    "item_id": 45545,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783637034635_p1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:43:56"
+  },
+  {
+    "ledger_entry_id": 31932,
+    "item_id": 45545,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783637034635_p1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 06:43:56"
+  },
+  {
+    "ledger_entry_id": 31933,
+    "item_id": 45540,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783637034635_success_45540:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783637034635",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 06:43:57"
+  },
+  {
+    "ledger_entry_id": 31934,
+    "item_id": 45540,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783637034635_success_45540:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783637034635",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 06:43:57"
+  },
+  {
+    "ledger_entry_id": 31935,
+    "item_id": 45546,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783637034635_success:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783637034635",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45540"
+      ]
+    },
+    "created_at": "2026-07-10 06:43:57"
+  },
+  {
+    "ledger_entry_id": 31936,
+    "item_id": 45546,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783637034635_success:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783637034635",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45540"
+      ]
+    },
+    "created_at": "2026-07-10 06:43:57"
+  },
+  {
+    "ledger_entry_id": 31937,
+    "item_id": 45541,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783637034635_limit2_45541:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783637034635",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 06:43:57"
+  },
+  {
+    "ledger_entry_id": 31938,
+    "item_id": 45541,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783637034635_limit2_45541:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783637034635",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 06:43:57"
+  },
+  {
+    "ledger_entry_id": 31939,
+    "item_id": 45547,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783637034635_limit2:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783637034635",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45541"
+      ]
+    },
+    "created_at": "2026-07-10 06:43:57"
+  },
+  {
+    "ledger_entry_id": 31940,
+    "item_id": 45547,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783637034635_limit2:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783637034635",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45541"
+      ]
+    },
+    "created_at": "2026-07-10 06:43:57"
+  },
+  {
+    "ledger_entry_id": 31941,
+    "item_id": 45544,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783637034635_physical_45544:out",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783637034635",
+      "output_exchange_item_id": 676
+    },
+    "created_at": "2026-07-10 06:43:57"
+  },
+  {
+    "ledger_entry_id": 31942,
+    "item_id": 45544,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783637034635_physical_45544:in",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783637034635",
+      "output_exchange_item_id": 676
+    },
+    "created_at": "2026-07-10 06:43:57"
+  },
+  {
+    "ledger_entry_id": 31943,
+    "item_id": 45548,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783650932810_v0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 10:35:34"
+  },
+  {
+    "ledger_entry_id": 31944,
+    "item_id": 45548,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783650932810_v0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 10:35:34"
+  },
+  {
+    "ledger_entry_id": 31945,
+    "item_id": 45549,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783650932810_v1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 10:35:34"
+  },
+  {
+    "ledger_entry_id": 31946,
+    "item_id": 45549,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783650932810_v1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 10:35:34"
+  },
+  {
+    "ledger_entry_id": 31947,
+    "item_id": 45550,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783650932810_v2:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 10:35:34"
+  },
+  {
+    "ledger_entry_id": 31948,
+    "item_id": 45550,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783650932810_v2:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 10:35:34"
+  },
+  {
+    "ledger_entry_id": 31949,
+    "item_id": 45551,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783650932810_v3:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 10:35:34"
+  },
+  {
+    "ledger_entry_id": 31950,
+    "item_id": 45551,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783650932810_v3:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 10:35:34"
+  },
+  {
+    "ledger_entry_id": 31951,
+    "item_id": 45552,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783650932810_p0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 10:35:34"
+  },
+  {
+    "ledger_entry_id": 31952,
+    "item_id": 45552,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783650932810_p0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 10:35:34"
+  },
+  {
+    "ledger_entry_id": 31953,
+    "item_id": 45553,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783650932810_p1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 10:35:35"
+  },
+  {
+    "ledger_entry_id": 31954,
+    "item_id": 45553,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783650932810_p1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 10:35:35"
+  },
+  {
+    "ledger_entry_id": 31955,
+    "item_id": 45548,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783650932810_success_45548:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783650932810",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 10:35:35"
+  },
+  {
+    "ledger_entry_id": 31956,
+    "item_id": 45548,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783650932810_success_45548:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783650932810",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 10:35:35"
+  },
+  {
+    "ledger_entry_id": 31957,
+    "item_id": 45554,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783650932810_success:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783650932810",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45548"
+      ]
+    },
+    "created_at": "2026-07-10 10:35:35"
+  },
+  {
+    "ledger_entry_id": 31958,
+    "item_id": 45554,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783650932810_success:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783650932810",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45548"
+      ]
+    },
+    "created_at": "2026-07-10 10:35:35"
+  },
+  {
+    "ledger_entry_id": 31959,
+    "item_id": 45549,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783650932810_limit2_45549:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783650932810",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 10:35:35"
+  },
+  {
+    "ledger_entry_id": 31960,
+    "item_id": 45549,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783650932810_limit2_45549:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783650932810",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 10:35:35"
+  },
+  {
+    "ledger_entry_id": 31961,
+    "item_id": 45555,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783650932810_limit2:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783650932810",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45549"
+      ]
+    },
+    "created_at": "2026-07-10 10:35:35"
+  },
+  {
+    "ledger_entry_id": 31962,
+    "item_id": 45555,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783650932810_limit2:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783650932810",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45549"
+      ]
+    },
+    "created_at": "2026-07-10 10:35:35"
+  },
+  {
+    "ledger_entry_id": 31963,
+    "item_id": 45552,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783650932810_physical_45552:out",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783650932810",
+      "output_exchange_item_id": 678
+    },
+    "created_at": "2026-07-10 10:35:35"
+  },
+  {
+    "ledger_entry_id": 31964,
+    "item_id": 45552,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783650932810_physical_45552:in",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783650932810",
+      "output_exchange_item_id": 678
+    },
+    "created_at": "2026-07-10 10:35:35"
+  },
+  {
+    "ledger_entry_id": 31965,
+    "item_id": 45556,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670610130_v0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:03:32"
+  },
+  {
+    "ledger_entry_id": 31966,
+    "item_id": 45556,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670610130_v0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:03:32"
+  },
+  {
+    "ledger_entry_id": 31967,
+    "item_id": 45557,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670610130_v1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:03:32"
+  },
+  {
+    "ledger_entry_id": 31968,
+    "item_id": 45557,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670610130_v1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:03:32"
+  },
+  {
+    "ledger_entry_id": 31969,
+    "item_id": 45558,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670610130_v2:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:03:32"
+  },
+  {
+    "ledger_entry_id": 31970,
+    "item_id": 45558,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670610130_v2:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:03:32"
+  },
+  {
+    "ledger_entry_id": 31971,
+    "item_id": 45559,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670610130_v3:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:03:32"
+  },
+  {
+    "ledger_entry_id": 31972,
+    "item_id": 45559,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670610130_v3:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:03:32"
+  },
+  {
+    "ledger_entry_id": 31973,
+    "item_id": 45560,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670610130_p0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:03:32"
+  },
+  {
+    "ledger_entry_id": 31974,
+    "item_id": 45560,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670610130_p0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:03:32"
+  },
+  {
+    "ledger_entry_id": 31975,
+    "item_id": 45561,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670610130_p1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:03:32"
+  },
+  {
+    "ledger_entry_id": 31976,
+    "item_id": 45561,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670610130_p1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:03:32"
+  },
+  {
+    "ledger_entry_id": 31977,
+    "item_id": 45556,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783670610130_success_45556:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783670610130",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 16:03:33"
+  },
+  {
+    "ledger_entry_id": 31978,
+    "item_id": 45556,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783670610130_success_45556:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783670610130",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 16:03:33"
+  },
+  {
+    "ledger_entry_id": 31979,
+    "item_id": 45562,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783670610130_success:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783670610130",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45556"
+      ]
+    },
+    "created_at": "2026-07-10 16:03:33"
+  },
+  {
+    "ledger_entry_id": 31980,
+    "item_id": 45562,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783670610130_success:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783670610130",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45556"
+      ]
+    },
+    "created_at": "2026-07-10 16:03:33"
+  },
+  {
+    "ledger_entry_id": 31981,
+    "item_id": 45557,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783670610130_limit2_45557:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783670610130",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 16:03:33"
+  },
+  {
+    "ledger_entry_id": 31982,
+    "item_id": 45557,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783670610130_limit2_45557:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783670610130",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 16:03:33"
+  },
+  {
+    "ledger_entry_id": 31983,
+    "item_id": 45563,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783670610130_limit2:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783670610130",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45557"
+      ]
+    },
+    "created_at": "2026-07-10 16:03:33"
+  },
+  {
+    "ledger_entry_id": 31984,
+    "item_id": 45563,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783670610130_limit2:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783670610130",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45557"
+      ]
+    },
+    "created_at": "2026-07-10 16:03:33"
+  },
+  {
+    "ledger_entry_id": 31985,
+    "item_id": 45560,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783670610130_physical_45560:out",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783670610130",
+      "output_exchange_item_id": 680
+    },
+    "created_at": "2026-07-10 16:03:33"
+  },
+  {
+    "ledger_entry_id": 31986,
+    "item_id": 45560,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783670610130_physical_45560:in",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783670610130",
+      "output_exchange_item_id": 680
+    },
+    "created_at": "2026-07-10 16:03:33"
+  },
+  {
+    "ledger_entry_id": 31987,
+    "item_id": 45564,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670784695_v0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:06:26"
+  },
+  {
+    "ledger_entry_id": 31988,
+    "item_id": 45564,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670784695_v0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:06:26"
+  },
+  {
+    "ledger_entry_id": 31989,
+    "item_id": 45565,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670784695_v1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 31990,
+    "item_id": 45565,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670784695_v1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 31991,
+    "item_id": 45566,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670784695_v2:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 31992,
+    "item_id": 45566,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670784695_v2:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 31993,
+    "item_id": 45567,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670784695_v3:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 31994,
+    "item_id": 45567,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670784695_v3:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 31995,
+    "item_id": 45568,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670784695_p0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 31996,
+    "item_id": 45568,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670784695_p0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 31997,
+    "item_id": 45569,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670784695_p1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 31998,
+    "item_id": 45569,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783670784695_p1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 31999,
+    "item_id": 45564,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783670784695_success_45564:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783670784695",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 32000,
+    "item_id": 45564,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783670784695_success_45564:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783670784695",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 32001,
+    "item_id": 45570,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783670784695_success:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783670784695",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45564"
+      ]
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 32002,
+    "item_id": 45570,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783670784695_success:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783670784695",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45564"
+      ]
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 32003,
+    "item_id": 45565,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783670784695_limit2_45565:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783670784695",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 32004,
+    "item_id": 45565,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783670784695_limit2_45565:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783670784695",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 32005,
+    "item_id": 45571,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783670784695_limit2:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783670784695",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45565"
+      ]
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 32006,
+    "item_id": 45571,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783670784695_limit2:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783670784695",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45565"
+      ]
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 32007,
+    "item_id": 45568,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783670784695_physical_45568:out",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783670784695",
+      "output_exchange_item_id": 682
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 32008,
+    "item_id": 45568,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783670784695_physical_45568:in",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783670784695",
+      "output_exchange_item_id": 682
+    },
+    "created_at": "2026-07-10 16:06:27"
+  },
+  {
+    "ledger_entry_id": 32009,
+    "item_id": 45572,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783700233858_v0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 00:17:16"
+  },
+  {
+    "ledger_entry_id": 32010,
+    "item_id": 45572,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783700233858_v0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 00:17:16"
+  },
+  {
+    "ledger_entry_id": 32011,
+    "item_id": 45573,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783700233858_v1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 00:17:16"
+  },
+  {
+    "ledger_entry_id": 32012,
+    "item_id": 45573,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783700233858_v1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 00:17:16"
+  },
+  {
+    "ledger_entry_id": 32013,
+    "item_id": 45574,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783700233858_v2:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 00:17:16"
+  },
+  {
+    "ledger_entry_id": 32014,
+    "item_id": 45574,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783700233858_v2:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 00:17:16"
+  },
+  {
+    "ledger_entry_id": 32015,
+    "item_id": 45575,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783700233858_v3:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 00:17:16"
+  },
+  {
+    "ledger_entry_id": 32016,
+    "item_id": 45575,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783700233858_v3:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 00:17:16"
+  },
+  {
+    "ledger_entry_id": 32017,
+    "item_id": 45576,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783700233858_p0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 00:17:16"
+  },
+  {
+    "ledger_entry_id": 32018,
+    "item_id": 45576,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783700233858_p0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 00:17:16"
+  },
+  {
+    "ledger_entry_id": 32019,
+    "item_id": 45577,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783700233858_p1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 00:17:16"
+  },
+  {
+    "ledger_entry_id": 32020,
+    "item_id": 45577,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783700233858_p1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 00:17:16"
+  },
+  {
+    "ledger_entry_id": 32021,
+    "item_id": 45572,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783700233858_success_45572:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783700233858",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-11 00:17:16"
+  },
+  {
+    "ledger_entry_id": 32022,
+    "item_id": 45572,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783700233858_success_45572:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783700233858",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-11 00:17:16"
+  },
+  {
+    "ledger_entry_id": 32023,
+    "item_id": 45578,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783700233858_success:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783700233858",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45572"
+      ]
+    },
+    "created_at": "2026-07-11 00:17:16"
+  },
+  {
+    "ledger_entry_id": 32024,
+    "item_id": 45578,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783700233858_success:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783700233858",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45572"
+      ]
+    },
+    "created_at": "2026-07-11 00:17:16"
+  },
+  {
+    "ledger_entry_id": 32025,
+    "item_id": 45573,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783700233858_limit2_45573:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783700233858",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-11 00:17:17"
+  },
+  {
+    "ledger_entry_id": 32026,
+    "item_id": 45573,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783700233858_limit2_45573:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783700233858",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-11 00:17:17"
+  },
+  {
+    "ledger_entry_id": 32027,
+    "item_id": 45579,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783700233858_limit2:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783700233858",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45573"
+      ]
+    },
+    "created_at": "2026-07-11 00:17:17"
+  },
+  {
+    "ledger_entry_id": 32028,
+    "item_id": 45579,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783700233858_limit2:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783700233858",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45573"
+      ]
+    },
+    "created_at": "2026-07-11 00:17:17"
+  },
+  {
+    "ledger_entry_id": 32029,
+    "item_id": 45576,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783700233858_physical_45576:out",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783700233858",
+      "output_exchange_item_id": 687
+    },
+    "created_at": "2026-07-11 00:17:17"
+  },
+  {
+    "ledger_entry_id": 32030,
+    "item_id": 45576,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783700233858_physical_45576:in",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783700233858",
+      "output_exchange_item_id": 687
+    },
+    "created_at": "2026-07-11 00:17:17"
+  },
+  {
+    "ledger_entry_id": 32031,
+    "item_id": 45580,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783702906304_v0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:01:48"
+  },
+  {
+    "ledger_entry_id": 32032,
+    "item_id": 45580,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783702906304_v0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:01:48"
+  },
+  {
+    "ledger_entry_id": 32033,
+    "item_id": 45581,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783702906304_v1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:01:48"
+  },
+  {
+    "ledger_entry_id": 32034,
+    "item_id": 45581,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783702906304_v1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:01:48"
+  },
+  {
+    "ledger_entry_id": 32035,
+    "item_id": 45582,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783702906304_v2:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:01:48"
+  },
+  {
+    "ledger_entry_id": 32036,
+    "item_id": 45582,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783702906304_v2:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:01:48"
+  },
+  {
+    "ledger_entry_id": 32037,
+    "item_id": 45583,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783702906304_v3:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:01:48"
+  },
+  {
+    "ledger_entry_id": 32038,
+    "item_id": 45583,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783702906304_v3:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:01:48"
+  },
+  {
+    "ledger_entry_id": 32039,
+    "item_id": 45584,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783702906304_p0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:01:48"
+  },
+  {
+    "ledger_entry_id": 32040,
+    "item_id": 45584,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783702906304_p0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:01:48"
+  },
+  {
+    "ledger_entry_id": 32041,
+    "item_id": 45585,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783702906304_p1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:01:48"
+  },
+  {
+    "ledger_entry_id": 32042,
+    "item_id": 45585,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783702906304_p1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:01:48"
+  },
+  {
+    "ledger_entry_id": 32043,
+    "item_id": 45580,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783702906304_success_45580:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783702906304",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-11 01:01:49"
+  },
+  {
+    "ledger_entry_id": 32044,
+    "item_id": 45580,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783702906304_success_45580:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783702906304",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-11 01:01:49"
+  },
+  {
+    "ledger_entry_id": 32045,
+    "item_id": 45586,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783702906304_success:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783702906304",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45580"
+      ]
+    },
+    "created_at": "2026-07-11 01:01:49"
+  },
+  {
+    "ledger_entry_id": 32046,
+    "item_id": 45586,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783702906304_success:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783702906304",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45580"
+      ]
+    },
+    "created_at": "2026-07-11 01:01:49"
+  },
+  {
+    "ledger_entry_id": 32047,
+    "item_id": 45581,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783702906304_limit2_45581:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783702906304",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-11 01:01:49"
+  },
+  {
+    "ledger_entry_id": 32048,
+    "item_id": 45581,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783702906304_limit2_45581:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783702906304",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-11 01:01:49"
+  },
+  {
+    "ledger_entry_id": 32049,
+    "item_id": 45587,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783702906304_limit2:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783702906304",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45581"
+      ]
+    },
+    "created_at": "2026-07-11 01:01:49"
+  },
+  {
+    "ledger_entry_id": 32050,
+    "item_id": 45587,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783702906304_limit2:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783702906304",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45581"
+      ]
+    },
+    "created_at": "2026-07-11 01:01:49"
+  },
+  {
+    "ledger_entry_id": 32051,
+    "item_id": 45584,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783702906304_physical_45584:out",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783702906304",
+      "output_exchange_item_id": 691
+    },
+    "created_at": "2026-07-11 01:01:49"
+  },
+  {
+    "ledger_entry_id": 32052,
+    "item_id": 45584,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783702906304_physical_45584:in",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783702906304",
+      "output_exchange_item_id": 691
+    },
+    "created_at": "2026-07-11 01:01:49"
+  },
+  {
+    "ledger_entry_id": 32053,
+    "item_id": 45588,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783703713160_v0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32054,
+    "item_id": 45588,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783703713160_v0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32055,
+    "item_id": 45589,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783703713160_v1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32056,
+    "item_id": 45589,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783703713160_v1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32057,
+    "item_id": 45590,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783703713160_v2:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32058,
+    "item_id": 45590,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783703713160_v2:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32059,
+    "item_id": 45591,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783703713160_v3:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32060,
+    "item_id": 45591,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783703713160_v3:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32061,
+    "item_id": 45592,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783703713160_p0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32062,
+    "item_id": 45592,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783703713160_p0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32063,
+    "item_id": 45593,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783703713160_p1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32064,
+    "item_id": 45593,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783703713160_p1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32065,
+    "item_id": 45588,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783703713160_success_45588:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783703713160",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32066,
+    "item_id": 45588,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783703713160_success_45588:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783703713160",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32067,
+    "item_id": 45594,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783703713160_success:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783703713160",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45588"
+      ]
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32068,
+    "item_id": 45594,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783703713160_success:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783703713160",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45588"
+      ]
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32069,
+    "item_id": 45589,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783703713160_limit2_45589:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783703713160",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32070,
+    "item_id": 45589,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783703713160_limit2_45589:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783703713160",
+      "output_exchange_item_id": "633"
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32071,
+    "item_id": 45595,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783703713160_limit2:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783703713160",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45589"
+      ]
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32072,
+    "item_id": 45595,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783703713160_limit2:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783703713160",
+      "source_ref_id": "633",
+      "consumed_item_ids": [
+        "45589"
+      ]
+    },
+    "created_at": "2026-07-11 01:15:15"
+  },
+  {
+    "ledger_entry_id": 32073,
+    "item_id": 45592,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783703713160_physical_45592:out",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783703713160",
+      "output_exchange_item_id": 695
+    },
+    "created_at": "2026-07-11 01:15:16"
+  },
+  {
+    "ledger_entry_id": 32074,
+    "item_id": 45592,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783703713160_physical_45592:in",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783703713160",
+      "output_exchange_item_id": 695
+    },
+    "created_at": "2026-07-11 01:15:16"
+  },
+  {
+    "ledger_entry_id": 32075,
+    "item_id": 45533,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45533:out",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32076,
+    "item_id": 45533,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45533:in",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32077,
+    "item_id": 45546,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45546:out",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32078,
+    "item_id": 45546,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45546:in",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32079,
+    "item_id": 45547,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45547:out",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32080,
+    "item_id": 45547,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45547:in",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32081,
+    "item_id": 45554,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45554:out",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32082,
+    "item_id": 45554,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45554:in",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32083,
+    "item_id": 45555,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45555:out",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32084,
+    "item_id": 45555,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45555:in",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32085,
+    "item_id": 45562,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45562:out",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32086,
+    "item_id": 45562,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45562:in",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32087,
+    "item_id": 45563,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45563:out",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32088,
+    "item_id": 45563,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45563:in",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32089,
+    "item_id": 45570,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45570:out",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32090,
+    "item_id": 45570,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45570:in",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32091,
+    "item_id": 45571,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45571:out",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32092,
+    "item_id": 45571,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45571:in",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32093,
+    "item_id": 45578,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45578:out",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32094,
+    "item_id": 45578,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45578:in",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32095,
+    "item_id": 45579,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45579:out",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32096,
+    "item_id": 45579,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45579:in",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32097,
+    "item_id": 45586,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45586:out",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32098,
+    "item_id": 45586,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45586:in",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32099,
+    "item_id": 45587,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45587:out",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32100,
+    "item_id": 45587,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45587:in",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32101,
+    "item_id": 45594,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45594:out",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32102,
+    "item_id": 45594,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45594:in",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32103,
+    "item_id": 45595,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45595:out",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32104,
+    "item_id": 45595,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "expire",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "auto_expire",
+    "idempotency_key": "expire_45595:in",
+    "meta": {
+      "reason": "换物产出缺陷物品作废：产出商品未挂 item_template_id 被误当券铸造（2026-07-11 根因已修复，BARTER_OUTPUT_TEMPLATE_MISSING 守卫上线）"
+    },
+    "created_at": "2026-07-11 01:28:29"
+  },
+  {
+    "ledger_entry_id": 32113,
+    "item_id": 45598,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705488896_v0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:44:50"
+  },
+  {
+    "ledger_entry_id": 32114,
+    "item_id": 45598,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705488896_v0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:44:50"
+  },
+  {
+    "ledger_entry_id": 32115,
+    "item_id": 45599,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705488896_v1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:44:50"
+  },
+  {
+    "ledger_entry_id": 32116,
+    "item_id": 45599,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705488896_v1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:44:50"
+  },
+  {
+    "ledger_entry_id": 32117,
+    "item_id": 45600,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705488896_v2:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:44:50"
+  },
+  {
+    "ledger_entry_id": 32118,
+    "item_id": 45600,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705488896_v2:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:44:50"
+  },
+  {
+    "ledger_entry_id": 32119,
+    "item_id": 45601,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705488896_v3:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:44:50"
+  },
+  {
+    "ledger_entry_id": 32120,
+    "item_id": 45601,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705488896_v3:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:44:50"
+  },
+  {
+    "ledger_entry_id": 32121,
+    "item_id": 45602,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705488896_p0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:44:50"
+  },
+  {
+    "ledger_entry_id": 32122,
+    "item_id": 45602,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705488896_p0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:44:50"
+  },
+  {
+    "ledger_entry_id": 32123,
+    "item_id": 45603,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705488896_p1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:44:50"
+  },
+  {
+    "ledger_entry_id": 32124,
+    "item_id": 45603,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705488896_p1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:44:50"
+  },
+  {
+    "ledger_entry_id": 32125,
+    "item_id": 45598,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705488896_success_45598:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783705488896",
+      "output_exchange_item_id": 698
+    },
+    "created_at": "2026-07-11 01:44:51"
+  },
+  {
+    "ledger_entry_id": 32126,
+    "item_id": 45598,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705488896_success_45598:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783705488896",
+      "output_exchange_item_id": 698
+    },
+    "created_at": "2026-07-11 01:44:51"
+  },
+  {
+    "ledger_entry_id": 32127,
+    "item_id": 45604,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783705488896_success:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783705488896",
+      "source_ref_id": "698",
+      "consumed_item_ids": [
+        "45598"
+      ]
+    },
+    "created_at": "2026-07-11 01:44:51"
+  },
+  {
+    "ledger_entry_id": 32128,
+    "item_id": 45604,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783705488896_success:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783705488896",
+      "source_ref_id": "698",
+      "consumed_item_ids": [
+        "45598"
+      ]
+    },
+    "created_at": "2026-07-11 01:44:51"
+  },
+  {
+    "ledger_entry_id": 32129,
+    "item_id": 45599,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705488896_limit2_45599:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783705488896",
+      "output_exchange_item_id": 698
+    },
+    "created_at": "2026-07-11 01:44:51"
+  },
+  {
+    "ledger_entry_id": 32130,
+    "item_id": 45599,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705488896_limit2_45599:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783705488896",
+      "output_exchange_item_id": 698
+    },
+    "created_at": "2026-07-11 01:44:51"
+  },
+  {
+    "ledger_entry_id": 32131,
+    "item_id": 45605,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783705488896_limit2:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783705488896",
+      "source_ref_id": "698",
+      "consumed_item_ids": [
+        "45599"
+      ]
+    },
+    "created_at": "2026-07-11 01:44:51"
+  },
+  {
+    "ledger_entry_id": 32132,
+    "item_id": 45605,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783705488896_limit2:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783705488896",
+      "source_ref_id": "698",
+      "consumed_item_ids": [
+        "45599"
+      ]
+    },
+    "created_at": "2026-07-11 01:44:51"
+  },
+  {
+    "ledger_entry_id": 32133,
+    "item_id": 45602,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705488896_physical_45602:out",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783705488896",
+      "output_exchange_item_id": 700
+    },
+    "created_at": "2026-07-11 01:44:51"
+  },
+  {
+    "ledger_entry_id": 32134,
+    "item_id": 45602,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705488896_physical_45602:in",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783705488896",
+      "output_exchange_item_id": 700
+    },
+    "created_at": "2026-07-11 01:44:51"
+  },
+  {
+    "ledger_entry_id": 32147,
+    "item_id": 45609,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705733622_v0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32148,
+    "item_id": 45609,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705733622_v0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32149,
+    "item_id": 45610,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705733622_v1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32150,
+    "item_id": 45610,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705733622_v1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32151,
+    "item_id": 45611,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705733622_v2:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32152,
+    "item_id": 45611,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705733622_v2:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32153,
+    "item_id": 45612,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705733622_v3:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32154,
+    "item_id": 45612,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705733622_v3:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32155,
+    "item_id": 45613,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705733622_p0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32156,
+    "item_id": 45613,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705733622_p0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32157,
+    "item_id": 45614,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705733622_p1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32158,
+    "item_id": 45614,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705733622_p1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32159,
+    "item_id": 45609,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705733622_success_45609:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783705733622",
+      "output_exchange_item_id": 720
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32160,
+    "item_id": 45609,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705733622_success_45609:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783705733622",
+      "output_exchange_item_id": 720
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32161,
+    "item_id": 45615,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783705733622_success:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783705733622",
+      "source_ref_id": "720",
+      "consumed_item_ids": [
+        "45609"
+      ]
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32162,
+    "item_id": 45615,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783705733622_success:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783705733622",
+      "source_ref_id": "720",
+      "consumed_item_ids": [
+        "45609"
+      ]
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32163,
+    "item_id": 45610,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705733622_limit2_45610:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783705733622",
+      "output_exchange_item_id": 720
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32164,
+    "item_id": 45610,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705733622_limit2_45610:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783705733622",
+      "output_exchange_item_id": 720
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32165,
+    "item_id": 45616,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783705733622_limit2:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783705733622",
+      "source_ref_id": "720",
+      "consumed_item_ids": [
+        "45610"
+      ]
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32166,
+    "item_id": 45616,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783705733622_limit2:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783705733622",
+      "source_ref_id": "720",
+      "consumed_item_ids": [
+        "45610"
+      ]
+    },
+    "created_at": "2026-07-11 01:48:54"
+  },
+  {
+    "ledger_entry_id": 32167,
+    "item_id": 45613,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705733622_physical_45613:out",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783705733622",
+      "output_exchange_item_id": 722
+    },
+    "created_at": "2026-07-11 01:48:55"
+  },
+  {
+    "ledger_entry_id": 32168,
+    "item_id": 45613,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705733622_physical_45613:in",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783705733622",
+      "output_exchange_item_id": 722
+    },
+    "created_at": "2026-07-11 01:48:55"
+  },
+  {
+    "ledger_entry_id": 32169,
+    "item_id": 45617,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705774978_v0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:49:35"
+  },
+  {
+    "ledger_entry_id": 32170,
+    "item_id": 45617,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705774978_v0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:49:35"
+  },
+  {
+    "ledger_entry_id": 32171,
+    "item_id": 45618,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705774978_v1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:49:35"
+  },
+  {
+    "ledger_entry_id": 32172,
+    "item_id": 45618,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705774978_v1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:49:35"
+  },
+  {
+    "ledger_entry_id": 32173,
+    "item_id": 45619,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705774978_v2:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:49:35"
+  },
+  {
+    "ledger_entry_id": 32174,
+    "item_id": 45619,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705774978_v2:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:49:35"
+  },
+  {
+    "ledger_entry_id": 32175,
+    "item_id": 45620,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705774978_v3:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:49:35"
+  },
+  {
+    "ledger_entry_id": 32176,
+    "item_id": 45620,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705774978_v3:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:49:35"
+  },
+  {
+    "ledger_entry_id": 32177,
+    "item_id": 45621,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705774978_p0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:49:35"
+  },
+  {
+    "ledger_entry_id": 32178,
+    "item_id": 45621,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705774978_p0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:49:35"
+  },
+  {
+    "ledger_entry_id": 32179,
+    "item_id": 45622,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705774978_p1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:49:35"
+  },
+  {
+    "ledger_entry_id": 32180,
+    "item_id": 45622,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783705774978_p1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:49:35"
+  },
+  {
+    "ledger_entry_id": 32181,
+    "item_id": 45617,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705774978_success_45617:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783705774978",
+      "output_exchange_item_id": 724
+    },
+    "created_at": "2026-07-11 01:49:36"
+  },
+  {
+    "ledger_entry_id": 32182,
+    "item_id": 45617,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705774978_success_45617:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783705774978",
+      "output_exchange_item_id": 724
+    },
+    "created_at": "2026-07-11 01:49:36"
+  },
+  {
+    "ledger_entry_id": 32183,
+    "item_id": 45623,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783705774978_success:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783705774978",
+      "source_ref_id": "724",
+      "consumed_item_ids": [
+        "45617"
+      ]
+    },
+    "created_at": "2026-07-11 01:49:36"
+  },
+  {
+    "ledger_entry_id": 32184,
+    "item_id": 45623,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783705774978_success:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783705774978",
+      "source_ref_id": "724",
+      "consumed_item_ids": [
+        "45617"
+      ]
+    },
+    "created_at": "2026-07-11 01:49:36"
+  },
+  {
+    "ledger_entry_id": 32185,
+    "item_id": 45618,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705774978_limit2_45618:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783705774978",
+      "output_exchange_item_id": 724
+    },
+    "created_at": "2026-07-11 01:49:36"
+  },
+  {
+    "ledger_entry_id": 32186,
+    "item_id": 45618,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705774978_limit2_45618:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783705774978",
+      "output_exchange_item_id": 724
+    },
+    "created_at": "2026-07-11 01:49:36"
+  },
+  {
+    "ledger_entry_id": 32187,
+    "item_id": 45624,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783705774978_limit2:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783705774978",
+      "source_ref_id": "724",
+      "consumed_item_ids": [
+        "45618"
+      ]
+    },
+    "created_at": "2026-07-11 01:49:36"
+  },
+  {
+    "ledger_entry_id": 32188,
+    "item_id": 45624,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783705774978_limit2:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783705774978",
+      "source_ref_id": "724",
+      "consumed_item_ids": [
+        "45618"
+      ]
+    },
+    "created_at": "2026-07-11 01:49:36"
+  },
+  {
+    "ledger_entry_id": 32189,
+    "item_id": 45621,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705774978_physical_45621:out",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783705774978",
+      "output_exchange_item_id": 726
+    },
+    "created_at": "2026-07-11 01:49:36"
+  },
+  {
+    "ledger_entry_id": 32190,
+    "item_id": 45621,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783705774978_physical_45621:in",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783705774978",
+      "output_exchange_item_id": 726
+    },
+    "created_at": "2026-07-11 01:49:36"
+  },
+  {
+    "ledger_entry_id": 32191,
+    "item_id": 45625,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783706006922_v0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:53:27"
+  },
+  {
+    "ledger_entry_id": 32192,
+    "item_id": 45625,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783706006922_v0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:53:27"
+  },
+  {
+    "ledger_entry_id": 32193,
+    "item_id": 45626,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783706006922_v1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:53:27"
+  },
+  {
+    "ledger_entry_id": 32194,
+    "item_id": 45626,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783706006922_v1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:53:27"
+  },
+  {
+    "ledger_entry_id": 32195,
+    "item_id": 45627,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783706006922_v2:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:53:27"
+  },
+  {
+    "ledger_entry_id": 32196,
+    "item_id": 45627,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783706006922_v2:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:53:27"
+  },
+  {
+    "ledger_entry_id": 32197,
+    "item_id": 45628,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783706006922_v3:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:53:27"
+  },
+  {
+    "ledger_entry_id": 32198,
+    "item_id": 45628,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783706006922_v3:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:53:27"
+  },
+  {
+    "ledger_entry_id": 32199,
+    "item_id": 45629,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783706006922_p0:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:53:28"
+  },
+  {
+    "ledger_entry_id": 32200,
+    "item_id": 45629,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783706006922_p0:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:53:28"
+  },
+  {
+    "ledger_entry_id": 32201,
+    "item_id": 45630,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783706006922_p1:out",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:53:28"
+  },
+  {
+    "ledger_entry_id": 32202,
+    "item_id": 45630,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "test_mint",
+    "idempotency_key": "barter_test_mint_1783706006922_p1:in",
+    "meta": {
+      "source": "test",
+      "source_ref_id": "barter_contract_test"
+    },
+    "created_at": "2026-07-11 01:53:28"
+  },
+  {
+    "ledger_entry_id": 32203,
+    "item_id": 45625,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783706006922_success_45625:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783706006922",
+      "output_exchange_item_id": 728
+    },
+    "created_at": "2026-07-11 01:53:28"
+  },
+  {
+    "ledger_entry_id": 32204,
+    "item_id": 45625,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783706006922_success_45625:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783706006922",
+      "output_exchange_item_id": 728
+    },
+    "created_at": "2026-07-11 01:53:28"
+  },
+  {
+    "ledger_entry_id": 32205,
+    "item_id": 45631,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783706006922_success:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783706006922",
+      "source_ref_id": "728",
+      "consumed_item_ids": [
+        "45625"
+      ]
+    },
+    "created_at": "2026-07-11 01:53:28"
+  },
+  {
+    "ledger_entry_id": 32206,
+    "item_id": 45631,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783706006922_success:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783706006922",
+      "source_ref_id": "728",
+      "consumed_item_ids": [
+        "45625"
+      ]
+    },
+    "created_at": "2026-07-11 01:53:28"
+  },
+  {
+    "ledger_entry_id": 32207,
+    "item_id": 45626,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783706006922_limit2_45626:out",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783706006922",
+      "output_exchange_item_id": 728
+    },
+    "created_at": "2026-07-11 01:53:28"
+  },
+  {
+    "ledger_entry_id": 32208,
+    "item_id": 45626,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783706006922_limit2_45626:in",
+    "meta": {
+      "recipe_code": "test_barter_voucher_1783706006922",
+      "output_exchange_item_id": 728
+    },
+    "created_at": "2026-07-11 01:53:28"
+  },
+  {
+    "ledger_entry_id": 32209,
+    "item_id": 45632,
+    "account_id": 2,
+    "delta": -1,
+    "counterpart_id": 7,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783706006922_limit2:out",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783706006922",
+      "source_ref_id": "728",
+      "consumed_item_ids": [
+        "45626"
+      ]
+    },
+    "created_at": "2026-07-11 01:53:28"
+  },
+  {
+    "ledger_entry_id": 32210,
+    "item_id": 45632,
+    "account_id": 7,
+    "delta": 1,
+    "counterpart_id": 2,
+    "event_type": "mint",
+    "operator_id": null,
+    "operator_type": "system",
+    "business_type": "barter_mint",
+    "idempotency_key": "barter_mint_barter_test_1783706006922_limit2:in",
+    "meta": {
+      "source": "barter",
+      "recipe_code": "test_barter_voucher_1783706006922",
+      "source_ref_id": "728",
+      "consumed_item_ids": [
+        "45626"
+      ]
+    },
+    "created_at": "2026-07-11 01:53:28"
+  },
+  {
+    "ledger_entry_id": 32211,
+    "item_id": 45629,
+    "account_id": 7,
+    "delta": -1,
+    "counterpart_id": 3,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783706006922_physical_45629:out",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783706006922",
+      "output_exchange_item_id": 730
+    },
+    "created_at": "2026-07-11 01:53:29"
+  },
+  {
+    "ledger_entry_id": 32212,
+    "item_id": 45629,
+    "account_id": 3,
+    "delta": 1,
+    "counterpart_id": 7,
+    "event_type": "use",
+    "operator_id": 32,
+    "operator_type": "user",
+    "business_type": "barter_consume",
+    "idempotency_key": "barter_consume_barter_test_1783706006922_physical_45629:in",
+    "meta": {
+      "recipe_code": "test_barter_physical_1783706006922",
+      "output_exchange_item_id": 730
+    },
+    "created_at": "2026-07-11 01:53:29"
+  }
+]

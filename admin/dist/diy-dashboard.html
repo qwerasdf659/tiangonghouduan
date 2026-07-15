@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>DIY 数据看板 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/diy-dashboard-BRMUVpeA.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/diy-S3YEyTQI.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+
+  <nav class="page-navbar">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="text-blue-200 hover:text-white transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">📈 DIY 数据看板</span>
+      </div>
+      <button @click="refresh()" class="px-3 py-1.5 text-sm bg-white/20 rounded-lg hover:bg-white/30">刷新</button>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6"
+       x-data="diyDashboard()"
+       x-init="init()">
+
+    <div x-cloak class="space-y-6">
+
+      <!-- P0 数据完备度（运营录数工作清单，点击跳转对应管理页带筛选） -->
+      <section>
+        <h2 class="text-sm font-semibold text-gray-700 mb-3">P0 · 数据完备度（当前录数瓶颈）</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <a href="/admin/diy-material-management.html?filter=missing_image"
+             class="bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-red-300 transition">
+            <div class="text-xs text-gray-500">缺图素材 ▸ 去补图</div>
+            <div class="text-2xl font-bold mt-1" :class="(completeness?.materials?.missing_image_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
+                 x-text="completeness?.materials?.missing_image_count ?? '-'"></div>
+          </a>
+          <a href="/admin/diy-material-management.html?filter=missing_copy"
+             class="bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-amber-300 transition">
+            <div class="text-xs text-gray-500">缺文案素材 ▸ 去补文案</div>
+            <div class="text-2xl font-bold mt-1" :class="(completeness?.materials?.missing_copy_count ?? 0) > 0 ? 'text-amber-600' : 'text-green-600'"
+                 x-text="completeness?.materials?.missing_copy_count ?? '-'"></div>
+          </a>
+          <a href="/admin/diy-material-management.html?filter=zero_price_enabled"
+             class="bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-red-300 transition">
+            <div class="text-xs text-gray-500">0价且启用 ▸ 去定价</div>
+            <div class="text-2xl font-bold mt-1" :class="(completeness?.materials?.zero_price_enabled_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
+                 x-text="completeness?.materials?.zero_price_enabled_count ?? '-'"></div>
+          </a>
+          <a href="/admin/diy-template-management.html?filter=missing_preview"
+             class="bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-amber-300 transition">
+            <div class="text-xs text-gray-500">模板缺预览图 ▸ 去补图</div>
+            <div class="text-2xl font-bold mt-1" :class="(completeness?.templates?.missing_preview_count ?? 0) > 0 ? 'text-amber-600' : 'text-green-600'"
+                 x-text="completeness?.templates?.missing_preview_count ?? '-'"></div>
+          </a>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+          <div class="bg-white rounded-xl shadow p-4">
+            <div class="text-xs text-gray-500">素材总数 / 已启用</div>
+            <div class="text-xl font-bold text-blue-600 mt-1">
+              <span x-text="completeness?.materials?.total ?? '-'"></span>
+              <span class="text-sm text-gray-400"> / </span>
+              <span class="text-green-600" x-text="completeness?.materials?.enabled_count ?? '-'"></span>
+            </div>
+          </div>
+          <a href="/admin/diy-template-management.html?filter=missing_base_image"
+             class="bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-amber-300 transition">
+            <div class="text-xs text-gray-500">模板缺底图 ▸ 去补图</div>
+            <div class="text-xl font-bold text-amber-600 mt-1" x-text="completeness?.templates?.missing_base_image_count ?? '-'"></div>
+          </a>
+          <a href="/admin/diy-template-management.html?filter=draft"
+             class="bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-gray-300 transition">
+            <div class="text-xs text-gray-500">草稿未发布模板 ▸ 去发布</div>
+            <div class="text-xl font-bold text-gray-600 mt-1" x-text="completeness?.templates?.draft_count ?? '-'"></div>
+          </a>
+          <div class="bg-white rounded-xl shadow p-4">
+            <div class="text-xs text-gray-500">已发布但无可用素材</div>
+            <div class="text-xl font-bold" :class="(completeness?.templates?.published_without_materials_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
+                 x-text="completeness?.templates?.published_without_materials_count ?? '-'"></div>
+          </div>
+        </div>
+        <!-- 手围驱动方案 §11.7-A1/A2：物理数据 + 档位毫米数据完备度 -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+          <a href="/admin/diy-material-management.html?filter=missing_physical"
+             class="bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-red-300 transition">
+            <div class="text-xs text-gray-500">素材缺物理数据 ▸ 去补录</div>
+            <div class="text-2xl font-bold mt-1" :class="(completeness?.materials?.missing_physical_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
+                 x-text="completeness?.materials?.missing_physical_count ?? '-'"></div>
+            <div class="text-xs text-gray-400 mt-1">长度联动/校验不可用，禁止发布</div>
+          </a>
+          <div class="bg-white rounded-xl shadow p-4">
+            <div class="text-xs text-gray-500">已发布模板缺档位数据</div>
+            <div class="text-2xl font-bold mt-1" :class="(completeness?.templates?.published_missing_sizing_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
+                 x-text="completeness?.templates?.published_missing_sizing_count ?? '-'"></div>
+            <div class="text-xs text-gray-400 mt-1">存量脏数据兜底口（护栏只拦新发布）</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- P1 经营看板：转化漏斗 + GMV + 履约 -->
+      <section>
+        <h2 class="text-sm font-semibold text-gray-700 mb-3">P1 · 经营看板（转化漏斗 / GMV / 履约）</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-white rounded-xl shadow p-4">
+            <div class="text-xs text-gray-500 mb-2">作品转化漏斗</div>
+            <div ref="funnelChart" class="w-full h-64"></div>
+            <div class="text-xs text-gray-400 mt-2">
+              确认率 <span x-text="funnel?.confirm_rate ?? '-'"></span>% ·
+              完成率 <span x-text="funnel?.complete_rate ?? '-'"></span>%
+            </div>
+          </div>
+          <div class="bg-white rounded-xl shadow p-4">
+            <div class="text-xs text-gray-500 mb-2">GMV 每日趋势（已完成作品冻结金额）</div>
+            <div ref="gmvChart" class="w-full h-64"></div>
+            <div class="text-xs text-gray-400 mt-2">
+              兑换记录交叉校验合计 <span x-text="gmv?.exchange_cross_check_total ?? 0"></span>
+            </div>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+          <a href="/admin/diy-work-management.html?status=frozen"
+             class="bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-amber-300 transition">
+            <div class="text-xs text-gray-500">待发货（pending）▸ 去处理</div>
+            <div class="text-2xl font-bold text-amber-600 mt-1" x-text="fulfillment?.pending_shipment_count ?? '-'"></div>
+          </a>
+          <a href="/admin/diy-work-management.html?status=frozen"
+             class="bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-red-300 transition">
+            <div class="text-xs text-gray-500">待发货中缺收货地址 ▸ 去补录</div>
+            <div class="text-2xl font-bold" :class="(fulfillment?.missing_address_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'"
+                 x-text="fulfillment?.missing_address_count ?? '-'"></div>
+          </a>
+          <template x-for="asset in (gmv?.by_asset || [])" :key="asset.asset_code">
+            <a href="/admin/diy-work-management.html?status=completed"
+               class="bg-white rounded-xl shadow p-4 hover:ring-2 hover:ring-blue-300 transition">
+              <div class="text-xs text-gray-500">GMV · <span x-text="asset.asset_code"></span> ▸ 看已完成作品</div>
+              <div class="text-2xl font-bold text-blue-600 mt-1" x-text="asset.total_amount"></div>
+            </a>
+          </template>
+        </div>
+      </section>
+
+      <!-- P2 素材热度 + 五行分布 -->
+      <section>
+        <h2 class="text-sm font-semibold text-gray-700 mb-3">P2 · 素材热度 & 五行分布</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-white rounded-xl shadow p-4">
+            <div class="text-xs text-gray-500 mb-2">素材使用热度 Top20（反哺采购决策）</div>
+            <div class="overflow-y-auto max-h-72">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600 sticky top-0">
+                  <tr>
+                    <th class="px-3 py-2 text-left">素材</th>
+                    <th class="px-3 py-2 text-center">使用次数</th>
+                    <th class="px-3 py-2 text-right">金额贡献</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="item in materialRanking" :key="item.material_code">
+                    <tr class="border-t">
+                      <td class="px-3 py-2" x-text="item.display_name"></td>
+                      <td class="px-3 py-2 text-center" x-text="item.use_count"></td>
+                      <td class="px-3 py-2 text-right" x-text="item.total_amount"></td>
+                    </tr>
+                  </template>
+                  <tr x-show="materialRanking.length === 0">
+                    <td colspan="3" class="px-3 py-6 text-center text-gray-400">暂无使用数据（需有冻结/完成作品）</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="bg-white rounded-xl shadow p-4">
+            <div class="text-xs text-gray-500 mb-2">素材库五行分布（配货平衡参考）</div>
+            <div ref="fiveElementsChart" class="w-full h-72"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 手围看板：档位分布 + 长度偏差（手围驱动方案 §11.7-B4/B5） -->
+      <section>
+        <h2 class="text-sm font-semibold text-gray-700 mb-3">手围看板 · 档位分布 & 长度偏差（配货备料 / 余量调参）</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-white rounded-xl shadow p-4">
+            <div class="text-xs text-gray-500 mb-2">手围档位分布（冻结/完成作品，哪个手围段卖得多）</div>
+            <div ref="sizeDistributionChart" class="w-full h-64"></div>
+            <div class="text-xs text-gray-400 mt-2">
+              未选手围作品 <span x-text="sizeDistribution?.unset_count ?? 0"></span> 个
+            </div>
+          </div>
+          <div class="bg-white rounded-xl shadow p-4">
+            <div class="text-xs text-gray-500 mb-2">成品长度偏差分布（|成品长度 − 目标周长|，余量参数是否合理的量化依据）</div>
+            <div class="grid grid-cols-2 gap-3 mt-3">
+              <div class="rounded-lg border p-3">
+                <div class="text-xs text-gray-500">≤ 5mm（工艺可吸收）</div>
+                <div class="text-2xl font-bold text-green-600 mt-1" x-text="lengthDeviation?.within_5mm ?? '-'"></div>
+              </div>
+              <div class="rounded-lg border p-3">
+                <div class="text-xs text-gray-500">5 ~ 10mm（需关注）</div>
+                <div class="text-2xl font-bold text-amber-600 mt-1" x-text="lengthDeviation?.within_10mm ?? '-'"></div>
+              </div>
+              <div class="rounded-lg border p-3">
+                <div class="text-xs text-gray-500">&gt; 10mm（复核余量参数）</div>
+                <div class="text-2xl font-bold text-red-600 mt-1" x-text="lengthDeviation?.over_10mm ?? '-'"></div>
+              </div>
+              <div class="rounded-lg border p-3">
+                <div class="text-xs text-gray-500">不可测（缺手围/缺素材尺寸）</div>
+                <div class="text-2xl font-bold text-gray-500 mt-1" x-text="lengthDeviation?.unmeasurable ?? '-'"></div>
+              </div>
+            </div>
+            <div class="text-xs text-gray-400 mt-3">偏差普遍偏大时应调整模板的弹力余量（elastic_margin_mm），数据驱动而非拍脑袋</div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+</body>
+</html>

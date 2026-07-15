@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>兑换市场管理 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/exchange-market-pfO7wFN4.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/exchange-stats-BWevyIcu.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-BYHTji0J.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/core-Db48157X.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-export-DWcgNdQC.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/asset-BmjTKnbE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/advanced-ChmRjD2s.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 导航栏（深色渐变风格） -->
+  <nav class="page-navbar">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="text-blue-200 hover:text-white transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">🏪 兑换市场管理</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="exchangeMarket()" x-init="init()"
+       @edit-item="editItem($event.detail)"
+       @edit-redeem-requirement="openRedeemRequirementModal($event.detail)"
+       @delete-item="deleteItem($event.detail)"
+       @toggle-item-status="toggleItemStatus($event.detail)"
+       @view-item-dashboard="viewItemDashboard($event.detail)"
+       @toggle-pin="togglePin($event.detail)"
+       @toggle-recommend="toggleRecommend($event.detail)"
+       @ship-order="openShipModal($event.detail)"
+       @reject-order="rejectOrder($event.detail)"
+       @approve-order="approveOrder($event.detail)"
+       @refund-order="refundOrder($event.detail)"
+       @complete-order="completeOrder($event.detail)">
+    
+    <!-- 页面横幅 -->
+    <div class="page-banner mb-6">
+      <h1>🏪 兑换市场管理</h1>
+      <p>管理兑换商品上下架、库存、订单处理和运营数据分析</p>
+    </div>
+
+    <!-- 子页面导航（增强Tab样式） -->
+    <div class="enhanced-tabs">
+      <template x-for="page in subPages" :key="page.id">
+        <button 
+          @click="switchPage(page.id)"
+          :class="current_page === page.id ? 'active' : ''"
+          class="tab-item"
+          x-text="page.icon + ' ' + page.name"
+        ></button>
+      </template>
+    </div>
+
+    <!-- 商品列表 -->
+    <div x-show="current_page === 'items'" x-cloak>
+      <div class="content-section">
+        <div class="content-section-header flex flex-wrap items-center justify-between gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="section-title">
+              <span class="title-icon">📦</span>
+              兑换商品列表
+            </div>
+            <button @click="openAddItemModal()" class="action-btn action-btn-primary">
+              ➕ 新增商品
+            </button>
+            <button x-show="!sortMode" @click="enterSortMode()" class="action-btn action-btn-secondary ml-2">
+              ↕ 批量排序
+            </button>
+            <template x-if="sortMode">
+              <div class="flex items-center gap-2 ml-2">
+                <button @click="saveSortOrder()" :disabled="sortSaving || !sortDirty" class="action-btn action-btn-primary disabled:opacity-50">
+                  <span x-show="sortSaving" class="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+                  保存排序
+                </button>
+                <button @click="exitSortMode()" class="action-btn action-btn-secondary">取消</button>
+              </div>
+            </template>
+            <!-- 扫码/输码快速定位（§8.3 增强项6）：输码或扫码枪录入后回车，精确直达单品详情，供客服/对账高频使用 -->
+            <div x-show="!sortMode" class="flex items-center gap-1 ml-2" x-cloak>
+              <input type="text" x-model="quickLocateCode" @keyup.enter="quickLocate(quickLocateCode)"
+                     placeholder="扫码/输码直达单品"
+                     class="w-44 px-3 py-2 text-sm border rounded-lg themed-border focus:ring-2 focus:ring-rose-500 focus:border-rose-500 font-mono">
+              <button type="button" @click="quickLocate(quickLocateCode)"
+                      class="px-3 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-colors" title="扫码或输入商品编码直达单品详情">🎯 定位</button>
+            </div>
+          </div>
+          <!-- 网格/列表视图切换（与下方 data-table 共用数据源） -->
+          <div class="flex gap-1 items-center shrink-0" x-show="!sortMode" x-cloak>
+            <button type="button" @click="toggleViewMode('grid')" title="宫格视图"
+                    class="w-9 h-9 rounded border text-sm font-bold transition-colors"
+                    :class="view_mode === 'grid' ? 'bg-green-500 text-white border-green-600' : 'themed-bg-base themed-text-muted border-gray-200 hover:border-green-400'">田</button>
+            <button type="button" @click="toggleViewMode('list')" title="列表视图"
+                    class="w-9 h-9 rounded border text-sm font-bold transition-colors"
+                    :class="view_mode === 'list' ? 'bg-green-500 text-white border-green-600' : 'themed-bg-base themed-text-muted border-gray-200 hover:border-green-400'">≡</button>
+          </div>
+        </div>
+        <!-- 排序模式视图（进入排序模式时显示，替代 data-table） -->
+        <template x-if="sortMode">
+          <div class="themed-card rounded-lg border p-4">
+            <p class="text-sm text-gray-500 mb-3">拖拽或使用上下箭头调整商品排序，完成后点击"保存排序"</p>
+            <div class="space-y-1">
+              <template x-for="(item, idx) in sortableList" :key="item.exchange_item_id">
+                <div class="flex items-center justify-between py-2 px-3 rounded border bg-white hover:bg-gray-50">
+                  <div class="flex items-center gap-3">
+                    <span class="text-xs text-gray-400 w-6 text-center" x-text="idx + 1"></span>
+                    <span class="text-sm font-medium" x-text="item.item_name"></span>
+                    <span class="text-xs text-gray-400" x-text="'ID:' + item.exchange_item_id"></span>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button @click="moveSortItemUp(idx)" :disabled="idx === 0" class="w-7 h-7 rounded text-xs border hover:bg-gray-100 disabled:opacity-30">↑</button>
+                    <button @click="moveSortItemDown(idx)" :disabled="idx === sortableList.length - 1" class="w-7 h-7 rounded text-xs border hover:bg-gray-100 disabled:opacity-30">↓</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <!-- data-table: 兑换商品列表（排序模式时隐藏） -->
+        <div x-show="!sortMode" x-data="exchangeItemsTable()" x-init="init()">
+
+          <!-- 空间视角切换：全部 / 幸运空间 / 臻选空间（直接按后端 space 字段筛选） -->
+          <div class="flex items-center gap-1 mb-3 border-b border-gray-200">
+            <button type="button" @click="switchSpaceView('all')"
+                    class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+                    :class="spaceView === 'all' ? 'border-green-500 text-green-600' : 'border-transparent themed-text-muted hover:text-green-500'">
+              🗂 全部商品
+            </button>
+            <button type="button" @click="switchSpaceView('lucky')"
+                    class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+                    :class="spaceView === 'lucky' ? 'border-green-500 text-green-600' : 'border-transparent themed-text-muted hover:text-green-500'">
+              🍀 幸运空间视角
+            </button>
+            <button type="button" @click="switchSpaceView('premium')"
+                    class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+                    :class="spaceView === 'premium' ? 'border-green-500 text-green-600' : 'border-transparent themed-text-muted hover:text-green-500'">
+              💎 臻选空间视角
+            </button>
+            <!-- 低库存预警筛选（看板三）：仅看库存≤预警阈值的在售商品，复用后端 low_stock_only -->
+            <button type="button" @click="toggleLowStockFilter()"
+                    class="ml-auto px-3 py-1.5 text-sm font-medium rounded border transition-colors"
+                    :class="lowStockOnly ? 'bg-red-500 text-white border-red-500' : 'border-gray-300 themed-text-muted hover:border-red-400 hover:text-red-500'">
+              ⚠️ 仅看低库存
+            </button>
+          </div>
+
+          <!-- 编码/名称搜索框（商品编码体系：输 SP/SK 编码精确定位，容错大小写/横线/空格；输文字按名称模糊搜） -->
+          <div class="flex items-center gap-2 mb-3">
+            <input type="text" x-model="searchKeyword" @keyup.enter="applyKeywordSearch()"
+                   placeholder="输入商品编码（SP-XXXX-XXXX-XXXX / SK 码）或商品名称"
+                   class="flex-1 max-w-md px-3 py-2 text-sm border rounded-lg themed-border focus:ring-2 focus:ring-green-500 focus:border-green-500 font-mono">
+            <button type="button" @click="applyKeywordSearch()"
+                    class="px-4 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">🔍 搜索</button>
+            <button type="button" x-show="searchKeyword" @click="clearKeywordSearch()"
+                    class="px-3 py-2 text-sm border rounded-lg themed-border themed-text-muted hover:bg-gray-50 transition-colors">✕ 清空</button>
+          </div>
+
+          <!-- 批量操作栏（选中商品时显示） -->
+          <div x-show="hasSelected" x-cloak class="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200 flex items-center gap-3 flex-wrap">
+            <span class="text-sm text-blue-700 font-medium">已选 <span x-text="selectedCount"></span> 个商品</span>
+            <button @click="$dispatch('batch-status', { ids: selectedRows, status: 'active' })" class="px-3 py-1.5 bg-green-500 text-white text-sm rounded hover:bg-green-600">批量上架</button>
+            <button @click="$dispatch('batch-status', { ids: selectedRows, status: 'inactive' })" class="px-3 py-1.5 bg-gray-500 text-white text-sm rounded hover:bg-gray-600">批量下架</button>
+            <button @click="$dispatch('batch-price-modal', { ids: selectedRows })" class="px-3 py-1.5 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600">批量改价</button>
+            <button @click="$dispatch('batch-category-modal', { ids: selectedRows })" class="px-3 py-1.5 bg-purple-500 text-white text-sm rounded hover:bg-purple-600">批量修改分类</button>
+            <button @click="exportItems()" class="px-3 py-1.5 bg-indigo-500 text-white text-sm rounded hover:bg-indigo-600">导出 xlsx</button>
+            <button @click="exportManualPdf()" class="px-3 py-1.5 bg-rose-500 text-white text-sm rounded hover:bg-rose-600">导出手册 PDF</button>
+            <label class="px-3 py-1.5 bg-teal-500 text-white text-sm rounded hover:bg-teal-600 cursor-pointer">
+              导入 Excel/CSV
+              <input type="file" accept=".xlsx,.csv" class="hidden" @change="importItems($event)">
+            </label>
+          </div>
+          <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+          <div x-show="hasError" class="p-8 text-center">
+            <p class="text-red-500 mb-2" x-text="error"></p>
+            <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+          </div>
+          <!-- 宫格视图：与表格共用本组件 data 与分页 -->
+          <div x-show="hasData && view_mode === 'grid'" x-cloak class="p-2">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <template x-for="(row, idx) in data" :key="row.exchange_item_id || idx">
+                <div class="themed-card rounded-lg border overflow-hidden flex flex-col shadow-sm hover:shadow-md transition-shadow">
+                  <div class="aspect-square bg-gray-50 flex items-center justify-center overflow-hidden cursor-pointer group"
+                       @click="openImagePreview(exchangeItemFullImageUrl(row), row.item_name)">
+                    <template x-if="exchangeItemImageUrl(row)">
+                      <img :src="exchangeItemImageUrl(row)" :alt="row.item_name || ''" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" loading="lazy" />
+                    </template>
+                    <template x-if="!exchangeItemImageUrl(row)">
+                      <span class="text-gray-400 text-sm">暂无图片</span>
+                    </template>
+                  </div>
+                  <div class="p-3 flex-1 flex flex-col gap-2">
+                    <h3 class="font-medium text-sm line-clamp-2" x-text="row.item_name || '-'"></h3>
+                    <!-- 商品编码（展示形 SP-XXXX-XXXX-XXXX，手册/对账主标识） -->
+                    <div x-show="row.item_code" class="text-xs font-mono text-indigo-600"
+                         x-text="formatItemCode(row.item_code)"
+                         title="平台商品展示码（SPU）"></div>
+                    <div class="text-sm text-green-600 font-mono">
+                      <span x-text="row.min_cost_amount ?? 0"></span>
+                      <span class="text-xs text-gray-500" x-text="' ' + getAssetTypeName(row.min_cost_asset_code)"></span>
+                    </div>
+                    <div class="text-xs themed-text-muted">库存 <span class="font-semibold themed-text-secondary" x-text="row.stock ?? '-'"></span></div>
+                    <div>
+                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                            :class="row.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'"
+                            x-text="exchangeItemStatusLabel(row.status)"></span>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5 pt-2 mt-auto border-t border-gray-100">
+                      <button type="button" @click="$dispatch('edit-item', row)" class="text-xs text-green-600 hover:underline">编辑</button>
+                      <button type="button" @click="$dispatch('view-item-dashboard', row)" class="text-xs text-indigo-600 hover:underline">看板</button>
+                      <button type="button" @click="$dispatch('toggle-item-status', row)" class="text-xs text-yellow-600 hover:underline" x-text="row.status === 'active' ? '下架' : '上架'"></button>
+                      <button type="button" @click="$dispatch('delete-item', row)" class="text-xs text-red-600 hover:underline">删除</button>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+          <div x-show="hasData && view_mode === 'list'" class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="themed-bg-base">
+                <tr>
+                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                        :class="{ 'cursor-pointer hover:text-green-600': col.sortable }"
+                        @click="sort(col)">
+                      <span x-text="col.label"></span>
+                      <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                    </th>
+                  </template>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="(row, idx) in data" :key="row.exchange_item_id || idx">
+                  <tr class="themed-hover-bg">
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                      <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                    </template>
+                    <td class="px-4 py-3">
+                      <div class="flex space-x-2">
+                        <button @click="$dispatch('edit-item', row)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                        <button @click="$dispatch('edit-redeem-requirement', row)" class="text-purple-500 hover:text-purple-700 text-sm">等级门槛</button>
+                        <button @click="$dispatch('view-item-dashboard', row)" class="text-indigo-500 hover:text-indigo-700 text-sm">看板</button>
+                        <button @click="$dispatch('toggle-pin', row)" class="text-sm" :class="row.is_pinned ? 'text-orange-500 hover:text-orange-700' : 'text-gray-400 hover:text-orange-500'" x-text="row.is_pinned ? '取消置顶' : '置顶'"></button>
+                        <button @click="$dispatch('toggle-recommend', row)" class="text-sm" :class="row.is_recommended ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 hover:text-blue-500'" x-text="row.is_recommended ? '取消推荐' : '推荐'"></button>
+                        <button @click="$dispatch('toggle-item-status', row)" class="text-yellow-500 hover:text-yellow-700 text-sm" x-text="row.status === 'active' ? '下架' : '上架'"></button>
+                        <button @click="$dispatch('delete-item', row)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+            <div class="text-4xl mb-4">📦</div>
+            <p>暂无商品数据</p>
+          </div>
+          <template x-if="total_pages > 1 && (view_mode === 'list' || view_mode === 'grid')">
+            <div class="p-4 border-t flex justify-between items-center">
+              <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+              <div class="flex space-x-1">
+                <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                <template x-for="p in visiblePages" :key="'pi'+p">
+                  <button @click="goToPage(p)" :class="p === current_page ? 'bg-green-500 text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                </template>
+                <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+              </div>
+            </div>
+          </template>
+          <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+            最后更新: <span x-text="lastUpdateTime"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 订单管理 -->
+    <div x-show="current_page === 'orders'" x-cloak>
+      <div class="themed-card rounded-lg shadow">
+        <div class="p-4 border-b">
+          <h5 class="font-semibold">兑换订单</h5>
+        </div>
+        <!-- data-table: 兑换订单列表（含筛选） -->
+        <div x-data="exchangeOrdersTable()" x-init="init()">
+          <!-- 筛选栏 -->
+          <div class="p-4 border-b themed-bg-base">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <input type="text" x-model="activeFilters.order_no" placeholder="订单号" class="px-3 py-2 border rounded">
+              <select x-model="activeFilters.status" class="px-3 py-2 border rounded">
+                <option value="">全部状态</option>
+                <option value="pending">待审核</option>
+                <option value="approved">已审核</option>
+                <option value="shipped">已发货</option>
+                <option value="received">已收货</option>
+                <option value="completed">已完成</option>
+                <option value="rejected">已拒绝</option>
+                <option value="refunded">已退款</option>
+                <option value="cancelled">已取消</option>
+              </select>
+              <select x-model="activeFilters.source" class="px-3 py-2 border rounded">
+                <option value="">全部来源</option>
+                <option value="exchange">普通兑换</option>
+                <option value="bid">竞价中标</option>
+                <option value="diy">DIY 设计</option>
+                <option value="barter">以物易物</option>
+              </select>
+              <button @click="search()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
+              <button @click="handleFilterReset()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">🔄 重置</button>
+            </div>
+          </div>
+          <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+          <div x-show="hasError" class="p-8 text-center">
+            <p class="text-red-500 mb-2" x-text="error"></p>
+            <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+          </div>
+          <div x-show="hasData" class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="themed-bg-base">
+                <tr>
+                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                        :class="{ 'cursor-pointer hover:text-green-600': col.sortable }"
+                        @click="sort(col)">
+                      <span x-text="col.label"></span>
+                      <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                    </th>
+                  </template>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="(row, idx) in data" :key="row.order_no || idx">
+                  <tr class="themed-hover-bg">
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                      <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                    </template>
+                    <td class="px-4 py-3">
+                      <div class="flex flex-wrap gap-1">
+                        <template x-if="row.status === 'pending'">
+                          <button @click="$dispatch('approve-order', row)" class="text-green-600 hover:text-green-800 text-sm font-medium">✓ 审核通过</button>
+                        </template>
+                        <template x-if="row.status === 'pending'">
+                          <button @click="$dispatch('reject-order', row)" class="text-red-500 hover:text-red-700 text-sm">✕ 拒绝</button>
+                        </template>
+                        <template x-if="row.status === 'approved'">
+                          <button @click="$dispatch('ship-order', row)" class="themed-text-primary hover:text-blue-700 text-sm font-medium">📦 发货</button>
+                        </template>
+                        <template x-if="row.status === 'approved' || row.status === 'shipped'">
+                          <button @click="$dispatch('refund-order', row)" class="text-orange-500 hover:text-orange-700 text-sm">💰 退款</button>
+                        </template>
+                        <template x-if="row.status === 'shipped' || row.status === 'received' || row.status === 'rated'">
+                          <button @click="$dispatch('complete-order', row)" class="text-green-600 hover:text-green-800 text-sm">✅ 完成</button>
+                        </template>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+            <div class="text-4xl mb-4">📋</div>
+            <p>暂无订单数据</p>
+          </div>
+          <template x-if="total_pages > 1">
+            <div class="p-4 border-t flex justify-between items-center">
+              <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+              <div class="flex space-x-1">
+                <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                <template x-for="p in visiblePages" :key="'po'+p">
+                  <button @click="goToPage(p)" :class="p === current_page ? 'bg-green-500 text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                </template>
+                <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+              </div>
+            </div>
+          </template>
+          <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+            最后更新: <span x-text="lastUpdateTime"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 统计分析 -->
+    <div x-show="current_page === 'stats'" x-cloak>
+      <!-- 统计卡片 -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <div class="themed-card rounded-lg shadow p-6 text-center">
+          <h6 class="themed-text-muted mb-2">总商品数</h6>
+          <h2 class="text-3xl font-bold themed-text-primary" x-text="marketStats.total_items"></h2>
+        </div>
+        <div class="themed-card rounded-lg shadow p-6 text-center">
+          <h6 class="themed-text-muted mb-2">今日订单</h6>
+          <h2 class="text-3xl font-bold text-green-600" x-text="marketStats.today_orders"></h2>
+        </div>
+        <div class="themed-card rounded-lg shadow p-6 text-center">
+          <h6 class="themed-text-muted mb-2">待发货</h6>
+          <h2 class="text-3xl font-bold text-yellow-600" x-text="marketStats.pending_shipments"></h2>
+        </div>
+        <div class="themed-card rounded-lg shadow p-6 text-center">
+          <h6 class="themed-text-muted mb-2">积分消耗</h6>
+          <h2 class="text-3xl font-bold text-purple-600" x-text="marketStats.points_consumed"></h2>
+        </div>
+      </div>
+
+      <!-- 图表区域 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- 订单状态分布图表 -->
+        <div class="themed-card rounded-lg shadow p-6">
+          <h6 class="font-semibold themed-text-secondary mb-4">📊 订单状态分布</h6>
+          <div id="orderStatusChart" style="width: 100%; height: 300px;"></div>
+        </div>
+        
+        <!-- 兑换趋势图表 -->
+        <div class="themed-card rounded-lg shadow p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h6 class="font-semibold themed-text-secondary">📈 兑换趋势</h6>
+            <div class="flex space-x-2">
+              <button @click="changeTrendRange('7d')" :class="trendRange === '7d' ? 'bg-green-500 text-white' : 'themed-bg-subtle themed-text-muted'" class="px-3 py-1 text-sm rounded hover:bg-green-400 hover:text-white transition-colors">7天</button>
+              <button @click="changeTrendRange('30d')" :class="trendRange === '30d' ? 'bg-green-500 text-white' : 'themed-bg-subtle themed-text-muted'" class="px-3 py-1 text-sm rounded hover:bg-green-400 hover:text-white transition-colors">30天</button>
+              <button @click="changeTrendRange('90d')" :class="trendRange === '90d' ? 'bg-green-500 text-white' : 'themed-bg-subtle themed-text-muted'" class="px-3 py-1 text-sm rounded hover:bg-green-400 hover:text-white transition-colors">90天</button>
+            </div>
+          </div>
+          <div id="exchangeTrendChart" style="width: 100%; height: 300px;"></div>
+          <p class="text-xs text-gray-400 mt-2 text-center" x-show="trendData.length === 0 && !loading">暂无订单数据</p>
+        </div>
+      </div>
+
+      <!-- P1-8: 履约追踪看板 -->
+      <div class="mt-6 themed-card rounded-lg shadow">
+        <div class="p-4 border-b themed-gradient-light">
+          <div class="flex items-center justify-between">
+            <h6 class="font-semibold text-green-800 flex items-center gap-2">
+              📦 履约追踪看板
+              <span class="text-xs px-2 py-0.5 rounded" :class="fulfillmentTracking.fulfillment_rate >= 80 ? 'bg-green-100 text-green-700' : fulfillmentTracking.fulfillment_rate >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'" x-text="getFulfillmentRateLabel(fulfillmentTracking.fulfillment_rate)"></span>
+            </h6>
+            <div class="text-sm text-gray-500">
+              总订单 <span class="font-bold" x-text="fulfillmentTracking.total_orders">0</span>
+            </div>
+          </div>
+        </div>
+        <div class="p-6">
+          <!-- 核心指标 -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="text-center p-4 border-2 rounded-lg" :class="fulfillmentTracking.fulfillment_rate >= 80 ? 'border-green-300 bg-green-50' : fulfillmentTracking.fulfillment_rate >= 50 ? 'border-yellow-300 bg-yellow-50' : 'border-red-300 bg-red-50'">
+              <p class="text-xs text-gray-500 mb-1">兑换完成率</p>
+              <p class="text-3xl font-bold" :class="getFulfillmentRateClass(fulfillmentTracking.fulfillment_rate)" x-text="fulfillmentTracking.fulfillment_rate + '%'">0%</p>
+            </div>
+            <div class="text-center p-4 border rounded-lg bg-yellow-50">
+              <p class="text-xs text-gray-500 mb-1">⏳ 待发货</p>
+              <p class="text-3xl font-bold text-yellow-600" x-text="fulfillmentTracking.pending_count">0</p>
+            </div>
+            <div class="text-center p-4 border rounded-lg bg-blue-50">
+              <p class="text-xs text-gray-500 mb-1">🚚 已发货</p>
+              <p class="text-3xl font-bold text-blue-600" x-text="fulfillmentTracking.shipped_count">0</p>
+            </div>
+            <div class="text-center p-4 border rounded-lg bg-green-50">
+              <p class="text-xs text-gray-500 mb-1">✅ 已完成</p>
+              <p class="text-3xl font-bold text-green-600" x-text="fulfillmentTracking.completed_count">0</p>
+            </div>
+          </div>
+          
+          <!-- 履约进度条 -->
+          <div class="mb-4">
+            <div class="flex justify-between text-xs text-gray-500 mb-1">
+              <span>履约进度</span>
+              <span x-text="fulfillmentTracking.completed_count + fulfillmentTracking.shipped_count + ' / ' + fulfillmentTracking.total_orders + ' 已处理'">0 / 0</span>
+            </div>
+            <!-- 后端 ExchangeRecord 状态枚举: pending / approved / shipped / received / rated / rejected / refunded / cancelled / completed -->
+            <div class="h-4 bg-gray-200 rounded-full overflow-hidden flex" x-show="fulfillmentTracking.total_orders > 0">
+              <div class="bg-green-500 transition-all" :style="'width:' + (fulfillmentTracking.completed_count / fulfillmentTracking.total_orders * 100) + '%'" title="已完成"></div>
+              <div class="bg-blue-500 transition-all" :style="'width:' + (fulfillmentTracking.shipped_count / fulfillmentTracking.total_orders * 100) + '%'" title="已发货"></div>
+              <div class="bg-yellow-500 transition-all" :style="'width:' + (fulfillmentTracking.pending_count / fulfillmentTracking.total_orders * 100) + '%'" title="待发货"></div>
+              <div class="bg-red-500 transition-all" :style="'width:' + (fulfillmentTracking.cancelled_count / fulfillmentTracking.total_orders * 100) + '%'" title="已取消"></div>
+            </div>
+            <div class="flex gap-4 mt-2 text-xs">
+              <span class="flex items-center gap-1"><span class="w-3 h-3 bg-green-500 rounded"></span>已完成</span>
+              <span class="flex items-center gap-1"><span class="w-3 h-3 bg-blue-500 rounded"></span>已发货</span>
+              <span class="flex items-center gap-1"><span class="w-3 h-3 bg-yellow-500 rounded"></span>待发货</span>
+              <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-500 rounded"></span>已取消</span>
+            </div>
+          </div>
+
+          <!-- 补充统计 -->
+          <div class="grid grid-cols-2 gap-4 mt-4">
+            <div class="p-3 bg-red-50 rounded text-center">
+              <p class="text-xs text-gray-500">已取消订单</p>
+              <p class="text-xl font-bold text-red-600" x-text="fulfillmentTracking.cancelled_count">0</p>
+            </div>
+            <div class="p-3 bg-indigo-50 rounded text-center">
+              <p class="text-xs text-gray-500">平均履约时间</p>
+              <p class="text-xl font-bold text-indigo-600" x-text="fulfillmentTracking.avg_fulfillment_time > 0 ? fulfillmentTracking.avg_fulfillment_time + 'h' : '-'">-</p>
+            </div>
+          </div>
+
+          <!-- 低履约率预警 -->
+          <div x-show="fulfillmentTracking.fulfillment_rate < 10 && fulfillmentTracking.total_orders > 0" class="mt-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+            ⚠️ 兑换完成率严重偏低 (<span x-text="fulfillmentTracking.fulfillment_rate">0</span>%)！建议：1.检查核销流程 2.处理积压的待发货订单 3.联系商户确认发货
+          </div>
+        </div>
+      </div>
+
+      <!-- 详细统计表格 -->
+      <div class="mt-6 themed-card rounded-lg shadow">
+        <div class="p-4 border-b">
+          <h6 class="font-semibold themed-text-secondary">📋 订单统计详情</h6>
+        </div>
+        <div class="p-6">
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div class="text-center p-4 themed-bg-base rounded-lg">
+              <p class="text-sm themed-text-muted">总订单</p>
+              <p class="text-2xl font-bold themed-text-secondary" x-text="exchangeStats.orders.total"></p>
+            </div>
+            <div class="text-center p-4 bg-yellow-50 rounded-lg">
+              <p class="text-sm text-yellow-600">待发货</p>
+              <p class="text-2xl font-bold text-yellow-600" x-text="exchangeStats.orders.pending"></p>
+            </div>
+            <div class="text-center p-4 themed-bg-primary-light rounded-lg">
+              <p class="text-sm themed-text-primary">已发货</p>
+              <p class="text-2xl font-bold themed-text-primary" x-text="exchangeStats.orders.shipped"></p>
+            </div>
+            <div class="text-center p-4 bg-green-50 rounded-lg">
+              <p class="text-sm text-green-600">已完成</p>
+              <p class="text-2xl font-bold text-green-600" x-text="exchangeStats.orders.completed"></p>
+            </div>
+            <div class="text-center p-4 bg-red-50 rounded-lg">
+              <p class="text-sm text-red-600">已取消</p>
+              <p class="text-2xl font-bold text-red-600" x-text="exchangeStats.orders.cancelled"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 以物易物配方管理（合规整改阶段六：旧物组合→官方产出物，B2C 官方合成） -->
+    <div x-show="current_page === 'barter'" x-cloak>
+      <div class="content-section">
+        <div class="content-section-header flex flex-wrap items-center justify-between gap-2">
+          <div class="section-title">
+            <span class="title-icon">🔄</span>
+            以物易物配方
+          </div>
+          <div class="flex items-center gap-2">
+            <button @click="addBarterRecipe()" class="action-btn action-btn-secondary">+ 新增配方</button>
+            <button @click="saveBarterRecipes()" :disabled="barterSaving" class="action-btn action-btn-primary">
+              <span x-show="!barterSaving">保存全部</span>
+              <span x-show="barterSaving">保存中…</span>
+            </button>
+          </div>
+        </div>
+        <div class="p-4">
+          <p class="text-xs themed-text-muted mb-3">
+            说明：以物易物为「用户↔官方」B2C 合成。用户投入旧物（按模板匹配的可用实例）→ 官方核销销毁旧物 → 从官方库存发放产出物。
+            产出禁为货币型资产、必须关联物品模板、方向仅等价或向下（由后端守卫强制）。配方为运营配置，保存即生效。
+            库存口径：<strong>配方总量（total_limit）是换物发放总量的唯一权威</strong>——实物产出必须设总量 ≥1（后端强制），商品库存（stock）属商城购买链路与换物无关；补货 = 调大配方总量。
+          </p>
+          <div x-show="barterLoading" class="text-center py-6 themed-text-muted">加载中…</div>
+          <div x-show="!barterLoading && barterRecipes.length === 0" class="text-center py-6 themed-text-muted">
+            暂无配方，点击「新增配方」添加
+          </div>
+          <table x-show="!barterLoading && barterRecipes.length > 0" class="w-full text-sm border">
+            <thead>
+              <tr class="bg-gray-50 text-left">
+                <th class="px-3 py-2 border-b">配方码 <span class="text-red-500">*</span></th>
+                <th class="px-3 py-2 border-b">配方名称</th>
+                <th class="px-3 py-2 border-b">旧物模板ID <span class="text-red-500">*</span></th>
+                <th class="px-3 py-2 border-b">需投入数量</th>
+                <th class="px-3 py-2 border-b">产出商品ID <span class="text-red-500">*</span></th>
+                <th class="px-3 py-2 border-b" title="每人限换次数（拍板⑬-(c) 防薅），0=不限">每人限换</th>
+                <th class="px-3 py-2 border-b" title="配方总量（换物发放总量的唯一库存口径）：实物产出必须 ≥1，券/道具 0=不限">配方总量</th>
+                <th class="px-3 py-2 border-b" title="全时段已成交换物次数（取消/拒绝/退款不占额）">已用</th>
+                <th class="px-3 py-2 border-b" title="剩余可换额度 = 配方总量 − 已用；不限量配方显示「不限」">剩余</th>
+                <th class="px-3 py-2 border-b">启用</th>
+                <th class="px-3 py-2 border-b">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="(recipe, idx) in barterRecipes" :key="idx">
+                <tr class="border-b">
+                  <td class="px-3 py-2"><input type="text" x-model="recipe.recipe_code" class="w-full px-2 py-1 border rounded" placeholder="如 old_towel_to_new"></td>
+                  <td class="px-3 py-2"><input type="text" x-model="recipe.name" class="w-full px-2 py-1 border rounded" placeholder="展示名"></td>
+                  <td class="px-3 py-2"><input type="number" x-model.number="recipe.required_item_template_id" class="w-24 px-2 py-1 border rounded" min="1"></td>
+                  <td class="px-3 py-2"><input type="number" x-model.number="recipe.required_quantity" class="w-20 px-2 py-1 border rounded" min="1"></td>
+                  <td class="px-3 py-2"><input type="number" x-model.number="recipe.output_exchange_item_id" class="w-24 px-2 py-1 border rounded" min="1"></td>
+                  <td class="px-3 py-2"><input type="number" x-model.number="recipe.per_user_limit" class="w-20 px-2 py-1 border rounded" min="0" placeholder="0=不限"></td>
+                  <td class="px-3 py-2"><input type="number" x-model.number="recipe.total_limit" class="w-20 px-2 py-1 border rounded" min="0" placeholder="实物≥1"></td>
+                  <td class="px-3 py-2 text-center themed-text-secondary" x-text="barterRecipeUsedText(recipe.recipe_code)"></td>
+                  <td class="px-3 py-2 text-center themed-text-secondary" x-text="barterRecipeRemainingText(recipe.recipe_code)"></td>
+                  <td class="px-3 py-2 text-center"><input type="checkbox" x-model="recipe.is_enabled"></td>
+                  <td class="px-3 py-2"><button @click="removeBarterRecipe(idx)" class="text-red-600 hover:underline">删除</button></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 兑换市场设置（事项C：轮播速度全局配置） -->
+    <div x-show="current_page === 'settings'" x-cloak>
+      <div class="content-section">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">⚙️</span>
+            兑换市场设置
+          </div>
+        </div>
+        <div class="themed-card rounded-lg border p-6 max-w-xl">
+          <div x-show="settingsLoading" class="text-center py-6 themed-text-muted">加载中…</div>
+          <div x-show="!settingsLoading">
+            <label class="block text-sm font-medium themed-text-secondary mb-2">
+              商品图片轮播速度（毫秒/张）
+            </label>
+            <p class="text-xs themed-text-muted mb-3">
+              商品主图与 SKU 图轮播自动切换间隔，全站统一生效。范围 1000-10000 毫秒（小程序读不到时默认 3000）。
+            </p>
+            <div class="flex items-center gap-3">
+              <input type="number" min="1000" max="10000" step="500"
+                     x-model.number="gallery_autoplay_interval_ms"
+                     class="w-40 border rounded px-3 py-2 text-sm">
+              <span class="text-sm themed-text-muted">毫秒</span>
+              <button type="button" @click="saveExchangeSettings()" :disabled="settingsSaving"
+                      class="action-btn action-btn-primary disabled:opacity-50">
+                <span x-show="!settingsSaving">保存</span>
+                <span x-show="settingsSaving">保存中…</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== Modal 组件区域 ==================== -->
+
+  <!-- 批量改价弹窗 -->
+  <div x-ref="batchPriceModal"
+       x-show="isModalOpen('batchPriceModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('batchPriceModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-sm mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center bg-yellow-50">
+        <h5 class="font-semibold text-yellow-700">💰 批量改价</h5>
+        <button @click="hideModal('batchPriceModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+      </div>
+      <div class="p-5 space-y-4">
+        <p class="text-sm text-gray-500">已选 <span class="font-bold text-yellow-600" x-text="batchPriceIds.length"></span> 个商品</p>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">调价模式</label>
+          <select x-model="batchPriceMode" class="w-full border rounded px-3 py-2 text-sm">
+            <option value="percent">按比例（%）</option>
+            <option value="fixed">固定值增减</option>
+            <option value="set">直接设置</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            <span x-show="batchPriceMode === 'percent'">比例值（如 80 表示打8折）</span>
+            <span x-show="batchPriceMode === 'fixed'">增减值（正数加价，负数减价）</span>
+            <span x-show="batchPriceMode === 'set'">目标价格</span>
+          </label>
+          <input type="number" x-model.number="batchPriceValue" class="w-full border rounded px-3 py-2 text-sm" />
+        </div>
+      </div>
+      <div class="p-4 border-t flex justify-end gap-2">
+        <button @click="hideModal('batchPriceModal')" class="px-4 py-2 text-sm border rounded hover:bg-gray-50">取消</button>
+        <button @click="submitBatchPrice()" class="px-4 py-2 text-sm bg-yellow-500 text-white rounded hover:bg-yellow-600">确认改价</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 批量修改分类弹窗 -->
+  <div x-ref="batchCategoryModal"
+       x-show="isModalOpen('batchCategoryModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('batchCategoryModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-sm mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center bg-purple-50">
+        <h5 class="font-semibold text-purple-700">📂 批量修改分类</h5>
+        <button @click="hideModal('batchCategoryModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+      </div>
+      <div class="p-5 space-y-4">
+        <p class="text-sm text-gray-500">已选 <span class="font-bold text-purple-600" x-text="batchCategoryIds.length"></span> 个商品</p>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">目标分类</label>
+          <select x-model.number="batchCategoryId" class="w-full border rounded px-3 py-2 text-sm">
+            <option value="">请选择分类</option>
+            <template x-for="cat in (categoryOptions || [])" :key="cat.value">
+              <option :value="cat.value" x-text="cat.label"></option>
+            </template>
+          </select>
+        </div>
+      </div>
+      <div class="p-4 border-t flex justify-end gap-2">
+        <button @click="hideModal('batchCategoryModal')" class="px-4 py-2 text-sm border rounded hover:bg-gray-50">取消</button>
+        <button @click="submitBatchCategory()" :disabled="!batchCategoryId" class="px-4 py-2 text-sm bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50">确认修改</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 单品数据看板弹窗 -->
+  <div x-ref="itemDashboardModal"
+       x-show="isModalOpen('itemDashboardModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('itemDashboardModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 z-10 max-h-[80vh] overflow-y-auto">
+      <div class="p-4 border-b flex justify-between items-center bg-indigo-50">
+        <h5 class="font-semibold text-indigo-700">📊 单品数据看板</h5>
+        <button @click="hideModal('itemDashboardModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+      </div>
+      <div class="p-5">
+        <div x-show="itemDashboardLoading" class="text-center py-8">
+          <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500"></div>
+          <p class="mt-2 text-sm text-gray-500">加载中...</p>
+        </div>
+        <template x-if="itemDashboard && !itemDashboardLoading">
+          <div class="space-y-4">
+            <div class="text-center mb-3">
+              <h6 class="font-bold text-lg" x-text="itemDashboard.item_name || '-'"></h6>
+              <span class="text-xs text-gray-400" x-text="'ID: ' + (itemDashboard.exchange_item_id || '-')"></span>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div class="p-3 bg-blue-50 rounded-lg text-center">
+                <p class="text-xl font-bold text-blue-700" x-text="itemDashboard.orders_7d ?? '-'"></p>
+                <p class="text-xs text-gray-500">7天订单</p>
+              </div>
+              <div class="p-3 bg-green-50 rounded-lg text-center">
+                <p class="text-xl font-bold text-green-700" x-text="itemDashboard.orders_30d ?? '-'"></p>
+                <p class="text-xs text-gray-500">30天订单</p>
+              </div>
+              <div class="p-3 bg-yellow-50 rounded-lg text-center">
+                <p class="text-xl font-bold text-yellow-700" x-text="itemDashboard.current_stock ?? '-'"></p>
+                <p class="text-xs text-gray-500">当前库存</p>
+              </div>
+              <div class="p-3 bg-purple-50 rounded-lg text-center">
+                <p class="text-xl font-bold text-purple-700" x-text="itemDashboard.total_sold ?? '-'"></p>
+                <p class="text-xs text-gray-500">累计销量</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+              <div class="p-3 bg-gray-50 rounded-lg text-center">
+                <p class="text-lg font-bold" x-text="itemDashboard.avg_rating ? Number(itemDashboard.avg_rating).toFixed(1) : '-'"></p>
+                <p class="text-xs text-gray-500">平均评分</p>
+              </div>
+              <div class="p-3 bg-gray-50 rounded-lg text-center">
+                <p class="text-lg font-bold" x-text="itemDashboard.conversion_rate ? (Number(itemDashboard.conversion_rate) * 100).toFixed(1) + '%' : '-'"></p>
+                <p class="text-xs text-gray-500">转化率</p>
+              </div>
+              <div class="p-3 bg-gray-50 rounded-lg text-center">
+                <p class="text-lg font-bold" x-text="itemDashboard.inventory_turnover ? Number(itemDashboard.inventory_turnover).toFixed(2) : '-'"></p>
+                <p class="text-xs text-gray-500">库存周转</p>
+              </div>
+            </div>
+            <template x-if="itemDashboard.order_status_distribution">
+              <div>
+                <h6 class="text-sm font-medium text-gray-600 mb-2">订单状态分布</h6>
+                <div class="grid grid-cols-3 gap-2">
+                  <template x-for="[status, count] in Object.entries(itemDashboard.order_status_distribution)" :key="status">
+                    <div class="text-center p-2 bg-gray-50 rounded text-xs">
+                      <span class="font-bold" x-text="count"></span>
+                      <span class="text-gray-500 block" x-text="{'pending':'待处理','approved':'已审核','shipped':'已发货','completed':'已完成','cancelled':'已取消','refunded':'已退款','rejected':'已驳回'}[status] || status"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1. 商品编辑模态框 -->
+  <div x-ref="itemModal"
+       x-show="isModalOpen('itemModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('itemModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 z-10 max-h-[90vh] overflow-y-auto">
+      <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
+        <h5 class="font-semibold" x-text="editingItemId ? '编辑商品' : '新增商品'"></h5>
+        <button @click="hideModal('itemModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      <form @submit.prevent="saveItem()">
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">商品名称 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="itemForm.item_name" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" required>
+          </div>
+          <!-- 商品编码（商品编码体系：系统生成只读；展示形 + 二维码，扫码结果=编码可作搜索输入） -->
+          <div x-show="editingItemId && editingItemCode" class="rounded-lg border border-indigo-100 bg-indigo-50/50 px-4 py-3 flex items-center gap-4">
+            <div class="flex-1">
+              <p class="text-xs font-semibold text-indigo-500 mb-1">平台商品编码（系统生成，印刷手册用）</p>
+              <p class="font-mono text-base font-bold text-indigo-700" x-text="formatItemCodeDisplay(editingItemCode)"></p>
+              <p x-show="editingSeriesNo" class="text-xs text-teal-600 mt-1">
+                系列号：<span class="font-mono font-semibold" x-text="editingSeriesNo"></span>
+              </p>
+            </div>
+            <!-- 二维码（拍1 方案A：admin 纯 JS qrcode 端侧渲染，内容=编码规范形） -->
+            <canvas id="item-code-qr-canvas" width="96" height="96" class="border rounded bg-white" title="扫码得到商品编码，可作为搜索输入"></canvas>
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">商品描述</label>
+            <div class="border rounded-lg overflow-hidden">
+              <div id="description-toolbar" style="border-bottom: 1px solid #e5e7eb;"></div>
+              <div id="description-editor" style="min-height: 150px; max-height: 300px; overflow-y: auto;"></div>
+            </div>
+            <input type="hidden" x-model="itemForm.description">
+          </div>
+          <!-- 商品图片上传 -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">商品图片</label>
+            <div class="flex items-center gap-4">
+              <!-- 图片预览 -->
+              <div class="w-20 h-20 border-2 border-dashed rounded-lg flex items-center justify-center overflow-hidden bg-gray-50"
+                   :class="itemImagePreviewUrl ? 'border-green-300' : 'border-gray-300'">
+                <template x-if="itemImagePreviewUrl">
+                  <img :src="itemImagePreviewUrl" alt="商品图片" class="w-full h-full object-cover" />
+                </template>
+                <template x-if="!itemImagePreviewUrl">
+                  <span class="text-gray-400 text-2xl">📷</span>
+                </template>
+              </div>
+              <!-- 上传按钮 -->
+              <div class="flex-1">
+                <label class="inline-flex items-center px-3 py-2 bg-blue-50 text-blue-600 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors text-sm">
+                  <span x-show="!imageUploading">📤 选择图片</span>
+                  <span x-show="imageUploading">⏳ 上传中...</span>
+                  <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden"
+                         @change="uploadItemImage($event)" :disabled="imageUploading">
+                </label>
+                <p class="text-xs themed-text-muted mt-1">支持 JPG/PNG/GIF/WebP，最大 5MB</p>
+              </div>
+            </div>
+          </div>
+          <!-- 主图轮播组（事项A：role='gallery'，小程序详情页主图轮播 images[]） -->
+          <div x-show="editingItemId">
+            <label class="block text-sm font-medium themed-text-secondary mb-1">主图轮播组 <span class="text-xs themed-text-muted">(选填，最多9张，小程序详情页顶部主图轮播)</span></label>
+            <div class="flex flex-wrap gap-2 mb-1">
+              <template x-for="img in galleryImages" :key="img.media_id">
+                <div class="relative w-20 h-20 border rounded-lg overflow-hidden group">
+                  <img :src="img.url" class="w-full h-full object-cover" />
+                  <button type="button" @click="removeGalleryImage(img.media_id)"
+                          class="absolute top-0 right-0 bg-red-500 text-white w-5 h-5 text-xs opacity-0 group-hover:opacity-100" title="删除">✕</button>
+                </div>
+              </template>
+              <label x-show="galleryImages.length < 9"
+                     class="w-20 h-20 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-green-500 transition">
+                <span x-show="!galleryImageUploading" class="text-2xl text-gray-400">+</span>
+                <span x-show="galleryImageUploading" class="text-xs text-gray-400">上传中...</span>
+                <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden"
+                       @change="uploadGalleryImage($event)" :disabled="galleryImageUploading">
+              </label>
+            </div>
+            <p class="text-xs themed-text-muted">已上传 <span x-text="galleryImages.length">0</span>/9 张 · 用于小程序商品详情页顶部主图轮播</p>
+          </div>
+          <!-- 详情图上传区域（多图支持，最多9张） -->
+          <div x-show="editingItemId">
+            <label class="block text-sm font-medium themed-text-secondary mb-1">详情图 <span class="text-xs themed-text-muted">(选填，最多9张，用于商品详情页展示)</span></label>
+            <div class="grid grid-cols-5 gap-2 mb-2">
+              <!-- 已上传的详情图 -->
+              <template x-for="(img, idx) in detailImages" :key="img.media_id">
+                <div class="relative group w-full aspect-square border rounded-lg overflow-hidden bg-gray-50">
+                  <img :src="img.url" class="w-full h-full object-cover" />
+                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                    <button type="button" @click="moveDetailImage(idx, 'up')" x-show="idx > 0"
+                            class="w-6 h-6 bg-white/80 rounded text-xs hover:bg-white" title="上移">←</button>
+                    <button type="button" @click="moveDetailImage(idx, 'down')" x-show="idx < detailImages.length - 1"
+                            class="w-6 h-6 bg-white/80 rounded text-xs hover:bg-white" title="下移">→</button>
+                    <button type="button" @click="removeDetailImage(img.media_id)"
+                            class="w-6 h-6 bg-red-500/80 text-white rounded text-xs hover:bg-red-600" title="删除">✕</button>
+                  </div>
+                  <span class="absolute top-1 left-1 bg-black/50 text-white text-xs px-1 rounded" x-text="idx + 1"></span>
+                </div>
+              </template>
+              <!-- 添加按钮（未满9张时显示） -->
+              <div x-show="detailImages.length < 9"
+                   class="w-full aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-colors">
+                <label class="flex flex-col items-center cursor-pointer w-full h-full justify-center">
+                  <span x-show="!detailImageUploading" class="text-gray-400 text-xl">+</span>
+                  <span x-show="!detailImageUploading" class="text-xs text-gray-400 mt-1">添加</span>
+                  <span x-show="detailImageUploading" class="text-gray-400 text-sm">⏳</span>
+                  <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden"
+                         @change="uploadDetailImage($event)" :disabled="detailImageUploading">
+                </label>
+              </div>
+            </div>
+            <p class="text-xs themed-text-muted">已上传 <span x-text="detailImages.length">0</span>/9 张 · 悬停图片使用箭头按钮调整顺序 · 支持 JPG/PNG/GIF/WebP，最大 5MB</p>
+          </div>
+          <div class="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2">
+            <p class="text-xs themed-text-muted">
+              💡 计价资产与价格在下方「规格（SKU）管理」中按 SKU 设置（价格真相源为渠道价 channel_prices）。单规格商品也需建立一个 SKU 并设价。
+            </p>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">成本价（元）</label>
+              <input type="number" x-model.number="itemForm.cost_price" min="0" step="0.01" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="0 表示无成本">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">库存</label>
+              <input type="number" x-model.number="itemForm.stock" min="0" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
+              <select x-model="itemForm.status" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                <option value="active">上架</option>
+                <option value="inactive">下架</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">排序权重</label>
+              <input type="number" x-model.number="itemForm.sort_order" min="0" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="数值越小越靠前">
+            </div>
+          </div>
+          <!-- 稀有度（控制小程序卡片光效） -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">稀有度</label>
+              <select x-model="itemForm.rarity_code" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                <template x-for="rarity in rarityOptions" :key="rarity.value">
+                  <option :value="rarity.value" x-text="rarity.label" :selected="itemForm.rarity_code === rarity.value"></option>
+                </template>
+              </select>
+              <p class="text-xs text-gray-400 mt-1">影响小程序卡片光效</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">商品分类</label>
+              <select x-model="itemForm.category_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                <option :value="null">未分类</option>
+                <template x-for="cat in categoryOptions" :key="cat.value">
+                  <option :value="cat.value" :disabled="cat.level === 1 && categoryOptions.some(c => c.parent_category_id === cat.value)" x-text="(cat.level === 2 ? '  └ ' : '') + cat.label"></option>
+                </template>
+              </select>
+              <p class="text-xs text-gray-400 mt-1">统一商品中心品类树，选择具体子分类</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">所属空间</label>
+              <select x-model="itemForm.space" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                <option value="lucky">幸运空间</option>
+                <option value="premium">臻选空间</option>
+                <option value="both">两个空间</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">原价（划线价）</label>
+              <input type="number" x-model.number="itemForm.original_price" min="0" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="留空表示无原价">
+            </div>
+          </div>
+          <!-- 所属系列（商品编码体系双轨制：归入系列时后端事务内自动发连续序号 series_seq） -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">所属系列 <span class="text-xs themed-text-muted">(选填；归入系列后系统自动分配连号，如 SLNB-001)</span></label>
+            <select x-model="itemForm.series_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+              <option :value="null">不归入系列</option>
+              <template x-for="s in seriesOptions" :key="s.series_id">
+                <option :value="s.series_id" x-text="s.series_code + ' - ' + s.series_name"></option>
+              </template>
+            </select>
+            <p class="text-xs text-gray-400 mt-1">系列在「产品系列管理」页维护；序号连续不回收，下架商品序号留空号</p>
+          </div>
+          <!-- 供应商关联（商品编码体系 §3.8：多供应商 + 各自货号 + 主供货商标记；货号可空可重复仅对账参考） -->
+          <div class="rounded-lg border border-cyan-200 bg-cyan-50/40 p-3">
+            <div class="flex justify-between items-center mb-2">
+              <label class="text-sm font-medium themed-text-secondary">🏭 供应商关联 <span class="text-xs themed-text-muted">(选填；不挂供应商=自营/未知来源)</span></label>
+              <button type="button" @click="addSupplierLink()" class="text-xs px-2 py-1 bg-cyan-500 text-white rounded hover:bg-cyan-600">+ 添加供应商</button>
+            </div>
+            <div x-show="itemSupplierLinks.length === 0" class="text-xs themed-text-muted py-1">暂无供应商关联（自营/未知来源）</div>
+            <template x-for="(link, idx) in itemSupplierLinks" :key="idx">
+              <div class="flex items-center gap-2 mb-2">
+                <select x-model="link.supplier_id" class="flex-1 px-2 py-1.5 text-sm border rounded focus:ring-2 focus:ring-cyan-500">
+                  <option value="">选择供应商</option>
+                  <template x-for="s in supplierOptions" :key="s.supplier_id">
+                    <option :value="s.supplier_id" x-text="s.supplier_name"></option>
+                  </template>
+                </select>
+                <input type="text" x-model="link.supplier_item_code" placeholder="该供应商货号（可空，如 CB4385）"
+                       class="flex-1 px-2 py-1.5 text-sm border rounded font-mono focus:ring-2 focus:ring-cyan-500">
+                <label class="flex items-center gap-1 text-xs whitespace-nowrap cursor-pointer" title="主供货商（展示/默认对账，最多一个）">
+                  <input type="checkbox" :checked="link.is_primary" @change="setPrimarySupplierLink(idx)" class="w-3.5 h-3.5 text-cyan-500 rounded">
+                  主供
+                </label>
+                <button type="button" @click="removeSupplierLink(idx)" class="text-red-500 hover:text-red-700 text-sm px-1" title="移除该行">✕</button>
+              </div>
+            </template>
+            <p class="text-xs text-gray-400">货号是供应商自有编码（可重复可空），仅采购对账参考；系统内部只认我方 SP 商品编码</p>
+          </div>
+          <!-- 门店专属兑换券：履约类型 + 核销范围（业务线2） -->
+          <div class="grid grid-cols-2 gap-4 p-3 rounded-lg bg-amber-50 border border-amber-200">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">履约类型</label>
+              <select x-model="itemForm.fulfillment_type" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                <option value="physical">实物邮寄（physical）</option>
+                <option value="virtual">虚拟即时（virtual）</option>
+                <option value="voucher">卡券核销（voucher）</option>
+              </select>
+              <p class="text-xs text-gray-400 mt-1">门店专属券需选「卡券核销 voucher」</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">核销范围</label>
+              <select x-model="itemForm.applicable_scope" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                <option value="all">通用（任意门店可核）</option>
+                <option value="specified_stores">指定门店</option>
+                <option value="merchant_all">商家全门店</option>
+              </select>
+              <p class="text-xs text-gray-400 mt-1" x-text="itemForm.applicable_scope === 'all' ? '通用券：任意门店核销，不计入本店待核销' : (itemForm.applicable_scope === 'specified_stores' ? '仅勾选门店可核销' : '该商家所有门店可核销')"></p>
+            </div>
+            <!-- 指定门店：多选 -->
+            <div class="col-span-2" x-show="itemForm.applicable_scope === 'specified_stores'" x-cloak>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">选择允许核销的门店（可多选）</label>
+              <div class="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 border rounded-lg bg-white">
+                <template x-for="store in storeScopeOptions" :key="store.store_id">
+                  <label class="inline-flex items-center gap-1 px-2 py-1 rounded border cursor-pointer text-sm"
+                    :class="(itemForm.scoped_store_ids || []).includes(store.store_id) ? 'bg-green-100 border-green-400 text-green-800' : 'bg-gray-50 border-gray-200'">
+                    <input type="checkbox" class="hidden" :checked="(itemForm.scoped_store_ids || []).includes(store.store_id)" @change="toggleScopeStore(store.store_id)">
+                    <span x-text="store.store_name + ' (#' + store.store_id + ')'"></span>
+                  </label>
+                </template>
+                <span x-show="storeScopeOptions.length === 0" class="text-xs text-gray-400">暂无可选门店</span>
+              </div>
+            </div>
+            <!-- 商家全门店：单选 -->
+            <div class="col-span-2" x-show="itemForm.applicable_scope === 'merchant_all'" x-cloak>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">选择归属商家</label>
+              <select x-model.number="itemForm.merchant_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                <option :value="null">请选择商家</option>
+                <template x-for="m in merchantScopeOptions" :key="m.merchant_id">
+                  <option :value="m.merchant_id" x-text="m.merchant_name + ' (#' + m.merchant_id + ')'"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">营销卖点</label>
+            <input type="text" x-model="itemForm.sell_point" maxlength="200" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="一句话卖点，如：开箱必出稀有道具，欧皇必备">
+          </div>
+          <!-- 商品视频 -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">商品视频 URL</label>
+            <input type="url" x-model="itemForm.video_url" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="输入视频链接（如 https://...）">
+            <p class="text-xs text-gray-400 mt-1">支持 MP4 格式视频链接，用于商品详情页展示</p>
+            <template x-if="itemForm.video_url">
+              <div class="mt-2">
+                <video :src="itemForm.video_url" controls class="w-full max-h-40 rounded border bg-black" preload="metadata"></video>
+              </div>
+            </template>
+          </div>
+          <!-- 标签管理 -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">商品标签</label>
+            <div class="flex gap-2 mb-2">
+              <input type="text" x-model="tagInput" @keydown.enter.prevent="addTag()" class="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="输入标签后按回车">
+              <button type="button" @click="addTag()" class="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm">添加</button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="(tag, idx) in (itemForm.tags || [])" :key="idx">
+                <span class="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                  <span x-text="'#' + tag"></span>
+                  <button type="button" @click="removeTag(idx)" class="text-green-600 hover:text-red-500">&times;</button>
+                </span>
+              </template>
+            </div>
+          </div>
+          <!-- 使用说明管理 -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">使用说明</label>
+            <div class="flex gap-2 mb-2">
+              <input type="text" x-model="usageRuleInput" @keydown.enter.prevent="addUsageRule()" class="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="输入一条使用说明后按回车">
+              <button type="button" @click="addUsageRule()" class="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">添加</button>
+            </div>
+            <div class="space-y-1">
+              <template x-for="(rule, idx) in (itemForm.usage_rules || [])" :key="idx">
+                <div class="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg">
+                  <span class="text-sm text-gray-600" x-text="(idx + 1) + '. ' + rule"></span>
+                  <button type="button" @click="removeUsageRule(idx)" class="ml-auto text-gray-400 hover:text-red-500 text-xs">&times;</button>
+                </div>
+              </template>
+            </div>
+          </div>
+          <!-- 定时上下架 -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">定时上架</label>
+              <input type="datetime-local" x-model="itemForm.publish_at" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+              <p class="text-xs themed-text-muted mt-1">留空表示不自动上架</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">定时下架</label>
+              <input type="datetime-local" x-model="itemForm.unpublish_at" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+              <p class="text-xs themed-text-muted mt-1">留空表示不自动下架</p>
+            </div>
+          </div>
+          <!-- 库存预警阈值 -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">库存预警阈值</label>
+            <input type="number" x-model.number="itemForm.stock_alert_threshold" min="0" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="0 表示不告警">
+            <p class="text-xs themed-text-muted mt-1">低于此值时系统自动创建库存预警通知，0=不告警</p>
+          </div>
+          <!-- 每单兑换数量上限（议题四·P6=A：商品级可配，替代历史硬编码 1-10） -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">每单兑换数量上限</label>
+            <input type="number" x-model.number="itemForm.max_quantity_per_order" min="1" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="默认 10">
+            <p class="text-xs themed-text-muted mt-1">单次兑换最多可兑数量（≥1）；限量款可设小值，提交时后端据此校验</p>
+          </div>
+          <!-- 商品参数表（结构化属性JSON） -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">商品参数表</label>
+            <textarea x-model="attributesStr" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 font-mono text-sm" placeholder='{"材质":"纯棉","产地":"中国","规格":"500ml"}'></textarea>
+            <p class="text-xs themed-text-muted mt-1">JSON 格式的商品参数键值对，用于详情页展示</p>
+          </div>
+          <!-- 展示图上传（category='showcase'） -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">展示图（最多9张）</label>
+            <div class="flex flex-wrap gap-2 mb-2">
+              <template x-for="(img, idx) in showcaseImages" :key="img.media_id">
+                <div class="relative w-20 h-20 border rounded-lg overflow-hidden group">
+                  <img :src="img.url" class="w-full h-full object-cover">
+                  <button type="button" @click="removeShowcaseImage(img.media_id)" class="absolute top-0 right-0 bg-red-500 text-white w-5 h-5 rounded-bl text-xs opacity-0 group-hover:opacity-100 transition">&times;</button>
+                </div>
+              </template>
+              <label x-show="showcaseImages.length < 9" class="w-20 h-20 border-2 border-dashed rounded-lg flex items-center justify-center cursor-pointer hover:border-green-500 transition">
+                <span x-show="!showcaseImageUploading" class="text-2xl text-gray-400">+</span>
+                <span x-show="showcaseImageUploading" class="text-xs text-gray-400">上传中...</span>
+                <input type="file" accept="image/*" @change="uploadShowcaseImage($event)" class="hidden">
+              </label>
+            </div>
+          </div>
+          <!-- 物品系统关联（铸造实例 + 关联模板） -->
+          <div class="border rounded-lg p-4 bg-blue-50/30">
+            <label class="block text-sm font-medium themed-text-secondary mb-3">🔗 物品系统关联</label>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" x-model="itemForm.mint_instance" class="w-4 h-4 text-blue-500 rounded focus:ring-blue-500">
+                  <span class="text-sm">⚙️ 兑换后铸造物品实例</span>
+                </label>
+                <p class="text-xs text-gray-400 mt-1 ml-6">开启后兑换将自动铸造 Item 进入用户背包，可在 C2C 市场交易</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">关联物品模板</label>
+                <select x-model.number="itemForm.item_template_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" :disabled="!itemForm.mint_instance">
+                  <option :value="null">不关联</option>
+                  <template x-for="tpl in itemTemplateOptions" :key="tpl.value">
+                    <option :value="tpl.value" x-text="tpl.label"></option>
+                  </template>
+                </select>
+                <p class="text-xs text-gray-400 mt-1">铸造时使用的物品定义模板（品质规则、稀有度等）</p>
+              </div>
+            </div>
+          </div>
+          <!-- 商品标记（布尔开关） -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-2">商品标记</label>
+            <div class="grid grid-cols-3 gap-3">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" x-model="itemForm.is_new" class="w-4 h-4 text-green-500 rounded focus:ring-green-500">
+                <span class="text-sm">🆕 新品</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" x-model="itemForm.is_hot" class="w-4 h-4 text-red-500 rounded focus:ring-red-500">
+                <span class="text-sm">🔥 热门</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" x-model="itemForm.is_lucky" class="w-4 h-4 text-yellow-500 rounded focus:ring-yellow-500">
+                <span class="text-sm">🍀 幸运</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" x-model="itemForm.is_limited" class="w-4 h-4 text-purple-500 rounded focus:ring-purple-500">
+                <span class="text-sm">💎 限量</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" x-model="itemForm.has_warranty" class="w-4 h-4 text-blue-500 rounded focus:ring-blue-500">
+                <span class="text-sm">🛡️ 质保</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" x-model="itemForm.free_shipping" class="w-4 h-4 text-teal-500 rounded focus:ring-teal-500">
+                <span class="text-sm">📦 包邮</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- SKU 规格管理区域（仅编辑已有商品时显示） -->
+        <div x-show="editingItemId" class="px-6 pb-4">
+          <div class="border-t pt-4">
+            <div class="flex justify-between items-center mb-3">
+              <label class="text-sm font-medium themed-text-secondary">📦 SKU 规格管理</label>
+              <button type="button" @click="resetSkuForm(); skuForm.spec_values_str = '{}'; showModal('skuModal')" class="text-xs px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600">+ 添加规格</button>
+            </div>
+            <div x-show="itemSkus && itemSkus.length > 0" class="overflow-x-auto">
+              <table class="w-full text-sm border">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <th class="px-3 py-2 text-left">SKU编码</th>
+                    <th class="px-3 py-2 text-left">规格值</th>
+                    <th class="px-3 py-2 text-left">价格</th>
+                    <th class="px-3 py-2 text-left">库存</th>
+                    <th class="px-3 py-2 text-left">已售</th>
+                    <th class="px-3 py-2 text-left">状态</th>
+                    <th class="px-3 py-2 text-left">操作</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="sku in itemSkus" :key="sku.sku_id">
+                    <tr class="themed-hover-bg">
+                      <!-- SKU 平台展示码（SK-XXXX-XXXX-XXXX，系统生成不可改） -->
+                      <td class="px-3 py-2">
+                        <span class="font-mono text-xs text-indigo-600" x-text="formatSkuCode(sku.sku_code)" title="SKU 平台展示码（系统生成）"></span>
+                      </td>
+                      <td class="px-3 py-2">
+                        <template x-for="(val, key) in (sku.spec_values || {})" :key="key">
+                          <span class="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs mr-1" x-text="key + ':' + val"></span>
+                        </template>
+                      </td>
+                      <td class="px-3 py-2 font-mono" x-text="skuPriceLabel(sku)"></td>
+                      <td class="px-3 py-2" x-text="sku.stock"></td>
+                      <td class="px-3 py-2" x-text="sku.sold_count || 0"></td>
+                      <td class="px-3 py-2">
+                        <span class="px-1.5 py-0.5 rounded text-xs" :class="sku.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'" x-text="sku.status === 'active' ? '启用' : '禁用'"></span>
+                      </td>
+                      <td class="px-3 py-2">
+                        <button type="button" @click="editSkuWithStr(sku); showModal('skuModal')" class="text-blue-500 hover:text-blue-700 text-xs mr-2">编辑</button>
+                        <button type="button" @click="deleteSku(editingItemId, sku.sku_id)" class="text-red-500 hover:text-red-700 text-xs">删除</button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="!itemSkus || itemSkus.length === 0" class="text-center py-4 text-sm themed-text-muted">
+              暂无规格数据，点击「添加规格」创建第一个 SKU
+            </div>
+          </div>
+        </div>
+
+        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3 sticky bottom-0">
+          <button type="button" @click="hideModal('itemModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+          <button type="submit" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50" :disabled="saving">
+            <span x-text="editingItemId ? '保存修改' : '创建商品'"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 1.5 兑换等级门槛配置模态框（P0-2，拍板⑪） -->
+  <div x-ref="redeemRequirementModal"
+       x-show="isModalOpen('redeemRequirementModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="closeRedeemRequirementModal()"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
+      <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card z-10">
+        <h5 class="font-semibold">🔒 等级门槛配置 <span class="text-sm themed-text-muted" x-text="redeemRequirementItem?.item_name"></span></h5>
+        <button @click="closeRedeemRequirementModal()" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      <div class="p-4">
+        <p class="text-xs themed-text-muted mb-3">
+          配置本商品的成长等级兑换门槛（区间语义）：仅配「最低等级」=该等级及以上可兑；仅配「最高等级」=该等级及以下可兑（新人专享）；两者相同=仅该等级；都不配=不限。C 端对不满足门槛的用户显示「专享」角标并置灰兑换按钮（橱窗效应）。
+        </p>
+
+        <!-- 现有门槛列表 -->
+        <div x-show="redeemRequirementLoading" class="text-center py-4 themed-text-muted text-sm">加载中…</div>
+        <div x-show="!redeemRequirementLoading">
+          <table class="w-full text-sm border mb-4" x-show="redeemRequirements.length > 0">
+            <thead>
+              <tr class="bg-gray-50 text-left">
+                <th class="px-3 py-2 border-b">最低等级</th>
+                <th class="px-3 py-2 border-b">最高等级</th>
+                <th class="px-3 py-2 border-b">状态</th>
+                <th class="px-3 py-2 border-b">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="req in redeemRequirements" :key="req.exchange_redeem_requirement_id">
+                <tr class="border-b">
+                  <td class="px-3 py-2" x-text="growthLevelName(req.min_growth_level_key)"></td>
+                  <td class="px-3 py-2" x-text="growthLevelName(req.max_growth_level_key)"></td>
+                  <td class="px-3 py-2">
+                    <span class="px-2 py-0.5 rounded text-xs" :class="req.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'" x-text="req.is_enabled ? '启用' : '停用'"></span>
+                  </td>
+                  <td class="px-3 py-2 space-x-2">
+                    <button @click="editRedeemRequirement(req)" class="text-blue-600 hover:underline">编辑</button>
+                    <button @click="deleteRedeemRequirement(req)" class="text-red-600 hover:underline">删除</button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <div x-show="redeemRequirements.length === 0" class="text-center py-3 themed-text-muted text-sm">暂无门槛配置（该商品不限等级兑换）</div>
+
+          <button @click="addRedeemRequirement()" x-show="!redeemRequirementForm" class="action-btn action-btn-secondary mb-2">+ 新增门槛</button>
+
+          <!-- 门槛编辑表单 -->
+          <div x-show="redeemRequirementForm" x-cloak class="border rounded p-4 mt-2 themed-bg-base">
+            <template x-if="redeemRequirementForm">
+              <div class="space-y-3">
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium themed-text-secondary mb-1">最低等级（及以上）</label>
+                    <select x-model="redeemRequirementForm.min_growth_level_key" class="w-full px-3 py-2 border rounded">
+                      <option value="">不限</option>
+                      <template x-for="lv in growthLevelOptions" :key="lv.level_key">
+                        <option :value="lv.level_key" x-text="lv.level_name + '（' + lv.level_key + '）'"></option>
+                      </template>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium themed-text-secondary mb-1">最高等级（及以下）</label>
+                    <select x-model="redeemRequirementForm.max_growth_level_key" class="w-full px-3 py-2 border rounded">
+                      <option value="">不限</option>
+                      <template x-for="lv in growthLevelOptions" :key="lv.level_key">
+                        <option :value="lv.level_key" x-text="lv.level_name + '（' + lv.level_key + '）'"></option>
+                      </template>
+                    </select>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium themed-text-secondary mb-1">生效时间（北京时间，留空=立即）</label>
+                    <input type="datetime-local" x-model="redeemRequirementForm.publish_at" class="w-full px-3 py-2 border rounded">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium themed-text-secondary mb-1">失效时间（北京时间，留空=长期）</label>
+                    <input type="datetime-local" x-model="redeemRequirementForm.unpublish_at" class="w-full px-3 py-2 border rounded">
+                  </div>
+                </div>
+                <label class="flex items-center gap-2 text-sm">
+                  <input type="checkbox" x-model="redeemRequirementForm.is_enabled"> 启用该门槛
+                </label>
+                <div class="flex justify-end gap-2">
+                  <button @click="redeemRequirementForm = null" class="px-3 py-1.5 border rounded text-sm hover:bg-gray-100">取消</button>
+                  <button @click="saveRedeemRequirement()" :disabled="redeemRequirementSaving" class="action-btn action-btn-primary disabled:opacity-50">
+                    <span x-show="!redeemRequirementSaving">保存门槛</span>
+                    <span x-show="redeemRequirementSaving">保存中…</span>
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 订单详情模态框 -->
+  <div x-ref="orderDetailModal"
+       x-show="isModalOpen('orderDetailModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('orderDetailModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">📦 订单详情</h5>
+        <button @click="hideModal('orderDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      <template x-if="selectedOrder">
+        <div class="p-6">
+          <div class="space-y-3">
+            <div class="flex justify-between border-b pb-2">
+              <span class="themed-text-muted">订单号</span>
+              <span class="font-mono" x-text="selectedOrder.order_no"></span>
+            </div>
+            <div class="flex justify-between border-b pb-2">
+              <span class="themed-text-muted">用户</span>
+              <span x-text="selectedOrder.user_nickname || selectedOrder.user_mobile || selectedOrder.user_id"></span>
+            </div>
+            <div class="flex justify-between border-b pb-2">
+              <span class="themed-text-muted">商品</span>
+              <span x-text="selectedOrder.source === 'diy' ? '🎨 DIY 设计兑换' : (selectedOrder.item_snapshot?.item_name || '-')"></span>
+            </div>
+            <div class="flex justify-between border-b pb-2">
+              <span class="themed-text-muted">消耗资产</span>
+              <span class="font-mono text-green-600" x-text="(selectedOrder.pay_amount || 0) + ' ' + getAssetTypeName(selectedOrder.pay_asset_code)"></span>
+            </div>
+            <div class="flex justify-between border-b pb-2">
+              <span class="themed-text-muted">状态</span>
+              <span :class="{
+                'text-yellow-600': selectedOrder.status === 'pending',
+                'themed-text-primary': selectedOrder.status === 'shipped',
+                'text-green-600': selectedOrder.status === 'completed',
+                'text-red-600': selectedOrder.status === 'cancelled'
+              }" x-text="{'pending':'待审核','approved':'已审核待发货','shipped':'已发货','received':'已收货','rated':'已评分','completed':'已完成','rejected':'已拒绝','refunded':'已退款','cancelled':'已取消'}[selectedOrder.status] || selectedOrder.status"></span>
+            </div>
+            <div class="flex justify-between border-b pb-2">
+              <span class="themed-text-muted">下单时间</span>
+              <span x-text="formatDate(selectedOrder.created_at)"></span>
+            </div>
+            <div x-show="selectedOrder.shipped_at" class="flex justify-between border-b pb-2">
+              <span class="themed-text-muted">发货时间</span>
+              <span x-text="formatDate(selectedOrder.shipped_at)"></span>
+            </div>
+            <div x-show="selectedOrder.completed_at" class="flex justify-between border-b pb-2">
+              <span class="themed-text-muted">完成时间</span>
+              <span x-text="formatDate(selectedOrder.completed_at)"></span>
+            </div>
+            <div x-show="selectedOrder.address_snapshot || selectedOrder.address">
+              <span class="themed-text-muted block mb-1">收货地址</span>
+              <template x-if="selectedOrder.address_snapshot">
+                <div class="themed-bg-base rounded p-2 text-sm space-y-1">
+                  <div><span class="text-gray-500">收件人：</span><span x-text="selectedOrder.address_snapshot.receiver_name || '-'"></span></div>
+                  <div><span class="text-gray-500">手机号：</span><span x-text="selectedOrder.address_snapshot.receiver_phone || '-'"></span></div>
+                  <div><span class="text-gray-500">地址：</span><span x-text="(selectedOrder.address_snapshot.province || '') + (selectedOrder.address_snapshot.city || '') + (selectedOrder.address_snapshot.district || '') + ' ' + (selectedOrder.address_snapshot.detail_address || '')"></span></div>
+                </div>
+              </template>
+              <template x-if="!selectedOrder.address_snapshot && selectedOrder.address">
+                <p class="themed-bg-base rounded p-2 text-sm" x-text="selectedOrder.address"></p>
+              </template>
+            </div>
+            <div x-show="selectedOrder.source === 'diy' && !selectedOrder.address_snapshot && !selectedOrder.address">
+              <span class="themed-text-muted block mb-1">收货地址</span>
+              <div class="bg-yellow-50 border border-yellow-200 rounded p-2 text-sm text-yellow-700">
+                ⚠️ 尚未填写收货地址，请前往 DIY 作品管理页面补录
+              </div>
+            </div>
+            <!-- 快递信息 -->
+            <div x-show="selectedOrder.shipping_no" class="border-t pt-3 mt-3">
+              <span class="themed-text-muted block mb-2 font-medium">🚚 快递信息</span>
+              <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                  <span class="themed-text-muted">快递公司</span>
+                  <span x-text="selectedOrder.shipping_company_name || selectedOrder.shipping_company || '-'"></span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="themed-text-muted">快递单号</span>
+                  <span class="font-mono" x-text="selectedOrder.shipping_no || '-'"></span>
+                </div>
+              </div>
+            </div>
+            <!-- 物流轨迹时间线 -->
+            <div x-show="selectedOrder.shipping_no" class="border-t pt-3 mt-3">
+              <div class="flex justify-between items-center mb-2">
+                <span class="themed-text-muted font-medium">📍 物流轨迹</span>
+                <button type="button" @click="queryOrderTrack(selectedOrder.order_no)" class="text-xs text-blue-500 hover:text-blue-700">🔄 刷新</button>
+              </div>
+              <div x-show="orderTrack && orderTrack.track && orderTrack.track.traces && orderTrack.track.traces.length > 0" class="max-h-48 overflow-y-auto">
+                <div class="relative pl-6 space-y-3">
+                  <template x-for="(trace, tidx) in (orderTrack?.track?.traces || [])" :key="tidx">
+                    <div class="relative">
+                      <div class="absolute -left-6 top-1 w-3 h-3 rounded-full" :class="tidx === 0 ? 'bg-green-500' : 'bg-gray-300'"></div>
+                      <div x-show="tidx < (orderTrack?.track?.traces?.length || 0) - 1" class="absolute -left-[18px] top-4 w-0.5 h-full bg-gray-200"></div>
+                      <p class="text-xs text-gray-400" x-text="trace.time"></p>
+                      <p class="text-sm" x-text="trace.desc"></p>
+                    </div>
+                  </template>
+                </div>
+              </div>
+              <div x-show="!orderTrack || !orderTrack.track || !orderTrack.track.traces || orderTrack.track.traces.length === 0" class="text-center py-3 text-xs themed-text-muted">
+                点击「刷新」查询最新物流信息
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+      <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+        <button type="button" @click="hideModal('orderDetailModal')" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">关闭</button>
+        <template x-if="selectedOrder && selectedOrder.status === 'pending'">
+          <button type="button" @click="approveOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">✓ 审核通过</button>
+        </template>
+        <template x-if="selectedOrder && selectedOrder.status === 'pending'">
+          <button type="button" @click="rejectOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">✕ 拒绝</button>
+        </template>
+        <template x-if="selectedOrder && (selectedOrder.status === 'pending' || selectedOrder.status === 'approved')">
+          <button type="button" @click="hideModal('orderDetailModal'); openAddressModal(selectedOrder)" class="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600">📍 修改收货地址</button>
+        </template>
+        <template x-if="selectedOrder && selectedOrder.status === 'approved'">
+          <button type="button" @click="hideModal('orderDetailModal'); openShipModal(selectedOrder)" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">📦 发货</button>
+        </template>
+        <template x-if="selectedOrder && (selectedOrder.status === 'approved' || selectedOrder.status === 'shipped')">
+          <button type="button" @click="refundOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">💰 退款</button>
+        </template>
+        <template x-if="selectedOrder && (selectedOrder.status === 'shipped' || selectedOrder.status === 'received' || selectedOrder.status === 'rated')">
+          <button type="button" @click="completeOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">✅ 完成</button>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 发货弹窗（结构化快递信息表单） -->
+  <div x-show="isModalOpen('shipModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('shipModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">📦 发货 - 填写快递信息</h5>
+        <button @click="hideModal('shipModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div x-show="selectedOrder" class="text-sm themed-text-muted mb-2">
+          订单号：<span class="font-mono" x-text="selectedOrder?.order_no"></span>
+        </div>
+        <!-- 收货地址展示区（读后端下发的 address_snapshot，运营据此发货；web 后台无脱敏） -->
+        <div x-show="selectedOrder && selectedOrder.address_snapshot" class="themed-bg-base rounded p-3 text-sm space-y-1 border">
+          <div class="font-medium themed-text-secondary mb-1">📍 收货地址</div>
+          <div><span class="text-gray-500">收件人：</span><span x-text="selectedOrder?.address_snapshot?.receiver_name || '-'"></span></div>
+          <div><span class="text-gray-500">手机号：</span><span class="font-mono" x-text="selectedOrder?.address_snapshot?.receiver_phone || '-'"></span></div>
+          <div><span class="text-gray-500">地址：</span><span x-text="(selectedOrder?.address_snapshot?.province || '') + (selectedOrder?.address_snapshot?.city || '') + (selectedOrder?.address_snapshot?.district || '') + ' ' + (selectedOrder?.address_snapshot?.detail_address || '')"></span></div>
+        </div>
+        <div x-show="selectedOrder && !selectedOrder.address_snapshot" class="bg-yellow-50 text-yellow-700 rounded p-2 text-xs">
+          ⚠️ 该订单无收货地址快照（虚拟/卡券类无需邮寄，或下单未收集地址）
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">快递公司</label>
+          <select x-model="shipForm.shipping_company" @change="onShippingCompanyChange($event)" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" x-init="loadShippingCompanies()">
+            <option value="">请选择快递公司</option>
+            <template x-for="company in (shippingCompanies || [])" :key="company.code">
+              <option :value="company.code" x-text="company.name"></option>
+            </template>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">快递单号 <span class="text-red-500">*</span></label>
+          <input type="text" x-model="shipForm.shipping_no" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="请输入快递单号" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">发货备注</label>
+          <textarea x-model="shipForm.remark" rows="2" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="选填"></textarea>
+        </div>
+      </div>
+      <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
+        <button type="button" @click="hideModal('shipModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+        <button type="button" @click="submitShipForm()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50" :disabled="saving || !shipForm.shipping_no">
+          📦 确认发货
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 修改收货地址弹窗（运营手填覆写快照，对标淘宝京东客服改地址，仅未发货阶段） -->
+  <div x-show="isModalOpen('addressModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('addressModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">📍 修改收货地址</h5>
+        <button @click="hideModal('addressModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div x-show="selectedOrder" class="text-sm themed-text-muted mb-1">
+          订单号：<span class="font-mono" x-text="selectedOrder?.order_no"></span>
+        </div>
+        <div class="bg-yellow-50 text-yellow-700 rounded p-2 text-xs">
+          ⚠️ 仅未发货（待审核/已审核）阶段可改；修改仅作用于本订单，不影响用户地址簿。
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">收件人 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="addressForm.receiver_name" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="收件人姓名">
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">手机号 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="addressForm.receiver_phone" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="11 位手机号">
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">省 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="addressForm.province" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="省">
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">市 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="addressForm.city" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="市">
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">区/县 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="addressForm.district" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="区/县">
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">详细地址 <span class="text-red-500">*</span></label>
+          <textarea x-model="addressForm.detail_address" rows="2" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="街道/门牌等详细地址"></textarea>
+        </div>
+      </div>
+      <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
+        <button type="button" @click="hideModal('addressModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+        <button type="button" @click="submitAddressForm()" class="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 disabled:opacity-50" :disabled="saving">
+          📍 保存收货地址
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. SKU 编辑弹窗 -->
+  <div x-show="isModalOpen('skuModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('skuModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold" x-text="skuForm.sku_id ? '编辑规格' : '添加规格'"></h5>
+        <button @click="hideModal('skuModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">规格值（JSON格式）</label>
+          <textarea x-model="skuForm.spec_values_str" rows="2" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 font-mono text-sm" placeholder='{"颜色":"白色","尺寸":"M"}'></textarea>
+          <p class="text-xs themed-text-muted mt-1">JSON 格式的规格键值对</p>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">价格 <span class="text-red-500">*</span></label>
+            <input type="number" x-model.number="skuForm.cost_amount" min="1" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">库存 <span class="text-red-500">*</span></label>
+            <input type="number" x-model.number="skuForm.stock" min="0" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" required>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">资产类型</label>
+            <select x-model="skuForm.cost_asset_code" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+              <option value="">与主商品一致</option>
+              <template x-for="assetType in assetTypes.filter(t => t.display_name && !t.display_name.includes('预算'))" :key="assetType.asset_code">
+                <option :value="assetType.asset_code" x-text="assetType.display_name"></option>
+              </template>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
+            <select x-model="skuForm.status" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+              <option value="active">启用</option>
+              <option value="inactive">禁用</option>
+            </select>
+          </div>
+        </div>
+        <!-- 事项B：SKU 多图轮播组（需先保存规格拿到 sku_id 才能上传） -->
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">
+            规格多图 <span class="text-xs themed-text-muted">(选填，最多9张，用户切到该规格时轮播展示)</span>
+          </label>
+          <div x-show="!editingSkuId" class="text-xs text-yellow-600 mb-2">请先保存规格，再为该规格上传多图。</div>
+          <div x-show="editingSkuId" class="flex flex-wrap gap-2">
+            <template x-for="img in skuGalleryImages" :key="img.media_id">
+              <div class="relative w-20 h-20 border rounded-lg overflow-hidden group">
+                <img :src="img.url" class="w-full h-full object-cover">
+                <button type="button" @click="removeSkuGalleryImage(img.media_id)"
+                        class="absolute top-0 right-0 bg-red-500 text-white w-5 h-5 text-xs opacity-0 group-hover:opacity-100">✕</button>
+              </div>
+            </template>
+            <label x-show="skuGalleryImages.length < 9"
+                   class="w-20 h-20 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-green-500 transition">
+              <span x-show="!skuGalleryUploading" class="text-2xl text-gray-400">+</span>
+              <span x-show="skuGalleryUploading" class="text-xs text-gray-400">上传中...</span>
+              <input type="file" accept="image/*" @change="uploadSkuGalleryImage($event)" class="hidden" :disabled="skuGalleryUploading">
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
+        <button type="button" @click="hideModal('skuModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+        <button type="button" @click="saveSkuFromForm()" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50" :disabled="saving">
+          保存规格
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 图片预览弹窗 -->
+  <div x-ref="imagePreviewModal"
+       x-show="isModalOpen('imagePreviewModal')"
+       x-cloak
+       class="fixed inset-0 z-[60] flex items-center justify-center"
+       style="display: none;"
+       @keydown.escape.window="closeImagePreview()">
+    <div class="fixed inset-0 bg-black/80" @click="closeImagePreview()"></div>
+    <div class="relative z-10 max-w-[90vw] max-h-[90vh] flex items-center justify-center">
+      <button @click="closeImagePreview()"
+              class="absolute -top-10 right-0 text-white/80 hover:text-white text-3xl font-light leading-none"
+              title="关闭">✕</button>
+      <img :src="previewImageUrl"
+           :alt="previewImageAlt"
+           class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+           @click.stop />
+    </div>
+  </div>
+
+  </div> <!-- 关闭 x-data="exchangeMarket()" 容器 -->
+
+  <!-- 页面专属逻辑 -->
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+
+
+</body>
+</html>
+

@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>数据驾驶舱 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>
+      [x-cloak] { display: none !important; }
+      
+      /* 自定义滚动条 */
+      .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+      .scrollbar-thin::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
+      .scrollbar-thin::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+      .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
+      
+      /* 指标卡片悬停效果 */
+      .stat-card { transition: all 0.3s ease; }
+      .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+      
+      /* 图表容器 */
+      .chart-container { min-height: 320px; }
+      
+      /* 预警级别颜色 */
+      .alert-critical { border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.05); }
+      .alert-warning { border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.05); }
+      .alert-info { border-left: 4px solid #3b82f6; background: rgba(59, 130, 246, 0.05); }
+      
+      /* 闪烁动画 */
+      @keyframes pulse-alert {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+      }
+      .pulse-alert { animation: pulse-alert 2s infinite; }
+      
+      /* 趋势指示器 */
+      .trend-up { color: #10b981; }
+      .trend-down { color: #ef4444; }
+      .trend-flat { color: #6b7280; }
+      
+      /* Tab样式 */
+      .tab-btn { transition: all 0.2s ease; border-bottom: 3px solid transparent; }
+      .tab-btn:hover { background: rgba(59, 130, 246, 0.1); }
+      .tab-btn.active { border-bottom-color: #3b82f6; color: #3b82f6; font-weight: 600; }
+      
+      /* 桑基图容器 */
+      .sankey-container { min-height: 400px; }
+      
+      /* 漏斗图容器 - 确保ECharts能正确识别容器尺寸 */
+      .funnel-container { min-height: 350px; height: 350px; width: 100%; }
+    </style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/dashboard-panel-D1yKSKSq.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/core-CTP2NuwM.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/advanced-ChmRjD2s.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-CjaK2zlZ.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/dashboard-Bhy6T0EM.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  <div x-data="dashboardPanelPage()" x-init="init()" x-cloak class="p-6 space-y-6">
+    <!-- 顶部控制栏 -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold themed-text">📊 数据驾驶舱</h1>
+        <p class="text-sm themed-text-muted mt-1">
+          实时监控核心业务指标 · 最后更新: <span x-text="lastUpdateTime">--:--:--</span>
+        </p>
+      </div>
+      
+      <div class="flex items-center gap-3">
+        <!-- 时间范围选择器 -->
+        <div class="flex themed-bg-base rounded-lg shadow-sm themed-border">
+          <button 
+            @click="switchTimeRange('today')"
+            :class="timeRange === 'today' ? 'bg-blue-500 text-white' : 'themed-text hover:themed-bg-subtle'"
+            class="px-4 py-2 text-sm font-medium rounded-l-lg transition"
+          >今日</button>
+          <button 
+            @click="switchTimeRange('7d')"
+            :class="timeRange === '7d' ? 'bg-blue-500 text-white' : 'themed-text hover:themed-bg-subtle'"
+            class="px-4 py-2 text-sm font-medium transition"
+          >近7天</button>
+          <button 
+            @click="switchTimeRange('30d')"
+            :class="timeRange === '30d' ? 'bg-blue-500 text-white' : 'themed-text hover:themed-bg-subtle'"
+            class="px-4 py-2 text-sm font-medium rounded-r-lg transition"
+          >近30天</button>
+        </div>
+        
+        <button 
+          @click="refreshDashboard()" 
+          :disabled="loading"
+          class="flex items-center gap-2 px-4 py-2 themed-bg-base themed-border rounded-lg text-sm font-medium themed-text hover:themed-bg-subtle transition"
+        >
+          <span :class="{ 'animate-spin': loading }">🔄</span>
+          刷新
+        </button>
+      </div>
+    </div>
+    
+    <!-- P0-4: 今日待办摘要横幅 -->
+    <div x-show="todoPending.total > 0" class="themed-card rounded-xl p-4 bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">📋</span>
+          <div>
+            <h3 class="text-sm font-semibold text-orange-800">今日待办</h3>
+            <p class="text-xs text-orange-600">共 <span class="font-bold text-lg" x-text="todoPending.total">0</span> 项待处理</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-4 text-sm">
+          <template x-if="todoPending.consumption > 0">
+            <a href="/admin/finance-management.html" class="flex items-center gap-1 text-orange-700 hover:text-orange-900 cursor-pointer"
+               @click.prevent="$dispatch('open-tab', {id:'consumption-review', title:'消费记录审核', icon:'📋', url:'/admin/finance-management.html'})">
+              📋 消费审核 <span class="font-bold" x-text="todoPending.consumption">0</span>
+            </a>
+          </template>
+          <template x-if="todoPending.redemption > 0">
+            <a href="/admin/redemption-management.html" class="flex items-center gap-1 text-teal-700 hover:text-teal-900 cursor-pointer"
+               @click.prevent="$dispatch('open-tab', {id:'redemption-mgmt', title:'兑换核销管理', icon:'🎫', url:'/admin/redemption-management.html'})">
+              🎫 兑换核销 <span class="font-bold" x-text="todoPending.redemption">0</span>
+            </a>
+          </template>
+          <template x-if="todoPending.customer_service > 0">
+            <a href="/admin/customer-service.html" class="flex items-center gap-1 text-blue-700 hover:text-blue-900 cursor-pointer"
+               @click.prevent="$dispatch('open-tab', {id:'customer-service', title:'客服工作台', icon:'💬', url:'/admin/customer-service.html'})">
+              💬 客服 <span class="font-bold" x-text="todoPending.customer_service">0</span>
+            </a>
+          </template>
+          <template x-if="todoPending.risk_alert > 0">
+            <a href="/admin/risk-alerts.html" class="flex items-center gap-1 text-red-700 hover:text-red-900 cursor-pointer"
+               @click.prevent="$dispatch('open-tab', {id:'risk-alerts', title:'风控告警', icon:'⚠️', url:'/admin/risk-alerts.html'})">
+              ⚠️ 风控 <span class="font-bold" x-text="todoPending.risk_alert">0</span>
+            </a>
+          </template>
+          <template x-if="todoPending.lottery_alert > 0">
+            <a href="/admin/lottery-alerts.html" class="flex items-center gap-1 text-yellow-700 hover:text-yellow-900 cursor-pointer"
+               @click.prevent="$dispatch('open-tab', {id:'lottery-alerts', title:'回馈告警', icon:'🎰', url:'/admin/lottery-alerts.html'})">
+              🎰 回馈告警 <span class="font-bold" x-text="todoPending.lottery_alert">0</span>
+            </a>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- P2-2: Tab导航栏 -->
+    <div class="themed-card rounded-xl overflow-hidden">
+      <div class="flex themed-bg-base border-b themed-border overflow-x-auto">
+        <button 
+          @click="activeTab = 'overview'"
+          :class="{ 'active': activeTab === 'overview' }"
+          class="tab-btn flex items-center gap-2 px-6 py-4 text-sm themed-text whitespace-nowrap"
+        >
+          <span>📊</span>
+          <span>运营大盘</span>
+        </button>
+        <button 
+          @click="activeTab = 'lottery'"
+          :class="{ 'active': activeTab === 'lottery' }"
+          class="tab-btn flex items-center gap-2 px-6 py-4 text-sm themed-text whitespace-nowrap"
+        >
+          <span>🎰</span>
+          <span>回馈分析</span>
+        </button>
+        <button 
+          @click="activeTab = 'user'"
+          :class="{ 'active': activeTab === 'user' }"
+          class="tab-btn flex items-center gap-2 px-6 py-4 text-sm themed-text whitespace-nowrap"
+        >
+          <span>👥</span>
+          <span>用户分析</span>
+        </button>
+        <button 
+          @click="activeTab = 'asset-flow'"
+          :class="{ 'active': activeTab === 'asset-flow' }"
+          class="tab-btn flex items-center gap-2 px-6 py-4 text-sm themed-text whitespace-nowrap"
+        >
+          <span>💎</span>
+          <span>资产流动</span>
+        </button>
+        <button 
+          @click="activeTab = 'funnel'"
+          :class="{ 'active': activeTab === 'funnel' }"
+          class="tab-btn flex items-center gap-2 px-6 py-4 text-sm themed-text whitespace-nowrap"
+        >
+          <span>📉</span>
+          <span>转化漏斗</span>
+        </button>
+        <button 
+          @click="activeTab = 'merchant'"
+          :class="{ 'active': activeTab === 'merchant' }"
+          class="tab-btn flex items-center gap-2 px-6 py-4 text-sm themed-text whitespace-nowrap"
+        >
+          <span>🏪</span>
+          <span>商户贡献度</span>
+        </button>
+        <button 
+          @click="activeTab = 'product-code'"
+          :class="{ 'active': activeTab === 'product-code' }"
+          class="tab-btn flex items-center gap-2 px-6 py-4 text-sm themed-text whitespace-nowrap"
+        >
+          <span>🏷️</span>
+          <span>商品主数据</span>
+        </button>
+      </div>
+    </div>
+    
+    <!-- ==================== Tab 1: 运营大盘 ==================== -->
+    <template x-if="activeTab === 'overview'">
+      <div class="space-y-6">
+        <!-- P0-4: 业务健康度卡片 -->
+        <div class="themed-card rounded-xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">🏥</span>
+              <div>
+                <h3 class="font-semibold themed-text">业务健康度</h3>
+                <p class="text-sm themed-text-muted" x-text="healthScore.status_text || '系统运行状态'"></p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span 
+                class="px-3 py-1 rounded-full text-sm font-medium"
+                :class="{
+                  'bg-green-100 text-green-700': healthScore.status === 'healthy',
+                  'bg-yellow-100 text-yellow-700': healthScore.status === 'warning',
+                  'bg-red-100 text-red-700': healthScore.status === 'critical',
+                  'bg-gray-100 text-gray-600': healthScore.status === 'loading' || !healthScore.status
+                }"
+                x-text="healthScore.status === 'healthy' ? '状态良好' : healthScore.status === 'warning' ? '需关注' : healthScore.status === 'critical' ? '需处理' : '加载中'"
+              ></span>
+              <span 
+                class="text-3xl font-bold"
+                :class="{
+                  'text-green-600': healthScore.score >= 90,
+                  'text-yellow-600': healthScore.score >= 70 && healthScore.score < 90,
+                  'text-orange-600': healthScore.score >= 50 && healthScore.score < 70,
+                  'text-red-600': healthScore.score < 50 && healthScore.score !== null,
+                  'text-gray-400': healthScore.score === null || healthScore.score === 0
+                }"
+                x-text="healthScore.score || '--'"
+              ></span>
+              <span class="text-sm themed-text-muted">/100</span>
+            </div>
+          </div>
+          <!-- 健康度进度条 -->
+          <div class="h-3 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              class="h-full rounded-full transition-all duration-500"
+              :class="{
+                'bg-green-500': healthScore.score >= 90,
+                'bg-yellow-500': healthScore.score >= 70 && healthScore.score < 90,
+                'bg-orange-500': healthScore.score >= 50 && healthScore.score < 70,
+                'bg-red-500': healthScore.score < 50 && healthScore.score > 0,
+                'bg-gray-400': healthScore.score === null || healthScore.score === 0
+              }"
+              :style="'width: ' + (healthScore.score || 0) + '%'"
+            ></div>
+          </div>
+          <!-- 健康度详细指标（如果有） -->
+          <template x-if="healthScore.components && Object.keys(healthScore.components).length > 0">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t themed-border">
+              <template x-for="(value, key) in healthScore.components" :key="key">
+                <div class="text-center">
+                  <div class="text-lg font-semibold themed-text" x-text="typeof value === 'object' ? value.score : value"></div>
+                  <div class="text-xs themed-text-muted" x-text="({'prize_pool':'奖品池','user_experience':'用户体验','budget_health':'预算健康','system_performance':'系统性能','draw_quality':'回馈质量','strategy_effectiveness':'策略效果','data_integrity':'数据完整性'})[key] || key.replace(/_/g, ' ')"></div>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+
+        <!-- 核心指标卡片 - 5个 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <!-- 今日回馈次数 -->
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center justify-between">
+              <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">🎰</span>
+              </div>
+              <template x-if="stats.lottery_trend">
+                <span 
+                  :class="stats.lottery_trend > 0 ? 'trend-up' : stats.lottery_trend < 0 ? 'trend-down' : 'trend-flat'"
+                  class="text-sm font-medium"
+                >
+                  <span x-text="stats.lottery_trend > 0 ? '↑' : stats.lottery_trend < 0 ? '↓' : '→'"></span>
+                  <span x-text="Math.abs(stats.lottery_trend) + '%'"></span>
+                </span>
+              </template>
+            </div>
+            <div class="mt-4">
+              <div class="text-2xl font-bold themed-text" x-text="formatNumber(stats.lottery_count || 0)">0</div>
+              <div class="text-sm themed-text-muted">今日回馈次数</div>
+            </div>
+          </div>
+          
+          <!-- 新增用户 -->
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center justify-between">
+              <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">👥</span>
+              </div>
+              <template x-if="stats.user_trend">
+                <span 
+                  :class="stats.user_trend > 0 ? 'trend-up' : stats.user_trend < 0 ? 'trend-down' : 'trend-flat'"
+                  class="text-sm font-medium"
+                >
+                  <span x-text="stats.user_trend > 0 ? '↑' : stats.user_trend < 0 ? '↓' : '→'"></span>
+                  <span x-text="Math.abs(stats.user_trend) + '%'"></span>
+                </span>
+              </template>
+            </div>
+            <div class="mt-4">
+              <div class="text-2xl font-bold themed-text" x-text="formatNumber(stats.new_users || 0)">0</div>
+              <div class="text-sm themed-text-muted">新增用户</div>
+            </div>
+          </div>
+          
+          <!-- 发放率 -->
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center justify-between">
+              <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">🏆</span>
+              </div>
+              <template x-if="stats.win_rate_trend">
+                <span 
+                  :class="stats.win_rate_trend > 0 ? 'trend-up' : stats.win_rate_trend < 0 ? 'trend-down' : 'trend-flat'"
+                  class="text-sm font-medium"
+                >
+                  <span x-text="stats.win_rate_trend > 0 ? '↑' : stats.win_rate_trend < 0 ? '↓' : '→'"></span>
+                  <span x-text="Math.abs(stats.win_rate_trend) + '%'"></span>
+                </span>
+              </template>
+            </div>
+            <div class="mt-4">
+              <div class="text-2xl font-bold themed-text" x-text="(stats.win_rate || 0).toFixed(1) + '%'">0%</div>
+              <div class="text-sm themed-text-muted">发放率</div>
+            </div>
+          </div>
+          
+          <!-- 待审核消耗 -->
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center justify-between">
+              <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">📋</span>
+              </div>
+              <template x-if="stats.pending_consumption > 0">
+                <span class="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full pulse-alert">紧急</span>
+              </template>
+            </div>
+            <div class="mt-4">
+              <div class="text-2xl font-bold themed-text" x-text="formatNumber(stats.pending_consumption || 0)">0</div>
+              <div class="text-sm themed-text-muted">待审核消耗</div>
+            </div>
+          </div>
+          
+          <!-- 活动预算消耗 -->
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center justify-between">
+              <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">💰</span>
+              </div>
+              <template x-if="stats.budget_usage >= 80">
+                <span 
+                  :class="stats.budget_usage >= 90 ? 'bg-red-500' : 'bg-yellow-500'"
+                  class="px-2 py-0.5 text-white text-xs rounded-full"
+                  x-text="stats.budget_usage >= 90 ? '预警' : '注意'"
+                ></span>
+              </template>
+            </div>
+            <div class="mt-4">
+              <div class="flex items-baseline gap-1">
+                <span class="text-2xl font-bold themed-text" x-text="(stats.budget_usage || 0).toFixed(1) + '%'">0%</span>
+              </div>
+              <div class="text-sm themed-text-muted">预算消耗率</div>
+              <!-- 进度条 -->
+              <div class="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  class="h-full transition-all duration-500"
+                  :class="stats.budget_usage >= 90 ? 'bg-red-500' : stats.budget_usage >= 80 ? 'bg-yellow-500' : 'bg-green-500'"
+                  :style="'width: ' + Math.min(stats.budget_usage || 0, 100) + '%'"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- P1-6: 运营扩展指标卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <!-- 兑换履约率 -->
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                <span class="text-xl">📦</span>
+              </div>
+              <div>
+                <h4 class="font-semibold themed-text text-sm">兑换履约率</h4>
+                <p class="text-xs themed-text-muted">fulfilled / total</p>
+              </div>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-3xl font-bold" :class="redemptionFulfillment.fulfillment_rate < 10 ? 'text-red-600' : redemptionFulfillment.fulfillment_rate < 50 ? 'text-yellow-600' : 'text-green-600'" x-text="redemptionFulfillment.fulfillment_rate + '%'">0%</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-3 text-xs">
+              <div class="flex justify-between"><span class="text-gray-500">待处理</span><span class="font-medium text-yellow-600" x-text="redemptionFulfillment.pending">0</span></div>
+              <div class="flex justify-between"><span class="text-gray-500">已完成</span><span class="font-medium text-green-600" x-text="redemptionFulfillment.fulfilled">0</span></div>
+              <div class="flex justify-between"><span class="text-gray-500">已取消</span><span class="font-medium text-red-600" x-text="redemptionFulfillment.cancelled">0</span></div>
+              <div class="flex justify-between"><span class="text-gray-500">总计</span><span class="font-medium" x-text="redemptionFulfillment.total">0</span></div>
+            </div>
+            <div x-show="redemptionFulfillment.fulfillment_rate < 5 && redemptionFulfillment.total > 0" class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+              ⚠️ 履约率严重偏低，建议关注兑换核销流程
+            </div>
+          </div>
+
+          <!-- 用户留存/活跃度 -->
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <span class="text-xl">👥</span>
+              </div>
+              <div>
+                <h4 class="font-semibold themed-text text-sm">用户活跃度</h4>
+                <p class="text-xs themed-text-muted">DAU / WAU / MAU</p>
+              </div>
+            </div>
+            <div class="space-y-2 mt-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-500">日活 (DAU)</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold" x-text="userRetention.dau">0</span>
+                  <span class="text-xs px-1.5 py-0.5 rounded" :class="userRetention.dau_rate < 10 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'" x-text="userRetention.dau_rate + '%'">0%</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-500">周活 (WAU)</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold" x-text="userRetention.wau">0</span>
+                  <span class="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700" x-text="userRetention.wau_rate + '%'">0%</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-500">月活 (MAU)</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold" x-text="userRetention.mau">0</span>
+                  <span class="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-700" x-text="userRetention.mau_rate + '%'">0%</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between pt-1 border-t">
+                <span class="text-xs text-gray-500">总用户</span>
+                <span class="text-sm font-bold" x-text="userRetention.total_users">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- P1-6: 时间对比卡片 -->
+        <div class="themed-card rounded-xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">📊</span>
+              <div>
+                <h3 class="font-semibold themed-text">数据对比分析</h3>
+                <p class="text-sm themed-text-muted">日环比与周同比数据对比</p>
+              </div>
+            </div>
+            <button 
+              @click="fetchComparison()" 
+              :disabled="loading"
+              class="px-3 py-1 text-sm themed-bg-subtle themed-text rounded-lg hover:themed-bg-hover transition"
+            >
+              <span x-show="!loading">🔄 刷新</span>
+              <span x-show="loading">...</span>
+            </button>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- 日环比：今日 vs 昨日 -->
+            <div class="p-4 themed-bg-subtle rounded-lg border themed-border">
+              <div class="flex items-center gap-2 mb-3">
+                <span class="text-lg">📅</span>
+                <span class="text-sm font-semibold themed-text">日环比（今日 vs 昨日）</span>
+              </div>
+              <div class="space-y-3">
+                <!-- 回馈次数对比 -->
+                <div class="flex items-center justify-between">
+                  <span class="text-sm themed-text-muted">回馈次数</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.day_comparison.lottery_draws?.current || 0)">--</span>
+                    <span 
+                      class="text-xs font-medium px-1.5 py-0.5 rounded"
+                      :class="{
+                        'bg-green-100 text-green-700': comparison.day_comparison.lottery_draws?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.day_comparison.lottery_draws?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.day_comparison.lottery_draws?.trend || comparison.day_comparison.lottery_draws?.trend === 'stable'
+                      }"
+                    >
+                      <span x-text="getTrendIcon(comparison.day_comparison.lottery_draws?.trend)"></span>
+                      <span x-text="Math.abs(comparison.day_comparison.lottery_draws?.change || 0).toFixed(1) + '%'"></span>
+                    </span>
+                  </div>
+                </div>
+                <!-- 新增用户对比 -->
+                <div class="flex items-center justify-between">
+                  <span class="text-sm themed-text-muted">新增用户</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.day_comparison.users?.current || 0)">--</span>
+                    <span 
+                      class="text-xs font-medium px-1.5 py-0.5 rounded"
+                      :class="{
+                        'bg-green-100 text-green-700': comparison.day_comparison.users?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.day_comparison.users?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.day_comparison.users?.trend || comparison.day_comparison.users?.trend === 'stable'
+                      }"
+                    >
+                      <span x-text="getTrendIcon(comparison.day_comparison.users?.trend)"></span>
+                      <span x-text="Math.abs(comparison.day_comparison.users?.change || 0).toFixed(1) + '%'"></span>
+                    </span>
+                  </div>
+                </div>
+                <!-- 发放率对比 -->
+                <div class="flex items-center justify-between">
+                  <span class="text-sm themed-text-muted">发放率</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium themed-text" x-text="(comparison.day_comparison.win_rate?.current || 0).toFixed(1) + '%'">--</span>
+                    <span 
+                      class="text-xs font-medium px-1.5 py-0.5 rounded"
+                      :class="{
+                        'bg-green-100 text-green-700': comparison.day_comparison.win_rate?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.day_comparison.win_rate?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.day_comparison.win_rate?.trend || comparison.day_comparison.win_rate?.trend === 'stable'
+                      }"
+                    >
+                      <span x-text="getTrendIcon(comparison.day_comparison.win_rate?.trend)"></span>
+                      <span x-text="Math.abs(comparison.day_comparison.win_rate?.change || 0).toFixed(1) + '%'"></span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 周同比：本周 vs 上周 -->
+            <div class="p-4 themed-bg-subtle rounded-lg border themed-border">
+              <div class="flex items-center gap-2 mb-3">
+                <span class="text-lg">📆</span>
+                <span class="text-sm font-semibold themed-text">周同比（本周 vs 上周）</span>
+              </div>
+              <div class="space-y-3">
+                <!-- 回馈次数对比 -->
+                <div class="flex items-center justify-between">
+                  <span class="text-sm themed-text-muted">回馈次数</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.week_comparison.lottery_draws?.current || 0)">--</span>
+                    <span 
+                      class="text-xs font-medium px-1.5 py-0.5 rounded"
+                      :class="{
+                        'bg-green-100 text-green-700': comparison.week_comparison.lottery_draws?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.week_comparison.lottery_draws?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.week_comparison.lottery_draws?.trend || comparison.week_comparison.lottery_draws?.trend === 'stable'
+                      }"
+                    >
+                      <span x-text="getTrendIcon(comparison.week_comparison.lottery_draws?.trend)"></span>
+                      <span x-text="Math.abs(comparison.week_comparison.lottery_draws?.change || 0).toFixed(1) + '%'"></span>
+                    </span>
+                  </div>
+                </div>
+                <!-- 新增用户对比 -->
+                <div class="flex items-center justify-between">
+                  <span class="text-sm themed-text-muted">新增用户</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.week_comparison.users?.current || 0)">--</span>
+                    <span 
+                      class="text-xs font-medium px-1.5 py-0.5 rounded"
+                      :class="{
+                        'bg-green-100 text-green-700': comparison.week_comparison.users?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.week_comparison.users?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.week_comparison.users?.trend || comparison.week_comparison.users?.trend === 'stable'
+                      }"
+                    >
+                      <span x-text="getTrendIcon(comparison.week_comparison.users?.trend)"></span>
+                      <span x-text="Math.abs(comparison.week_comparison.users?.change || 0).toFixed(1) + '%'"></span>
+                    </span>
+                  </div>
+                </div>
+                <!-- 发放率对比 -->
+                <div class="flex items-center justify-between">
+                  <span class="text-sm themed-text-muted">发放率</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium themed-text" x-text="(comparison.week_comparison.win_rate?.current || 0).toFixed(1) + '%'">--</span>
+                    <span 
+                      class="text-xs font-medium px-1.5 py-0.5 rounded"
+                      :class="{
+                        'bg-green-100 text-green-700': comparison.week_comparison.win_rate?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.week_comparison.win_rate?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.week_comparison.win_rate?.trend || comparison.week_comparison.win_rate?.trend === 'stable'
+                      }"
+                    >
+                      <span x-text="getTrendIcon(comparison.week_comparison.win_rate?.trend)"></span>
+                      <span x-text="Math.abs(comparison.week_comparison.win_rate?.change || 0).toFixed(1) + '%'"></span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- P3-5: 资产发放/消耗比 -->
+        <div class="themed-card rounded-xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">⚖️</span>
+              <div>
+                <h3 class="font-semibold themed-text">资产发放/消耗比</h3>
+                <p class="text-sm themed-text-muted">系统资产流转健康度指标</p>
+              </div>
+            </div>
+            <span 
+              class="px-3 py-1 rounded-full text-sm font-medium"
+              :class="{
+                'bg-green-100 text-green-700': assetRatio.ratio >= 0.8 && assetRatio.ratio <= 1.5,
+                'bg-yellow-100 text-yellow-700': (assetRatio.ratio >= 0.5 && assetRatio.ratio < 0.8) || (assetRatio.ratio > 1.5 && assetRatio.ratio <= 2),
+                'bg-red-100 text-red-700': assetRatio.ratio < 0.5 || assetRatio.ratio > 2
+              }"
+              x-text="assetRatio.ratio >= 0.8 && assetRatio.ratio <= 1.5 ? '健康' : assetRatio.ratio >= 0.5 ? '需关注' : '异常'"
+            ></span>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- 发放量 -->
+            <div class="p-4 bg-green-50 rounded-lg border border-green-200">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-lg">📥</span>
+                <span class="text-sm font-medium text-green-700">发放量</span>
+              </div>
+              <div class="text-2xl font-bold text-green-600" x-text="formatNumber(assetRatio.issued)">0</div>
+            </div>
+            
+            <!-- 消耗量 -->
+            <div class="p-4 bg-red-50 rounded-lg border border-red-200">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-lg">📤</span>
+                <span class="text-sm font-medium text-red-700">消耗量</span>
+              </div>
+              <div class="text-2xl font-bold text-red-600" x-text="formatNumber(assetRatio.consumed)">0</div>
+            </div>
+            
+            <!-- 发放/消耗比 -->
+            <div class="p-4 themed-bg-subtle rounded-lg border themed-border">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-lg">⚖️</span>
+                <span class="text-sm font-medium themed-text">比例</span>
+              </div>
+              <div class="flex items-baseline gap-1">
+                <span 
+                  class="text-3xl font-bold"
+                  :class="{
+                    'text-green-600': assetRatio.ratio >= 0.8 && assetRatio.ratio <= 1.5,
+                    'text-yellow-600': (assetRatio.ratio >= 0.5 && assetRatio.ratio < 0.8) || (assetRatio.ratio > 1.5 && assetRatio.ratio <= 2),
+                    'text-red-600': assetRatio.ratio < 0.5 || assetRatio.ratio > 2
+                  }"
+                  x-text="assetRatio.ratio.toFixed(2)"
+                >1.00</span>
+                <span class="text-sm themed-text-muted">: 1</span>
+              </div>
+              <p class="text-xs themed-text-muted mt-1">理想范围: 0.8 ~ 1.5</p>
+            </div>
+          </div>
+          
+          <!-- 比例进度条 -->
+          <div class="mt-4">
+            <div class="flex justify-between text-xs themed-text-muted mb-1">
+              <span>消耗偏高</span>
+              <span>平衡</span>
+              <span>发放偏高</span>
+            </div>
+            <div class="h-2 bg-gray-200 rounded-full overflow-hidden relative">
+              <!-- 背景渐变指示 -->
+              <div class="absolute inset-0 flex">
+                <div class="w-1/4 bg-red-300"></div>
+                <div class="w-1/4 bg-yellow-300"></div>
+                <div class="w-1/4 bg-green-300"></div>
+                <div class="w-1/4 bg-yellow-300"></div>
+              </div>
+              <!-- 当前比例指示器 -->
+              <div 
+                class="absolute top-0 h-full w-1 bg-gray-800 rounded transition-all duration-500"
+                :style="'left: ' + Math.min(Math.max((assetRatio.ratio / 2.5) * 100, 0), 100) + '%'"
+              ></div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 主内容区：趋势图 + 预警列表 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- 7天趋势图 -->
+          <div class="lg:col-span-2 themed-card rounded-xl p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold themed-text">📈 业务趋势</h3>
+              <div class="flex gap-2">
+                <button 
+                  @click="trendType = 'lottery'"
+                  :class="trendType === 'lottery' ? 'bg-blue-100 text-blue-600' : 'themed-bg-subtle themed-text'"
+                  class="px-3 py-1 rounded-md text-sm font-medium transition"
+                >回馈次数</button>
+                <button 
+                  @click="trendType = 'users'"
+                  :class="trendType === 'users' ? 'bg-blue-100 text-blue-600' : 'themed-bg-subtle themed-text'"
+                  class="px-3 py-1 rounded-md text-sm font-medium transition"
+                >活跃用户</button>
+                <button 
+                  @click="trendType = 'prizes'"
+                  :class="trendType === 'prizes' ? 'bg-blue-100 text-blue-600' : 'themed-bg-subtle themed-text'"
+                  class="px-3 py-1 rounded-md text-sm font-medium transition"
+                >奖品发放</button>
+              </div>
+            </div>
+            <div id="trend-chart" class="chart-container"></div>
+          </div>
+          
+          <!-- 实时预警列表 -->
+          <div class="themed-card rounded-xl p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold themed-text">🚨 实时预警</h3>
+              <span 
+                x-show="alerts.length > 0"
+                class="px-2 py-0.5 bg-red-100 text-red-600 text-xs rounded-full font-medium"
+                x-text="alerts.length + '条'"
+              ></span>
+            </div>
+            
+            <!-- 预警列表 -->
+            <div class="space-y-3 max-h-[400px] overflow-y-auto scrollbar-thin">
+
+                <div x-show="alerts.length === 0" class="text-center py-8 themed-text-muted">
+                  <div class="text-4xl mb-2">✅</div>
+                  <div>暂无预警信息</div>
+                </div>
+
+              <template x-for="alert in alerts" :key="alert.alert_id">
+                <div 
+                  class="p-4 rounded-lg cursor-pointer hover:shadow-md transition"
+                  :class="{
+                    'alert-critical': alert.level === 'danger',
+                    'alert-warning': alert.level === 'warning',
+                    'alert-info': alert.level === 'info'
+                  }"
+                  @click="handleAlert(alert)"
+                >
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <div class="flex items-center gap-2">
+                        <span 
+                          class="text-xs font-medium px-2 py-0.5 rounded"
+                          :class="{
+                            'bg-red-100 text-red-600': alert.level === 'danger',
+                            'bg-yellow-100 text-yellow-600': alert.level === 'warning',
+                            'bg-blue-100 text-blue-600': alert.level === 'info'
+                          }"
+                          x-text="alert.level === 'danger' ? '紧急' : alert.level === 'warning' ? '警告' : '信息'"
+                        ></span>
+                        <span class="text-sm font-medium themed-text" x-text="alert.type_name || alert.type"></span>
+                      </div>
+                      <p class="text-sm themed-text-muted mt-1" x-text="alert.message"></p>
+                      <div class="text-xs themed-text-muted mt-2" x-text="formatTime(alert.created_at)"></div>
+                    </div>
+                    <span class="themed-text-muted text-lg">→</span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+        
+        <!-- P2-11: 今日核心事件时间线 -->
+        <div class="themed-card rounded-xl p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold themed-text">📅 今日核心事件</h3>
+            <button 
+              @click="loadTodayEvents()"
+              class="text-sm themed-text-muted hover:themed-text"
+            >🔄 刷新</button>
+          </div>
+          
+          <!-- 事件时间线 -->
+          <div class="relative pl-6" x-show="todayEvents.length > 0">
+            <!-- 时间线竖线 -->
+            <div class="absolute left-2 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+            
+            <template x-for="(event, index) in todayEvents" :key="index">
+              <div 
+                class="relative mb-4 pb-4 border-b border-dashed themed-border last:border-0 last:pb-0 last:mb-0 cursor-pointer hover:bg-gray-50 rounded p-2 -ml-2 transition"
+                @click="handleEventAction(event)"
+              >
+                <!-- 时间点圆点 -->
+                <div 
+                  class="absolute -left-4 top-3 w-3 h-3 rounded-full border-2 border-white shadow"
+                  :class="{
+                    'bg-red-500': event.level === 'critical',
+                    'bg-yellow-500': event.level === 'warning',
+                    'bg-green-500': event.level === 'success',
+                    'bg-blue-500': event.level === 'info' || !event.level
+                  }"
+                ></div>
+                
+                <!-- 事件内容 -->
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-mono themed-text-muted" x-text="event.time"></span>
+                      <span 
+                        class="text-lg"
+                        x-text="event.level === 'critical' ? '🔴' : event.level === 'warning' ? '🟡' : event.level === 'success' ? '🟢' : '🔵'"
+                      ></span>
+                      <span class="text-sm font-medium themed-text" x-text="event.title"></span>
+                    </div>
+                    <p class="text-xs themed-text-muted mt-1 ml-16" x-text="event.description"></p>
+                  </div>
+                  <span x-show="event.action_url" class="themed-text-muted text-sm">→</span>
+                </div>
+              </div>
+            </template>
+          </div>
+          
+          <!-- 无事件状态 -->
+          <div x-show="todayEvents.length === 0" class="text-center py-6 themed-text-muted">
+            <div class="text-4xl mb-2">✨</div>
+            <div>今日暂无核心事件</div>
+          </div>
+        </div>
+        
+        <!-- 快捷操作区域 -->
+        <div class="themed-card rounded-xl p-6">
+          <h3 class="text-lg font-semibold themed-text mb-4">⚡ 快捷操作</h3>
+          <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <button 
+              @click="quickAction('consumption-review')"
+              class="flex flex-col items-center gap-2 p-4 rounded-lg themed-border hover:border-blue-300 hover:bg-blue-50 transition"
+            >
+              <span class="text-3xl">📋</span>
+              <span class="text-sm themed-text">消耗审核</span>
+              <span x-show="stats.pending_consumption > 0" class="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full" x-text="stats.pending_consumption">0</span>
+            </button>
+            
+            <button 
+              @click="quickAction('customer-service')"
+              class="flex flex-col items-center gap-2 p-4 rounded-lg themed-border hover:border-blue-300 hover:bg-blue-50 transition"
+            >
+              <span class="text-3xl">💬</span>
+              <span class="text-sm themed-text">客服会话</span>
+              <span x-show="stats.pending_sessions > 0" class="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full" x-text="stats.pending_sessions">0</span>
+            </button>
+            
+            <button 
+              @click="quickAction('lottery-alerts')"
+              class="flex flex-col items-center gap-2 p-4 rounded-lg themed-border hover:border-blue-300 hover:bg-blue-50 transition"
+            >
+              <span class="text-3xl">🚨</span>
+              <span class="text-sm themed-text">回馈告警</span>
+              <span x-show="stats.lottery_alerts > 0" class="px-2 py-0.5 bg-orange-500 text-white text-xs rounded-full" x-text="stats.lottery_alerts">0</span>
+            </button>
+            
+            <button 
+              @click="quickAction('risk-alerts')"
+              class="flex flex-col items-center gap-2 p-4 rounded-lg themed-border hover:border-blue-300 hover:bg-blue-50 transition"
+            >
+              <span class="text-3xl">⚠️</span>
+              <span class="text-sm themed-text">风控告警</span>
+              <span x-show="stats.risk_alerts > 0" class="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full" x-text="stats.risk_alerts">0</span>
+            </button>
+            
+            <button 
+              @click="quickAction('campaign-create')"
+              class="flex flex-col items-center gap-2 p-4 rounded-lg themed-border hover:border-blue-300 hover:bg-blue-50 transition"
+            >
+              <span class="text-3xl">🎯</span>
+              <span class="text-sm themed-text">新建活动</span>
+            </button>
+            
+            <button 
+              @click="quickAction('statistics')"
+              class="flex flex-col items-center gap-2 p-4 rounded-lg themed-border hover:border-blue-300 hover:bg-blue-50 transition"
+            >
+              <span class="text-3xl">📊</span>
+              <span class="text-sm themed-text">数据统计</span>
+            </button>
+          </div>
+        </div>
+        
+        <!-- 预算状态概览 -->
+        <div class="themed-card rounded-xl p-6">
+          <h3 class="text-lg font-semibold themed-text mb-4">💰 活动预算状态</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <template x-for="budget in budgetList" :key="budget.lottery_campaign_id">
+              <div class="p-4 rounded-lg border" :class="budget.usage >= 90 ? 'border-red-200 bg-red-50' : budget.usage >= 80 ? 'border-yellow-200 bg-yellow-50' : 'themed-border'">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-medium themed-text" x-text="budget.campaign_name"></span>
+                  <span 
+                    class="text-sm font-medium"
+                    :class="budget.usage >= 90 ? 'text-red-600' : budget.usage >= 80 ? 'text-yellow-600' : 'text-green-600'"
+                    x-text="budget.usage.toFixed(1) + '%'"
+                  ></span>
+                </div>
+                <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    class="h-full transition-all duration-500"
+                    :class="budget.usage >= 90 ? 'bg-red-500' : budget.usage >= 80 ? 'bg-yellow-500' : 'bg-green-500'"
+                    :style="'width: ' + Math.min(budget.usage, 100) + '%'"
+                  ></div>
+                </div>
+                <div class="flex items-center justify-between mt-2 text-xs themed-text-muted">
+                  <span x-text="'已用: ¥' + formatNumber(budget.used)"></span>
+                  <span x-text="'预算: ¥' + formatNumber(budget.total)"></span>
+                </div>
+              </div>
+            </template>
+            
+            <template x-if="budgetList.length === 0">
+              <div class="col-span-full text-center py-8 themed-text-muted">
+                暂无活动预算数据
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </template>
+    
+    <!-- ==================== Tab 2: 回馈分析 ==================== -->
+    <template x-if="activeTab === 'lottery'">
+      <div class="space-y-6">
+        <!-- 统计卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">🎰</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="formatNumber(lotteryAnalysis.total_draws)">0</div>
+                <div class="text-sm themed-text-muted">总回馈次数</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">🎁</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="formatNumber(lotteryAnalysis.total_wins)">0</div>
+                <div class="text-sm themed-text-muted">发放次数</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">📊</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="lotteryAnalysis.win_rate.toFixed(1) + '%'">0%</div>
+                <div class="text-sm themed-text-muted">平均发放率</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">💰</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="'¥' + formatNumber(lotteryAnalysis.total_prize_value)">¥0</div>
+                <div class="text-sm themed-text-muted">奖品总价值</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 回馈趋势图 -->
+        <div class="themed-card rounded-xl p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold themed-text">📈 回馈趋势</h3>
+            <select x-model="lotteryAnalysis.chart_range" @change="loadLotteryTrend()" class="px-3 py-1 text-sm themed-bg-base themed-border rounded-lg">
+              <option value="7d">近7天</option>
+              <option value="30d">近30天</option>
+            </select>
+          </div>
+          <div id="lottery-trend-chart" class="chart-container"></div>
+        </div>
+        
+        <!-- 奖品分布和活动排行 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="themed-card rounded-xl p-6">
+            <h3 class="text-lg font-semibold themed-text mb-4">🎁 奖品分布</h3>
+            <div id="prize-distribution-chart" class="chart-container" style="min-height: 280px;"></div>
+          </div>
+          
+          <div class="themed-card rounded-xl p-6">
+            <h3 class="text-lg font-semibold themed-text mb-4">🏆 活动排行</h3>
+            <div class="space-y-3 max-h-[300px] overflow-y-auto scrollbar-thin">
+              <template x-for="(campaign, index) in lotteryAnalysis.campaign_ranking" :key="campaign.lottery_campaign_id">
+                <div class="flex items-center justify-between p-3 rounded-lg themed-bg-subtle">
+                  <div class="flex items-center gap-3">
+                    <span class="w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold"
+                      :class="index === 0 ? 'bg-yellow-100 text-yellow-600' : index === 1 ? 'bg-gray-200 text-gray-600' : index === 2 ? 'bg-orange-100 text-orange-600' : 'bg-blue-50 text-blue-600'"
+                      x-text="index + 1"></span>
+                    <span class="font-medium themed-text" x-text="campaign.campaign_name"></span>
+                  </div>
+                  <div class="text-right">
+                    <div class="font-bold themed-text" x-text="formatNumber(campaign.draws)"></div>
+                    <div class="text-xs themed-text-muted" x-text="'发放率 ' + campaign.win_rate.toFixed(1) + '%'"></div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+    
+    <!-- ==================== Tab 3: 用户分析 (P2-7) ==================== -->
+    <template x-if="activeTab === 'user'">
+      <div class="space-y-6">
+        <!-- 用户统计卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">👥</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="formatNumber(userAnalysis.total_users)">0</div>
+                <div class="text-sm themed-text-muted">总用户数</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">🆕</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="formatNumber(userAnalysis.new_users_today)">0</div>
+                <div class="text-sm themed-text-muted">今日新增</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">🔥</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="formatNumber(userAnalysis.active_users)">0</div>
+                <div class="text-sm themed-text-muted">活跃用户</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">👑</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="formatNumber(userAnalysis.vip_users)">0</div>
+                <div class="text-sm themed-text-muted">VIP用户</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 用户增长趋势 -->
+        <div class="themed-card rounded-xl p-6">
+          <h3 class="text-lg font-semibold themed-text mb-4">📈 用户增长趋势（近7天）</h3>
+          <div id="user-growth-chart" class="chart-container"></div>
+        </div>
+        
+        <!-- 用户分层和活跃排行 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="themed-card rounded-xl p-6">
+            <h3 class="text-lg font-semibold themed-text mb-4">📊 用户分层分布</h3>
+            <div id="user-tier-chart" class="chart-container" style="min-height: 280px;"></div>
+          </div>
+          
+          <div class="themed-card rounded-xl p-6">
+            <h3 class="text-lg font-semibold themed-text mb-4">🔥 活跃排行</h3>
+            <div class="space-y-3 max-h-[300px] overflow-y-auto scrollbar-thin">
+              <template x-for="(user, index) in userAnalysis.active_ranking" :key="user.user_id">
+                <div class="flex items-center justify-between p-3 rounded-lg themed-bg-subtle">
+                  <div class="flex items-center gap-3">
+                    <span class="w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold"
+                      :class="index === 0 ? 'bg-yellow-100 text-yellow-600' : index === 1 ? 'bg-gray-200 text-gray-600' : index === 2 ? 'bg-orange-100 text-orange-600' : 'bg-blue-50 text-blue-600'"
+                      x-text="index + 1"></span>
+                    <div>
+                      <span class="font-medium themed-text" x-text="user.nickname"></span>
+                      <span class="text-xs themed-text-muted ml-2" x-text="user.phone"></span>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <div class="font-bold themed-text" x-text="user.activity_score + '分'"></div>
+                    <div class="text-xs themed-text-muted">活跃度</div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+    
+    <!-- ==================== Tab 4: 资产流动 (P2-1 桑基图) ==================== -->
+    <template x-if="activeTab === 'asset-flow'">
+      <div class="space-y-6">
+        <!-- 资产统计卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">💎</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="formatNumber(assetFlow.system_balance)">0</div>
+                <div class="text-sm themed-text-muted">系统余额</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">👛</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="formatNumber(assetFlow.user_holding)">0</div>
+                <div class="text-sm themed-text-muted">用户持有</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">🔒</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="formatNumber(assetFlow.frozen_amount)">0</div>
+                <div class="text-sm themed-text-muted">冻结中</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 rounded-lg flex items-center justify-center"
+                :class="assetFlow.net_flow >= 0 ? 'bg-green-100' : 'bg-red-100'">
+                <span class="text-2xl" x-text="assetFlow.net_flow >= 0 ? '📈' : '📉'"></span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold" 
+                  :class="assetFlow.net_flow >= 0 ? 'text-green-600' : 'text-red-600'"
+                  x-text="(assetFlow.net_flow >= 0 ? '+' : '') + formatNumber(assetFlow.net_flow)">0</div>
+                <div class="text-sm themed-text-muted">今日净流入</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 今日资产流动明细 -->
+        <div class="themed-card rounded-xl p-6">
+          <h3 class="text-lg font-semibold themed-text mb-4">📊 今日资产流动</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- 流入 -->
+            <div class="p-4 bg-green-50 rounded-lg border border-green-200">
+              <h4 class="font-medium text-green-700 mb-3 flex items-center gap-2">
+                <span>📥</span>
+                流入（+）
+              </h4>
+              <div class="space-y-2">
+                <template x-for="item in assetFlow.inflows" :key="item.type">
+                  <div class="flex justify-between text-sm">
+                    <span class="text-green-600" x-text="item.label"></span>
+                    <span class="font-medium text-green-700" x-text="'+' + formatNumber(item.amount)"></span>
+                  </div>
+                </template>
+                <div class="pt-2 border-t border-green-200 flex justify-between font-semibold">
+                  <span class="text-green-700">总流入</span>
+                  <span class="text-green-700" x-text="'+' + formatNumber(assetFlow.total_inflow)"></span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 流出 -->
+            <div class="p-4 bg-red-50 rounded-lg border border-red-200">
+              <h4 class="font-medium text-red-700 mb-3 flex items-center gap-2">
+                <span>📤</span>
+                流出（-）
+              </h4>
+              <div class="space-y-2">
+                <template x-for="item in assetFlow.outflows" :key="item.type">
+                  <div class="flex justify-between text-sm">
+                    <span class="text-red-600" x-text="item.label"></span>
+                    <span class="font-medium text-red-700" x-text="'-' + formatNumber(item.amount)"></span>
+                  </div>
+                </template>
+                <div class="pt-2 border-t border-red-200 flex justify-between font-semibold">
+                  <span class="text-red-700">总流出</span>
+                  <span class="text-red-700" x-text="'-' + formatNumber(assetFlow.total_outflow)"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- P2-1: 桑基图 -->
+        <div class="themed-card rounded-xl p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold themed-text">🔄 资产流动桑基图</h3>
+            <select x-model="assetFlow.chart_range" @change="loadAssetFlowChart()" class="px-3 py-1 text-sm themed-bg-base themed-border rounded-lg">
+              <option value="today">今日</option>
+              <option value="7d">近7天</option>
+              <option value="30d">近30天</option>
+            </select>
+          </div>
+          <div id="asset-sankey-chart" class="sankey-container"></div>
+        </div>
+        
+        <!-- 资产变化趋势 -->
+        <div class="themed-card rounded-xl p-6">
+          <h3 class="text-lg font-semibold themed-text mb-4">📈 资产变化趋势（7天）</h3>
+          <div id="asset-trend-chart" class="chart-container"></div>
+        </div>
+      </div>
+    </template>
+    
+    <!-- ==================== Tab 5: 转化漏斗 (P3-2) ==================== -->
+    <template x-if="activeTab === 'funnel'">
+      <div class="space-y-6">
+        <!-- 漏斗图 -->
+        <div class="themed-card rounded-xl p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold themed-text">📊 用户转化漏斗</h3>
+            <select x-model="funnelData.range" @change="loadFunnelData()" class="px-3 py-1 text-sm themed-bg-base themed-border rounded-lg">
+              <option value="7d">近7天</option>
+              <option value="30d">近30天</option>
+              <option value="90d">近90天</option>
+            </select>
+          </div>
+          <div id="conversion-funnel-chart" class="funnel-container"></div>
+        </div>
+        
+        <!-- 关键转化率 -->
+        <div class="themed-card rounded-xl p-6">
+          <h3 class="text-lg font-semibold themed-text mb-4">📈 关键转化率</h3>
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <template x-for="stage in funnelData.stages" :key="stage.name">
+              <div class="p-4 themed-bg-subtle rounded-lg text-center">
+                <div class="text-3xl font-bold" :class="stage.percentage >= 70 ? 'text-green-600' : stage.percentage >= 40 ? 'text-yellow-600' : 'text-red-600'" x-text="stage.percentage.toFixed(1) + '%'"></div>
+                <div class="text-sm themed-text mt-1" x-text="stage.name"></div>
+                <div class="text-xs themed-text-muted mt-1" x-text="formatNumber(stage.count) + '人'"></div>
+              </div>
+            </template>
+          </div>
+        </div>
+        
+        <!-- 转化率趋势 -->
+        <div class="themed-card rounded-xl p-6">
+          <h3 class="text-lg font-semibold themed-text mb-4">📈 转化率趋势</h3>
+          <div id="funnel-trend-chart" class="chart-container"></div>
+        </div>
+      </div>
+    </template>
+    
+    <!-- ==================== Tab 6: 商户贡献度 (P3-3) ==================== -->
+    <template x-if="activeTab === 'merchant'">
+      <div class="space-y-6">
+        <!-- 商户统计卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">🏪</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="formatNumber(merchantData.total_merchants)">0</div>
+                <div class="text-sm themed-text-muted">门店总数</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">💰</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="'¥' + formatNumber(merchantData.total_consumption)">¥0</div>
+                <div class="text-sm themed-text-muted">总消费金额</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">📝</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="formatNumber(merchantData.total_orders)">0</div>
+                <div class="text-sm themed-text-muted">总订单数</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">💵</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="'¥' + formatNumber(merchantData.avg_order_value)">¥0</div>
+                <div class="text-sm themed-text-muted">平均客单价</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 商户贡献度排行 -->
+        <div class="themed-card rounded-xl p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold themed-text">🏪 商户贡献度排行</h3>
+            <select x-model="merchantData.range" @change="loadMerchantData()" class="px-3 py-1 text-sm themed-bg-base themed-border rounded-lg">
+              <option value="7d">近7天</option>
+              <option value="30d">近30天</option>
+            </select>
+          </div>
+          
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="themed-bg-subtle">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text">排名</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text">门店名称</th>
+                  <th class="px-4 py-3 text-right text-sm font-medium themed-text">消费金额</th>
+                  <th class="px-4 py-3 text-right text-sm font-medium themed-text">笔数</th>
+                  <th class="px-4 py-3 text-right text-sm font-medium themed-text">客单价</th>
+                  <th class="px-4 py-3 text-right text-sm font-medium themed-text">占比</th>
+                  <th class="px-4 py-3 text-right text-sm font-medium themed-text">健康度</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y themed-border">
+                <!-- 使用后端实际字段名: merchant_id, merchant_name, total_amount, avg_amount -->
+                <template x-for="(merchant, index) in merchantData.ranking" :key="merchant.merchant_id">
+                  <tr class="hover:themed-bg-subtle">
+                    <td class="px-4 py-3">
+                      <span 
+                        class="w-6 h-6 inline-flex items-center justify-center rounded-full text-xs font-bold"
+                        :class="index === 0 ? 'bg-yellow-100 text-yellow-600' : index === 1 ? 'bg-gray-200 text-gray-600' : index === 2 ? 'bg-orange-100 text-orange-600' : 'bg-blue-50 text-blue-600'"
+                        x-text="index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1"
+                      ></span>
+                    </td>
+                    <td class="px-4 py-3 font-medium themed-text" x-text="merchant.merchant_name"></td>
+                    <td class="px-4 py-3 text-right themed-text" x-text="'¥' + formatNumber(merchant.total_amount || 0)"></td>
+                    <td class="px-4 py-3 text-right themed-text" x-text="formatNumber(merchant.order_count || 0)"></td>
+                    <td class="px-4 py-3 text-right themed-text" x-text="'¥' + formatNumber(merchant.avg_amount || 0)"></td>
+                    <td class="px-4 py-3 text-right themed-text" x-text="(merchant.contribution_rate || 0).toFixed(1) + '%'"></td>
+                    <td class="px-4 py-3 text-right">
+                      <span 
+                        class="px-2 py-1 text-xs font-medium rounded-full"
+                        :class="(merchant.health_score || 0) >= 80 ? 'bg-green-100 text-green-600' : (merchant.health_score || 0) >= 60 ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'"
+                        x-text="(merchant.health_score || '-') + (merchant.health_score ? '分' : '')"
+                      ></span>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <!-- 商户消费趋势和贡献度饼图 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="themed-card rounded-xl p-6">
+            <h3 class="text-lg font-semibold themed-text mb-4">📈 商户消费趋势（近7天）</h3>
+            <div id="merchant-trend-chart" class="chart-container"></div>
+          </div>
+          
+          <div class="themed-card rounded-xl p-6">
+            <h3 class="text-lg font-semibold themed-text mb-4">📊 贡献度分布</h3>
+            <div id="merchant-pie-chart" class="chart-container"></div>
+          </div>
+        </div>
+        
+        <!-- 环比对比表格 -->
+        <div class="themed-card rounded-xl p-6">
+          <h3 class="text-lg font-semibold themed-text mb-4">📊 环比对比</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="themed-bg-subtle">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text">门店</th>
+                  <th class="px-4 py-3 text-right text-sm font-medium themed-text">本周金额</th>
+                  <th class="px-4 py-3 text-right text-sm font-medium themed-text">上周金额</th>
+                  <th class="px-4 py-3 text-right text-sm font-medium themed-text">环比变化</th>
+                  <th class="px-4 py-3 text-right text-sm font-medium themed-text">健康度</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y themed-border">
+                <!-- 使用后端实际字段名: merchant_id, merchant_name, this_week_amount, last_week_amount, change_rate -->
+                <template x-for="merchant in merchantData.comparison" :key="merchant.merchant_id">
+                  <tr class="hover:themed-bg-subtle">
+                    <td class="px-4 py-3 font-medium themed-text" x-text="merchant.merchant_name"></td>
+                    <td class="px-4 py-3 text-right themed-text" x-text="'¥' + formatNumber(merchant.this_week_amount || 0)"></td>
+                    <td class="px-4 py-3 text-right themed-text-muted" x-text="'¥' + formatNumber(merchant.last_week_amount || 0)"></td>
+                    <td class="px-4 py-3 text-right">
+                      <span 
+                        :class="(merchant.change_rate || 0) >= 0 ? 'text-green-600' : 'text-red-600'"
+                        x-text="((merchant.change_rate || 0) >= 0 ? '+' : '') + (merchant.change_rate || 0).toFixed(1) + '%'"
+                      ></span>
+                      <span x-text="(merchant.change_rate || 0) >= 0 ? '📈' : '📉'" class="ml-1"></span>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                      <span 
+                        class="px-2 py-1 text-xs font-medium rounded-full"
+                        :class="(merchant.health_score || 0) >= 80 ? 'bg-green-100 text-green-600' : (merchant.health_score || 0) >= 60 ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'"
+                        x-text="(merchant.health_score || '-') + (merchant.health_score ? '分' : '')"
+                      ></span>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ==================== Tab 7: 商品主数据健康（商品编码体系看板 7/12/13） ==================== -->
+    <template x-if="activeTab === 'product-code'">
+      <div class="space-y-6">
+        <!-- 编码回填/关联健康统计卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">🏷️</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="productCodeHealth.spu_total">0</div>
+                <div class="text-sm themed-text-muted">SPU 总数（SKU <span x-text="productCodeHealth.sku_total">0</span>）</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 rounded-lg flex items-center justify-center"
+                   :class="productCodeHealth.item_code_null_count > 0 ? 'bg-red-100' : 'bg-green-100'">
+                <span class="text-2xl" x-text="productCodeHealth.item_code_null_count > 0 ? '⚠️' : '✅'"></span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold" :class="productCodeHealth.item_code_null_count > 0 ? 'text-red-600' : 'text-green-600'"
+                     x-text="productCodeHealth.item_code_null_count">0</div>
+                <div class="text-sm themed-text-muted">编码未回填 SPU（盯回填进度）</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-cyan-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">🏭</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="productCodeHealth.no_supplier_item_count">0</div>
+                <div class="text-sm themed-text-muted">无供应商归属 SPU（自营/待补）</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <span class="text-2xl">📋</span>
+              </div>
+              <div>
+                <div class="text-2xl font-bold themed-text" x-text="productCodeHealth.missing_supplier_code_count">0</div>
+                <div class="text-sm themed-text-muted">货号缺失关联行（共 <span x-text="productCodeHealth.supplier_link_total">0</span> 行）</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 供应商重复货号清单（冲突提示，非阻断，人工核对） -->
+        <div class="themed-card rounded-xl p-6">
+          <h3 class="text-lg font-semibold themed-text mb-1">⚠️ 供应商重复货号清单</h3>
+          <p class="text-xs themed-text-muted mb-4">同一供应商对多个 SPU 用了相同货号（可能是复用/改版），系统不自动合并，请采购侧人工核对</p>
+          <div x-show="productCodeHealth.duplicate_supplier_codes.length === 0" class="py-6 text-center text-sm text-green-600">✅ 暂无重复货号</div>
+          <div x-show="productCodeHealth.duplicate_supplier_codes.length > 0" class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="themed-bg-subtle">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text">供应商</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text">重复货号</th>
+                  <th class="px-4 py-3 text-right text-sm font-medium themed-text">命中 SPU 数</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y themed-border">
+                <template x-for="d in productCodeHealth.duplicate_supplier_codes" :key="d.supplier_id + '-' + d.supplier_item_code">
+                  <tr class="hover:themed-bg-subtle">
+                    <td class="px-4 py-3 font-medium themed-text" x-text="d.supplier_name"></td>
+                    <td class="px-4 py-3 font-mono text-sm text-yellow-700" x-text="d.supplier_item_code"></td>
+                    <td class="px-4 py-3 text-right themed-text" x-text="d.spu_count"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 供应商供货分布（识别供货集中度） -->
+        <div class="themed-card rounded-xl p-6">
+          <h3 class="text-lg font-semibold themed-text mb-1">🏭 供应商供货分布</h3>
+          <p class="text-xs themed-text-muted mb-4">按供应商统计供货 SPU 数 / 在售数 / 货号缺失数，识别供货集中度</p>
+          <div x-show="productCodeHealth.supplier_distribution.length === 0" class="py-6 text-center text-sm themed-text-muted">暂无供应商数据（先在「供应商管理」建档）</div>
+          <div x-show="productCodeHealth.supplier_distribution.length > 0" class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="themed-bg-subtle">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text">供应商</th>
+                  <th class="px-4 py-3 text-center text-sm font-medium themed-text">状态</th>
+                  <th class="px-4 py-3 text-right text-sm font-medium themed-text">供货 SPU 数</th>
+                  <th class="px-4 py-3 text-right text-sm font-medium themed-text">在售 SPU 数</th>
+                  <th class="px-4 py-3 text-right text-sm font-medium themed-text">货号缺失数</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y themed-border">
+                <template x-for="s in productCodeHealth.supplier_distribution" :key="s.supplier_id">
+                  <tr class="hover:themed-bg-subtle">
+                    <td class="px-4 py-3 font-medium themed-text" x-text="s.supplier_name"></td>
+                    <td class="px-4 py-3 text-center">
+                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                        :class="s.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
+                        x-text="s.status === 'active' ? '启用' : '停用'"></span>
+                    </td>
+                    <td class="px-4 py-3 text-right themed-text" x-text="s.supply_spu_count"></td>
+                    <td class="px-4 py-3 text-right themed-text" x-text="s.active_spu_count"></td>
+                    <td class="px-4 py-3 text-right" :class="s.missing_code_count > 0 ? 'text-yellow-600 font-medium' : 'themed-text'" x-text="s.missing_code_count"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 系列/条码预留统计 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="themed-card rounded-xl p-5 flex items-center gap-3">
+            <span class="text-2xl">📚</span>
+            <div>
+              <div class="text-xl font-bold themed-text" x-text="productCodeHealth.in_series_count">0</div>
+              <div class="text-sm themed-text-muted">已归入系列的 SPU（双轨制可读系列号）</div>
+            </div>
+          </div>
+          <div class="themed-card rounded-xl p-5 flex items-center gap-3">
+            <span class="text-2xl">📊</span>
+            <div>
+              <div class="text-xl font-bold themed-text" x-text="productCodeHealth.barcode_null_count">0</div>
+              <div class="text-sm themed-text-muted">未填国际条码的 SKU（barcode 预留字段，对接商超时补）</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+
+</body>
+</html>

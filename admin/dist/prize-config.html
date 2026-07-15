@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>奖品配置 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; } .tab-content-frame { border: none; width: 100%; min-height: calc(100vh - 180px); }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/prize-config-eTGEN-Kz.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
+        <span class="text-lg font-semibold">🎁 奖品配置</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="prizeConfigPage()" x-init="init()">
+    
+    <!-- Tab导航 -->
+    <div class="themed-card rounded-lg shadow mb-6">
+      <div class="flex border-b overflow-x-auto">
+        <template x-for="tab in tabs" :key="tab.id">
+          <button 
+            @click="switchTab(tab.id)"
+            :class="currentTab === tab.id ? 'border-b-2 themed-border-primary themed-text-primary themed-bg-primary-light' : 'themed-text-muted themed-hover-bg'"
+            class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
+            x-text="tab.icon + ' ' + tab.name"
+          ></button>
+        </template>
+      </div>
+    </div>
+
+    <!-- Tab内容区域 -->
+    <div class="themed-card rounded-lg shadow overflow-hidden">
+      <!-- 物品模板 -->
+      <div x-show="currentTab === 'item-templates'" x-cloak>
+        <iframe 
+          src="/admin/item-templates.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="itemTemplatesFrame"
+        ></iframe>
+      </div>
+      
+      <!-- 物料转换规则 -->
+      <div x-show="currentTab === 'material-rules'" x-cloak>
+        <iframe 
+          src="/admin/conversion-rule-management.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="materialRulesFrame"
+        ></iframe>
+      </div>
+      
+      <!-- 资产组合 -->
+      <div x-show="currentTab === 'assets-portfolio'" x-cloak>
+        <iframe 
+          src="/admin/assets-portfolio.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="assetsPortfolioFrame"
+        ></iframe>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+
+</body>
+</html>
+

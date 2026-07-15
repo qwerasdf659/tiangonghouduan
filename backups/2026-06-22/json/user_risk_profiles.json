@@ -1,0 +1,70 @@
+[
+  {
+    "user_risk_profile_id": 1,
+    "user_id": null,
+    "user_level": "normal",
+    "config_type": "level",
+    "thresholds": {
+      "daily_points_limit": 10000,
+      "daily_lottery_limit": 100,
+      "single_transaction_limit": 1000
+    },
+    "is_frozen": 0,
+    "frozen_reason": null,
+    "frozen_at": null,
+    "frozen_by": null,
+    "remarks": "测试环境配置 - 挂牌上限更新为 1000 (2026-06-04T21:36:26.442Z)",
+    "created_at": "2026-01-15 06:12:52",
+    "updated_at": "2026-06-05 05:36:26"
+  },
+  {
+    "user_risk_profile_id": 2,
+    "user_id": null,
+    "user_level": "vip",
+    "config_type": "level",
+    "thresholds": {
+      "DIAMOND": {
+        "daily_max_amount": 500000,
+        "daily_max_trades": 30,
+        "daily_max_listings": 50
+      },
+      "red_shard": {
+        "daily_max_amount": 200000,
+        "daily_max_trades": 30,
+        "daily_max_listings": 50
+      }
+    },
+    "is_frozen": 0,
+    "frozen_reason": null,
+    "frozen_at": null,
+    "frozen_by": null,
+    "remarks": "VIP用户默认风控配置",
+    "created_at": "2026-01-15 06:12:52",
+    "updated_at": "2026-01-15 06:12:52"
+  },
+  {
+    "user_risk_profile_id": 3,
+    "user_id": null,
+    "user_level": "merchant",
+    "config_type": "level",
+    "thresholds": {
+      "DIAMOND": {
+        "daily_max_amount": 1000000,
+        "daily_max_trades": 50,
+        "daily_max_listings": 100
+      },
+      "red_shard": {
+        "daily_max_amount": 500000,
+        "daily_max_trades": 50,
+        "daily_max_listings": 100
+      }
+    },
+    "is_frozen": 0,
+    "frozen_reason": null,
+    "frozen_at": null,
+    "frozen_by": null,
+    "remarks": "商户默认风控配置",
+    "created_at": "2026-01-15 06:12:52",
+    "updated_at": "2026-01-15 06:12:52"
+  }
+]

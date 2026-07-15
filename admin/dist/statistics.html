@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>统计报表 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; } .chart-container { height: 280px; } .tabular-nums { font-variant-numeric: tabular-nums; } .stats-icon { transition: transform 0.3s ease; } .stats-card-hover:hover .stats-icon { transform: scale(1.1) rotate(5deg); }</style>
+
+
+
+  <!-- ECharts 已通过 main.js 统一导入，无需 CDN -->
+  <script type="module" crossorigin src="/admin/assets/statistics-1NL7iqjo.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/core-Db48157X.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-DqA_IOCz.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen" x-data="statisticsPage()" x-init="init()" x-cloak>
+  
+  <!-- 导航栏 -->
+  <nav class="page-navbar">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="text-white/70 hover:text-white transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">📊 统计报表</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-text="'欢迎，' + (current_user?.nickname || '管理员')"></span>
+        <button @click="logout()" class="px-3 py-1 border border-white/50 rounded hover:bg-white/10">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6">
+    <!-- 时间范围选择 -->
+    <div class="themed-card rounded-lg shadow mb-6">
+      <div class="p-4">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">统计周期</label>
+            <select x-model="filters.period" @change="onPeriodChange()" class="w-full px-3 py-2 border rounded-lg">
+              <option value="today">今日</option>
+              <option value="yesterday">昨日</option>
+              <option value="week">本周</option>
+              <option value="month">本月</option>
+              <option value="custom">自定义</option>
+            </select>
+          </div>
+          <div x-show="filters.period === 'custom'">
+            <label class="block text-sm font-medium themed-text-secondary mb-1">开始日期</label>
+            <input type="date" x-model="filters.start_date" class="w-full px-3 py-2 border rounded-lg">
+          </div>
+          <div x-show="filters.period === 'custom'">
+            <label class="block text-sm font-medium themed-text-secondary mb-1">结束日期</label>
+            <input type="date" x-model="filters.end_date" class="w-full px-3 py-2 border rounded-lg">
+          </div>
+          <div>
+            <button @click="loadStatistics()" :disabled="loading" class="w-full px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary disabled:opacity-50">
+              <span x-show="!loading">🔍 查询</span>
+              <span x-show="loading">加载中...</span>
+            </button>
+          </div>
+          <div>
+            <button @click="exportReport()" :disabled="exporting" class="w-full px-4 py-2 themed-btn-primary rounded-lg disabled:opacity-50">
+              📥 导出报表
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 核心指标总览（带数字动画） -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <!-- 骨架屏加载状态 -->
+      <template x-if="loading">
+        <template x-for="i in 4" :key="'skeleton-' + i">
+          <div class="themed-card rounded-lg shadow p-4">
+            <div class="flex justify-between items-center">
+              <div class="space-y-2 flex-1">
+                <div class="skeleton-text-sm w-20"></div>
+                <div class="skeleton-title w-24"></div>
+                <div class="skeleton-text-xs w-16"></div>
+              </div>
+              <div class="skeleton-avatar-lg"></div>
+            </div>
+          </div>
+        </template>
+      </template>
+
+      <!-- 渐变指标卡片 — 数字滚动动画 + 迷你图表 -->
+      <template x-if="!loading">
+        <div class="gradient-stat-card gradient-stat-blue">
+          <div class="flex justify-between items-center">
+            <div class="flex-1">
+              <p class="stat-label">总用户数</p>
+              <h3 class="stat-value" x-text="getAnimatedValue('total_users')">-</h3>
+              <span class="stat-trend">
+                <span x-text="stats.user_trend >= 0 ? '↑' : '↓'"></span>
+                <span x-text="Math.abs(stats.user_trend).toFixed(1) + '% 较上期'"></span>
+              </span>
+            </div>
+            <div class="w-20 h-10" x-data="trendLine({ data: stats.user_trend_data, color: 'rgba(255,255,255,0.7)' })"></div>
+          </div>
+          <span class="stat-icon">👥</span>
+        </div>
+      </template>
+      <template x-if="!loading">
+        <div class="gradient-stat-card gradient-stat-green">
+          <div class="flex justify-between items-center">
+            <div class="flex-1">
+              <p class="stat-label">回馈次数</p>
+              <h3 class="stat-value" x-text="getAnimatedValue('total_draws')">-</h3>
+              <span class="stat-trend">
+                <span x-text="stats.draw_trend >= 0 ? '↑' : '↓'"></span>
+                <span x-text="Math.abs(stats.draw_trend).toFixed(1) + '% 较上期'"></span>
+              </span>
+            </div>
+            <div class="w-20 h-10" x-data="trendBar({ data: stats.draw_trend_data, color: 'rgba(255,255,255,0.7)' })"></div>
+          </div>
+          <span class="stat-icon">🎰</span>
+        </div>
+      </template>
+      <template x-if="!loading">
+        <div class="gradient-stat-card gradient-stat-orange">
+          <div class="flex justify-between items-center">
+            <div class="flex-1">
+              <p class="stat-label">发放率</p>
+              <h3 class="stat-value">
+                <span x-text="getAnimatedValue('win_rate')">-</span><span class="text-xl">%</span>
+              </h3>
+              <span class="stat-trend">
+                <span x-text="stats.win_rate_trend >= 0 ? '↑' : '↓'"></span>
+                <span x-text="Math.abs(stats.win_rate_trend).toFixed(1) + '% 较上期'"></span>
+              </span>
+            </div>
+            <div class="w-12 h-12" x-data="progressRing({ data: stats.win_rate || 45, color: 'rgba(255,255,255,0.8)' })"></div>
+          </div>
+          <span class="stat-icon">🏆</span>
+        </div>
+      </template>
+      <template x-if="!loading">
+        <div class="gradient-stat-card gradient-stat-rose">
+          <div class="flex justify-between items-center">
+            <div class="flex-1">
+              <p class="stat-label">积分发放</p>
+              <h3 class="stat-value" x-text="getAnimatedValue('total_revenue')">-</h3>
+              <span class="stat-trend">
+                <span x-text="stats.revenue_trend >= 0 ? '↑' : '↓'"></span>
+                <span x-text="Math.abs(stats.revenue_trend).toFixed(1) + '% 较上期'"></span>
+              </span>
+            </div>
+            <div class="w-20 h-10" x-data="trendLine({ data: stats.revenue_trend_data, color: 'rgba(255,255,255,0.7)' })"></div>
+          </div>
+          <span class="stat-icon">💰</span>
+        </div>
+      </template>
+    </div>
+
+    <!-- 详细统计区域 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <!-- 用户统计 -->
+      <div class="content-section">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">👥</span>
+            用户统计
+          </div>
+        </div>
+        <div class="content-section-body grid grid-cols-2 gap-4">
+          <div class="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
+            <p class="text-gray-500 text-sm">新增用户</p>
+            <h4 class="text-xl font-bold text-blue-600" x-text="userStats.new_users">0</h4>
+          </div>
+          <div class="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+            <p class="text-gray-500 text-sm">活跃用户</p>
+            <h4 class="text-xl font-bold text-green-600" x-text="userStats.active_users">0</h4>
+          </div>
+          <div class="text-center p-3 bg-purple-50 rounded-lg border border-purple-100">
+            <p class="text-gray-500 text-sm">管理员</p>
+            <h4 class="text-xl font-bold text-purple-600" x-text="userStats.admin_users">0</h4>
+          </div>
+          <div class="text-center p-3 bg-gray-50 rounded-lg border border-gray-100">
+            <p class="text-gray-500 text-sm">普通用户</p>
+            <h4 class="text-xl font-bold text-gray-600" x-text="userStats.regular_users">0</h4>
+          </div>
+        </div>
+      </div>
+
+      <!-- 回馈统计 -->
+      <div class="content-section">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">🎁</span>
+            回馈统计
+          </div>
+        </div>
+        <div class="content-section-body grid grid-cols-2 gap-4">
+          <div class="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
+            <p class="text-gray-500 text-sm">总回馈次数</p>
+            <h4 class="text-xl font-bold text-blue-600" x-text="lotteryStats.total_draws">0</h4>
+          </div>
+          <div class="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-100">
+            <p class="text-gray-500 text-sm">高档奖励</p>
+            <h4 class="text-xl font-bold text-yellow-600" x-text="lotteryStats.high_tier_wins">0</h4>
+          </div>
+          <div class="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+            <p class="text-gray-500 text-sm">普通奖励</p>
+            <h4 class="text-xl font-bold text-green-600" x-text="lotteryStats.regular_wins">0</h4>
+          </div>
+          <div class="text-center p-3 bg-rose-50 rounded-lg border border-rose-100">
+            <p class="text-gray-500 text-sm">发放率</p>
+            <h4 class="text-xl font-bold text-rose-600" x-text="lotteryStats.win_rate + '%'">0%</h4>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图表区域 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div class="chart-wrapper">
+        <div class="chart-wrapper-header">
+          <span>📈 用户增长趋势</span>
+        </div>
+        <div class="chart-wrapper-body">
+          <div x-ref="trendChart" class="chart-container"></div>
+        </div>
+      </div>
+      <div class="chart-wrapper">
+        <div class="chart-wrapper-header">
+          <span>📊 用户类型分布</span>
+        </div>
+        <div class="chart-wrapper-body">
+          <div x-ref="userTypeChart" class="chart-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 多维度统计分析 (P1-3) -->
+    <div class="themed-card rounded-lg shadow mb-6">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">🎯 多维度统计分析</h5>
+        <div class="flex space-x-2">
+          <template x-if="drillDownStack.length > 0">
+            <button @click="drillUp()" class="px-3 py-1 text-sm themed-text-primary border themed-border-primary rounded hover:themed-bg-primary-light">
+              ↩️ 返回上级
+            </button>
+          </template>
+          <select x-model="multiDimensionFilters.compare" @change="loadMultiDimensionStats()" class="px-2 py-1 text-sm border rounded">
+            <option value="">无对比</option>
+            <option value="week_over_week">周同比</option>
+            <option value="month_over_month">月环比</option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- 维度切换Tab（后端支持的维度：store, campaign, time） -->
+      <div class="flex border-b">
+        <button 
+          @click="switchDimension('store')"
+          :class="multiDimensionTab === 'store' ? 'border-b-2 themed-border-primary themed-text-primary' : 'themed-text-muted'"
+          class="px-4 py-2 text-sm font-medium transition-colors">
+          🏪 按门店
+        </button>
+        <button 
+          @click="switchDimension('campaign')"
+          :class="multiDimensionTab === 'campaign' ? 'border-b-2 themed-border-primary themed-text-primary' : 'themed-text-muted'"
+          class="px-4 py-2 text-sm font-medium transition-colors">
+          🎪 按活动
+        </button>
+        <button 
+          @click="switchDimension('time')"
+          :class="multiDimensionTab === 'time' ? 'border-b-2 themed-border-primary themed-text-primary' : 'themed-text-muted'"
+          class="px-4 py-2 text-sm font-medium transition-colors">
+          📅 按时间
+        </button>
+      </div>
+
+      <div class="p-4">
+        <!-- 下钻路径显示 -->
+        <template x-if="drillDownStack.length > 0">
+          <div class="mb-4 text-sm themed-text-muted">
+            <span>📍 路径：</span>
+            <template x-for="(item, index) in drillDownStack" :key="index">
+              <span>
+                <span x-text="item.dimension_display || getDimensionName(item.dimension)"></span>: <span class="themed-text-primary" x-text="item.value"></span>
+                <span x-if="index < drillDownStack.length - 1"> → </span>
+              </span>
+            </template>
+          </div>
+        </template>
+
+        <!-- 图表区域 -->
+        <div id="multiDimensionChart" style="width: 100%; height: 350px;"></div>
+
+        <!-- 数据表格 - 适配后端返回字段（支持 store, campaign, time 维度） -->
+        <div class="mt-4 overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="themed-bg-base">
+              <tr>
+                <th class="px-3 py-2 text-left font-medium themed-text-muted" x-text="multiDimensionFilters.dimension_display || getDimensionName(multiDimensionFilters.dimension)"></th>
+                <th class="px-3 py-2 text-right font-medium themed-text-muted">回馈次数</th>
+                <th class="px-3 py-2 text-right font-medium themed-text-muted">发放率</th>
+                <template x-if="multiDimensionData.comparison">
+                  <th class="px-3 py-2 text-right font-medium themed-text-muted">同比变化</th>
+                </template>
+                <th class="px-3 py-2 text-center font-medium themed-text-muted">操作</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <template x-for="(item, idx) in multiDimensionData.breakdown.slice(0, 10)" :key="item.store_id || item.lottery_campaign_id || item.period || idx">
+                <tr class="themed-hover-bg">
+                  <!-- 显示维度值：门店名/活动名/时间周期 - 使用后端字段名 -->
+                  <td class="px-3 py-2" x-text="item.store_name || item.name || item.period || ('活动#' + item.lottery_campaign_id) || '未知'"></td>
+                  <!-- 回馈次数：后端字段为 draws -->
+                  <td class="px-3 py-2 text-right tabular-nums" x-text="(item.draws || 0).toLocaleString()"></td>
+                  <!-- 发放率：后端字段为 win_rate -->
+                  <td class="px-3 py-2 text-right tabular-nums" x-text="(item.win_rate || 0).toFixed(2) + '%'"></td>
+                  <template x-if="multiDimensionData.comparison && item.change !== undefined">
+                    <td class="px-3 py-2 text-right">
+                      <span :class="item.change >= 0 ? 'text-green-500' : 'text-red-500'" x-text="(item.change >= 0 ? '+' : '') + item.change.toFixed(1) + '%'"></span>
+                    </td>
+                  </template>
+                  <td class="px-3 py-2 text-center">
+                    <button
+                      @click="drillDown(item)"
+                      x-show="multiDimensionFilters.dimension !== 'time'"
+                      class="themed-text-primary text-xs hover:underline">
+                      下钻 →
+                    </button>
+                  </td>
+                </tr>
+              </template>
+              <template x-if="multiDimensionData.breakdown.length === 0">
+                <tr>
+                  <td colspan="5" class="px-3 py-8 text-center themed-text-muted">
+                    暂无数据，请点击维度Tab加载
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- 自定义报表模板 (P2-2) -->
+    <div class="themed-card rounded-lg shadow">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">📋 自定义报表模板</h5>
+        <div class="flex space-x-2">
+          <button @click="loadReportTemplates()" class="px-3 py-1 text-sm border rounded hover:themed-bg-base">
+            🔄 刷新
+          </button>
+          <button @click="openReportTemplateModal()" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary text-sm">
+            ➕ 新建模板
+          </button>
+        </div>
+      </div>
+      <div class="p-4">
+
+          <div x-show="reportTemplates.length === 0" class="text-center py-8 themed-text-muted">
+            <p class="mb-2">暂无报表模板</p>
+            <button @click="openReportTemplateModal()" class="themed-text-primary hover:underline">点击创建第一个模板</button>
+          </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- 使用后端字段: report_template_id, template_name, template_description, is_enabled -->
+          <template x-for="template in reportTemplates" :key="template.report_template_id">
+            <div class="themed-card border rounded-lg p-4 hover:shadow-md transition-shadow">
+              <div class="flex justify-between items-start mb-2">
+                <h6 class="font-medium" x-text="template.template_name"></h6>
+                <span 
+                  :class="template.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+                  class="px-2 py-0.5 text-xs rounded"
+                  x-text="template.is_enabled ? '启用' : '禁用'"
+                ></span>
+              </div>
+              <p class="text-sm themed-text-muted mb-3 line-clamp-2" x-text="template.template_description || '暂无描述'"></p>
+              <div class="flex flex-wrap gap-1 mb-3">
+                <!-- 后端使用 dimensions_config 存储维度配置（数组） -->
+                <template x-for="(dim, idx) in (Array.isArray(template.dimensions_config) ? template.dimensions_config : []).slice(0, 3)" :key="'dim-' + idx">
+                  <span class="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded" x-text="dim.dimension_display || getDimensionName(dim)"></span>
+                </template>
+              </div>
+              <div class="flex justify-between items-center pt-2 border-t">
+                <div class="flex space-x-2 text-sm">
+                  <button @click="previewReport(template)" class="themed-text-primary hover:underline">预览</button>
+                  <button @click="exportTemplateReport(template)" class="text-green-600 hover:underline">导出</button>
+                </div>
+                <div class="flex space-x-2 text-sm">
+                  <button @click="openReportTemplateModal(template)" class="text-blue-500 hover:underline">编辑</button>
+                  <button @click="deleteReportTemplate(template)" class="text-red-500 hover:underline">删除</button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 报表模板编辑弹窗 (P2-2) -->
+  <div x-show="reportTemplateModalOpen"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="reportTemplateModalOpen = false"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold" x-text="editingTemplateId ? '编辑报表模板' : '新建报表模板'"></h5>
+        <button @click="reportTemplateModalOpen = false" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-2">模板名称 *</label>
+          <input type="text" x-model="reportTemplateForm.name" placeholder="如：月度运营报表" class="w-full px-3 py-2 border rounded">
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-2">描述</label>
+          <textarea x-model="reportTemplateForm.description" rows="2" placeholder="报表用途说明" class="w-full px-3 py-2 border rounded"></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-2">统计维度</label>
+          <div class="flex flex-wrap gap-2">
+            <label class="flex items-center">
+              <input type="checkbox" value="store" x-model="reportTemplateForm.dimensions" class="mr-2">
+              <span class="text-sm">门店</span>
+            </label>
+            <label class="flex items-center">
+              <input type="checkbox" value="campaign" x-model="reportTemplateForm.dimensions" class="mr-2">
+              <span class="text-sm">活动</span>
+            </label>
+            <label class="flex items-center">
+              <input type="checkbox" value="user_segment" x-model="reportTemplateForm.dimensions" class="mr-2">
+              <span class="text-sm">用户群</span>
+            </label>
+            <label class="flex items-center">
+              <input type="checkbox" value="time" x-model="reportTemplateForm.dimensions" class="mr-2">
+              <span class="text-sm">时间</span>
+            </label>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-2">统计指标</label>
+          <div class="flex flex-wrap gap-2">
+            <label class="flex items-center">
+              <input type="checkbox" value="draw_count" x-model="reportTemplateForm.metrics" class="mr-2">
+              <span class="text-sm">回馈次数</span>
+            </label>
+            <label class="flex items-center">
+              <input type="checkbox" value="consumption" x-model="reportTemplateForm.metrics" class="mr-2">
+              <span class="text-sm">消费金额</span>
+            </label>
+            <label class="flex items-center">
+              <input type="checkbox" value="user_count" x-model="reportTemplateForm.metrics" class="mr-2">
+              <span class="text-sm">用户数</span>
+            </label>
+            <label class="flex items-center">
+              <input type="checkbox" value="win_rate" x-model="reportTemplateForm.metrics" class="mr-2">
+              <span class="text-sm">发放率</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
+        <button @click="reportTemplateModalOpen = false" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300">取消</button>
+        <button @click="saveReportTemplate()" :disabled="exporting" class="px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary disabled:opacity-50">
+          <span x-show="!exporting">保存</span>
+          <span x-show="exporting">保存中...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+
+</body>
+</html>

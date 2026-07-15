@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>成长等级看板 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+
+
+  <!-- ECharts 已通过 main.js 统一导入，无需 CDN -->
+  <script type="module" crossorigin src="/admin/assets/growth-level-dashboard-DISkgkBE.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/analytics-DkSxC_wQ.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+
+  <!-- 导航栏 -->
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
+        <span class="text-lg font-semibold">👑 成长等级看板</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="growthLevelDashboard()" x-init="init()">
+
+    <div x-show="loading" class="p-8 text-center themed-text-muted">
+      <div class="inline-block w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+      <p class="mt-2 text-sm">看板数据加载中...</p>
+    </div>
+
+    <!-- ========== P1-4 成本汇总卡片 ========== -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6" x-show="!loading">
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <h6 class="themed-text-muted mb-2">总用户数</h6>
+        <h2 class="text-3xl font-bold text-purple-600" x-text="distribution?.total_users ?? 0"></h2>
+      </div>
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <h6 class="themed-text-muted mb-2" x-text="'近' + (cost?.period_days ?? costDays) + '天等级加成发放'"></h6>
+        <h2 class="text-3xl font-bold text-amber-600" x-text="(cost?.summary?.total_level_bonus_points ?? 0).toLocaleString()"></h2>
+      </div>
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <h6 class="themed-text-muted mb-2">加成成本占营收比</h6>
+        <h2 class="text-3xl font-bold text-red-600" x-text="bonusCostRatioText"></h2>
+      </div>
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <h6 class="themed-text-muted mb-2">积分负债余额</h6>
+        <h2 class="text-3xl font-bold text-blue-600" x-text="(cost?.summary?.points_liability ?? 0).toLocaleString()"></h2>
+        <p class="text-xs themed-text-muted mt-1">积分永不过期，负债只增不销</p>
+      </div>
+    </div>
+
+    <!-- ========== 图表区域 ========== -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6" x-show="!loading">
+      <!-- P0-3 等级人数分布 -->
+      <div class="themed-card rounded-lg shadow p-6">
+        <h5 class="font-semibold mb-4">👑 各等级人数分布 / 本月升级</h5>
+        <div class="h-80" x-ref="distChart"></div>
+      </div>
+      <!-- P1-4 成本趋势 -->
+      <div class="themed-card rounded-lg shadow p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h5 class="font-semibold">💰 成本趋势（加成发放 / 预算注入）</h5>
+          <select x-model.number="costDays" @change="reloadCost()" class="px-3 py-1.5 border rounded text-sm">
+            <option :value="7">近 7 天</option>
+            <option :value="30">近 30 天</option>
+            <option :value="90">近 90 天</option>
+          </select>
+        </div>
+        <div class="h-80" x-ref="dailyCostChart"></div>
+      </div>
+    </div>
+
+    <!-- ========== P0-3 等级分布明细表 ========== -->
+    <div class="themed-card rounded-lg shadow mb-6" x-show="!loading">
+      <div class="p-4 border-b">
+        <h5 class="font-semibold">各等级明细（人数 / 累计消费贡献 / 本月升级）</h5>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="themed-bg-base">
+            <tr>
+              <th class="text-left py-3 px-4 text-xs font-semibold themed-text-muted uppercase">等级</th>
+              <th class="text-right py-3 px-4 text-xs font-semibold themed-text-muted uppercase">门槛（积分）</th>
+              <th class="text-right py-3 px-4 text-xs font-semibold themed-text-muted uppercase">发放倍数</th>
+              <th class="text-right py-3 px-4 text-xs font-semibold themed-text-muted uppercase">人数</th>
+              <th class="text-right py-3 px-4 text-xs font-semibold themed-text-muted uppercase">累计积分贡献</th>
+              <th class="text-right py-3 px-4 text-xs font-semibold themed-text-muted uppercase">本月升级</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y themed-divide">
+            <template x-for="lv in (distribution?.levels || [])" :key="lv.level_key">
+              <tr class="themed-hover-bg">
+                <td class="py-3 px-4 text-sm font-medium themed-text-primary">
+                  <span x-text="lv.level_name"></span>
+                  <span class="text-xs font-mono themed-text-muted ml-1" x-text="'（' + lv.level_key + '）'"></span>
+                </td>
+                <td class="py-3 px-4 text-sm text-right themed-text-secondary" x-text="(lv.min_history_points ?? 0).toLocaleString()"></td>
+                <td class="py-3 px-4 text-sm text-right font-mono" :class="Number(lv.earn_multiplier) > 1 ? 'text-emerald-600' : 'themed-text-secondary'" x-text="'×' + Number(lv.earn_multiplier ?? 1).toFixed(2)"></td>
+                <td class="py-3 px-4 text-sm text-right themed-text-primary" x-text="(lv.user_count ?? 0).toLocaleString()"></td>
+                <td class="py-3 px-4 text-sm text-right themed-text-secondary" x-text="(lv.history_points_sum ?? 0).toLocaleString()"></td>
+                <td class="py-3 px-4 text-sm text-right text-emerald-600" x-text="(lv.upgraded_this_month ?? 0).toLocaleString()"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ========== P1-4 各档加成发放明细 ========== -->
+    <div class="themed-card rounded-lg shadow" x-show="!loading">
+      <div class="p-4 border-b">
+        <h5 class="font-semibold" x-text="'各档加成发放明细（近' + (cost?.period_days ?? costDays) + '天）'"></h5>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="themed-bg-base">
+            <tr>
+              <th class="text-left py-3 px-4 text-xs font-semibold themed-text-muted uppercase">等级码</th>
+              <th class="text-right py-3 px-4 text-xs font-semibold themed-text-muted uppercase">加成发放积分</th>
+              <th class="text-right py-3 px-4 text-xs font-semibold themed-text-muted uppercase">加成笔数</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y themed-divide">
+            <template x-for="row in (cost?.by_level || [])" :key="row.level_key || 'unknown'">
+              <tr class="themed-hover-bg">
+                <td class="py-3 px-4 text-sm font-mono themed-text-primary" x-text="row.level_key || '（未记录档位）'"></td>
+                <td class="py-3 px-4 text-sm text-right text-amber-600" x-text="(row.level_bonus_points ?? 0).toLocaleString()"></td>
+                <td class="py-3 px-4 text-sm text-right themed-text-secondary" x-text="(row.bonus_count ?? 0).toLocaleString()"></td>
+              </tr>
+            </template>
+            <template x-if="(cost?.by_level || []).length === 0">
+              <tr><td colspan="3" class="py-12 text-center themed-text-muted text-sm">暂无加成发放记录（发放线上线后产生）</td></tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+
+</body>
+</html>

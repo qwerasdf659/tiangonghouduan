@@ -1,0 +1,26 @@
+[
+  {
+    "id": 501,
+    "sku_id": 504,
+    "cost_asset_code": "star_stone",
+    "cost_amount": 100,
+    "original_amount": null,
+    "is_enabled": 1,
+    "publish_at": null,
+    "unpublish_at": null,
+    "created_at": "2026-06-22 06:29:06",
+    "updated_at": "2026-06-22 06:29:06"
+  },
+  {
+    "id": 520,
+    "sku_id": 508,
+    "cost_asset_code": "red_core_shard",
+    "cost_amount": 1000,
+    "original_amount": null,
+    "is_enabled": 1,
+    "publish_at": null,
+    "unpublish_at": null,
+    "created_at": "2026-06-26 06:18:37",
+    "updated_at": "2026-06-26 06:18:37"
+  }
+]

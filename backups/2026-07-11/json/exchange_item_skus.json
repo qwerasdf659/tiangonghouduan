@@ -1,0 +1,44 @@
+[
+  {
+    "sku_id": 504,
+    "exchange_item_id": 633,
+    "sku_code": "SKX2M9VSFJ4FZJ",
+    "stock": 4,
+    "sold_count": 6,
+    "cost_price": null,
+    "status": "active",
+    "image_id": null,
+    "sort_order": 0,
+    "created_at": "2026-06-22 06:29:05",
+    "updated_at": "2026-07-11 01:54:27",
+    "barcode": null
+  },
+  {
+    "sku_id": 508,
+    "exchange_item_id": 637,
+    "sku_code": "SKYZFYCTBYZ6T3",
+    "stock": 77,
+    "sold_count": 23,
+    "cost_price": null,
+    "status": "active",
+    "image_id": null,
+    "sort_order": 0,
+    "created_at": "2026-06-22 13:01:15",
+    "updated_at": "2026-07-06 08:30:03",
+    "barcode": null
+  },
+  {
+    "sku_id": 533,
+    "exchange_item_id": 637,
+    "sku_code": "SKRUGJYHAHYSMH",
+    "stock": 1,
+    "sold_count": 0,
+    "cost_price": null,
+    "status": "inactive",
+    "image_id": null,
+    "sort_order": 0,
+    "created_at": "2026-07-06 03:37:08",
+    "updated_at": "2026-07-06 03:37:08",
+    "barcode": null
+  }
+]

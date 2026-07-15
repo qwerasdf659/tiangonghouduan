@@ -1,0 +1,16 @@
+[
+  {
+    "merchant_id": 6,
+    "merchant_name": "老良记",
+    "merchant_type": "restaurant",
+    "contact_name": "黄帅哥",
+    "contact_mobile": "13612227930",
+    "logo_url": null,
+    "status": "active",
+    "settlement_account_id": null,
+    "commission_rate": "0.00",
+    "notes": null,
+    "created_at": "2026-03-09 03:13:53",
+    "updated_at": "2026-03-09 03:13:53"
+  }
+]

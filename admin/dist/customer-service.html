@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>客服工作台 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/customer-service-C51gQoq-.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/content-DQAvSqeE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-export-DWcgNdQC.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 顶部导航 -->
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-2.5 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-white/80 text-sm flex items-center gap-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          返回工作台
+        </a>
+        <span class="text-lg font-semibold">💬 客服工作台</span>
+      </div>
+      <div class="flex items-center space-x-4 text-sm" x-data="{ now: '' }" x-init="setInterval(() => now = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', second: '2-digit' }), 1000)">
+        <span class="text-white/60" x-text="now"></span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="h-[calc(100vh-44px)] flex flex-col" x-data="customerService()" x-init="init()">
+
+    <!-- ==================== 顶部指标条（含SLA告警）==================== -->
+    <div class="flex-shrink-0 themed-bg-base border-b px-4 py-2">
+      <div class="container mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-5">
+          <!-- 首响时间 -->
+          <div class="flex items-center gap-2">
+            <span class="text-base">⏱️</span>
+            <div class="leading-tight">
+              <p class="text-[10px] themed-text-muted">首响均值</p>
+              <p class="text-sm font-semibold themed-text" x-text="responseStats.avg_response_display || '--'"></p>
+            </div>
+          </div>
+          <!-- 1分钟达标率 -->
+          <div class="flex items-center gap-2">
+            <span class="text-base">💬</span>
+            <div class="leading-tight">
+              <p class="text-[10px] themed-text-muted">1分钟达标</p>
+              <p class="text-sm font-semibold themed-text" x-text="responseStats.within_1min_display || '--'"></p>
+            </div>
+          </div>
+          <!-- 等待队列 -->
+          <div class="flex items-center gap-2">
+            <span class="text-base">📬</span>
+            <div class="leading-tight">
+              <p class="text-[10px] themed-text-muted">等待队列</p>
+              <p class="text-sm font-semibold" :class="waitingCount > 0 ? 'text-yellow-600' : 'themed-text'" x-text="waitingCount + (maxWaitMinutes > 0 ? ' (最久' + maxWaitMinutes + '分)' : '')"></p>
+            </div>
+          </div>
+          <!-- 处理中 -->
+          <div class="flex items-center gap-2">
+            <span class="text-base">🔄</span>
+            <div class="leading-tight">
+              <p class="text-[10px] themed-text-muted">处理中</p>
+              <p class="text-sm font-semibold themed-text" x-text="activeCount"></p>
+            </div>
+          </div>
+          <!-- 今日已解决 -->
+          <div class="flex items-center gap-2">
+            <span class="text-base">✅</span>
+            <div class="leading-tight">
+              <p class="text-[10px] themed-text-muted">今日解决</p>
+              <p class="text-sm font-semibold themed-text" x-text="resolvedTodayCount"></p>
+            </div>
+          </div>
+          <!-- 待处理工单 -->
+          <div class="flex items-center gap-2">
+            <span class="text-base">📋</span>
+            <div class="leading-tight">
+              <p class="text-[10px] themed-text-muted">待处理工单</p>
+              <p class="text-sm font-semibold" :class="pendingIssueCount > 0 ? 'text-orange-600' : 'themed-text'" x-text="pendingIssueCount"></p>
+            </div>
+          </div>
+          <!-- 满意度均分 -->
+          <div class="flex items-center gap-2">
+            <span class="text-base">⭐</span>
+            <div class="leading-tight">
+              <p class="text-[10px] themed-text-muted">满意度</p>
+              <p class="text-sm font-semibold" :class="avgSatisfaction >= 4 ? 'text-green-600' : avgSatisfaction >= 3 ? 'text-yellow-600' : avgSatisfaction ? 'text-red-600' : 'themed-text'" x-text="avgSatisfaction ? avgSatisfaction.toFixed(1) : '--'"></p>
+            </div>
+          </div>
+          <!-- SLA超时告警 -->
+          <div x-show="slaBreachCount > 0" class="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1 animate-pulse">
+            <span class="text-base">⚠️</span>
+            <div class="leading-tight">
+              <p class="text-[10px] text-red-600 font-medium">SLA超时</p>
+              <p class="text-sm font-bold text-red-700" x-text="slaBreachCount + '个会话'"></p>
+            </div>
+          </div>
+        </div>
+        <!-- 连接状态 + 刷新 -->
+        <div class="flex items-center gap-3">
+          <span class="flex items-center gap-1.5 text-xs"
+                :class="wsConnection && wsConnection.connected ? 'text-green-500' : 'text-gray-400'">
+            <span class="w-2 h-2 rounded-full" :class="wsConnection && wsConnection.connected ? 'bg-green-500' : 'bg-gray-300'"></span>
+            <span x-text="wsConnection && wsConnection.connected ? '已连接' : '未连接'"></span>
+          </span>
+          <button @click="loadSessions(); loadResponseStats(); updateWorkStatus()" class="text-xs themed-text-muted hover:themed-text-primary flex items-center gap-1" title="刷新数据">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            刷新
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 三栏主体 ==================== -->
+    <div class="flex-1 min-h-0 container mx-auto px-4 py-3">
+      <div class="grid grid-cols-12 gap-3 h-full">
+
+        <!-- ==================== A区：智能会话队列（左栏 3/12） ==================== -->
+        <div class="col-span-3 themed-card rounded-lg shadow-sm overflow-hidden flex flex-col border themed-border-light">
+          <!-- 搜索 + 筛选 -->
+          <div class="flex-shrink-0 p-3 space-y-2 border-b">
+            <div class="relative flex gap-1.5">
+              <div class="relative flex-1">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 themed-text-hint" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" x-model="searchKeyword"
+                       @keydown.enter="a_panel_tab === 'sessions' ? loadSessions() : loadUserOrders()"
+                       @input.debounce.500ms="a_panel_tab === 'sessions' ? loadSessions() : null"
+                       placeholder="搜索用户手机号..."
+                       class="w-full pl-9 pr-3 py-2 text-sm border rounded-lg themed-input">
+              </div>
+              <button @click="a_panel_tab === 'sessions' ? loadSessions() : loadUserOrders()"
+                      class="flex-shrink-0 px-3 py-2 text-sm themed-btn-primary rounded-lg transition-colors">
+                搜索
+              </button>
+            </div>
+            <!-- A区顶部 Tab：订单/会话 切换 -->
+            <div class="flex rounded-lg themed-bg-subtle p-0.5 text-xs">
+              <template x-for="tab in [{val:'orders',label:'订单'},{val:'sessions',label:'会话'}]" :key="tab.val">
+                <button @click="a_panel_tab = tab.val; tab.val === 'orders' ? loadUserOrders() : loadSessions()"
+                        :class="a_panel_tab === tab.val ? 'themed-card shadow-sm font-medium themed-text' : 'themed-text-muted'"
+                        class="flex-1 py-1.5 rounded-md text-center transition-all" x-text="tab.label">
+                </button>
+              </template>
+            </div>
+            <!-- 会话状态筛选 Tabs（仅在会话Tab下显示） -->
+            <div x-show="a_panel_tab === 'sessions'" class="flex rounded-lg themed-bg-subtle p-0.5 text-xs">
+              <template x-for="tab in [{val:'all',label:'全部'},{val:'mine',label:'我的'},{val:'waiting',label:'待接入'},{val:'active',label:'进行中'},{val:'closed',label:'已关闭'}]" :key="tab.val">
+                <button @click="statusFilter = tab.val; loadSessions()"
+                        :class="statusFilter === tab.val ? 'themed-card shadow-sm font-medium themed-text' : 'themed-text-muted'"
+                        class="flex-1 py-1.5 rounded-md text-center transition-all" x-text="tab.label">
+                </button>
+              </template>
+            </div>
+          </div>
+
+          <!-- ===== A区订单列表（x-show 控制显隐）===== -->
+          <div x-show="a_panel_tab === 'orders'" class="flex-1 overflow-y-auto">
+            <!-- 加载状态 -->
+            <div x-show="user_orders_loading" class="p-3 space-y-3">
+              <template x-for="i in 4" :key="i">
+                <div class="flex items-center gap-3">
+                  <div class="skeleton-avatar-sm flex-shrink-0"></div>
+                  <div class="flex-1 space-y-1.5">
+                    <div class="skeleton-text" style="width:70%"></div>
+                    <div class="skeleton-text-xs"></div>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <!-- 空状态 -->
+            <div x-show="!user_orders_loading && user_orders.length === 0" class="flex flex-col items-center justify-center py-12 themed-text-hint">
+              <p class="text-sm">搜索用户后显示订单</p>
+            </div>
+            <!-- 订单卡片列表 -->
+            <div x-show="!user_orders_loading && user_orders.length > 0">
+              <div class="px-3 py-1.5 themed-bg-subtle border-b text-[10px] font-medium themed-text-muted flex items-center gap-1.5">
+                <span>📦</span><span>近期订单</span>
+                <span class="ml-auto" x-text="user_orders_total"></span>
+              </div>
+              <template x-for="order in user_orders" :key="order.order_type + '_' + order.order_id">
+                <div @click="openOrderTab(order)"
+                     class="px-3 py-2.5 border-b cursor-pointer themed-hover-bg transition-colors">
+                  <div class="flex items-start gap-2">
+                    <span class="text-base" x-text="getOrderTypeIcon(order.order_type)"></span>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-1.5">
+                        <span class="text-xs font-medium themed-text truncate" x-text="order.order_no || order.order_id"></span>
+                        <span x-show="order.issue_count > 0" class="text-[10px] bg-red-100 text-red-600 px-1 rounded" x-text="order.issue_count + '单'"></span>
+                      </div>
+                      <p class="text-[11px] themed-text-muted truncate mt-0.5" x-text="order.summary"></p>
+                      <div class="flex items-center gap-2 mt-1">
+                        <span class="text-[10px] px-1.5 py-0.5 rounded"
+                              :class="order.status === 'completed' || order.status === 'fulfilled' || order.status === 'approved' ? 'bg-green-100 text-green-700' : order.status === 'cancelled' || order.status === 'expired' || order.status === 'rejected' ? 'bg-gray-100 text-gray-500' : 'bg-yellow-100 text-yellow-700'"
+                              x-text="order.status"></span>
+                        <span class="text-[10px] themed-text-hint" x-text="getOrderTypeLabel(order.order_type)"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- ===== A区会话列表（x-show 控制显隐）===== -->
+          <div x-show="a_panel_tab === 'sessions'" class="flex-1 overflow-y-auto">
+            <!-- 加载骨架 -->
+            <template x-if="sessionsLoading">
+              <div class="p-3 space-y-3">
+                <template x-for="i in 5" :key="i">
+                  <div class="flex items-center gap-3">
+                    <div class="skeleton-avatar-sm flex-shrink-0"></div>
+                    <div class="flex-1 space-y-1.5">
+                      <div class="skeleton-text" style="width:60%"></div>
+                      <div class="skeleton-text-xs"></div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+            <!-- 空状态 -->
+            <div x-show="!sessionsLoading && sessions.length === 0" class="flex flex-col items-center justify-center py-12 themed-text-hint">
+              <svg class="w-12 h-12 mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+              <p class="text-sm">暂无会话</p>
+            </div>
+
+            <!-- 按优先级分组的会话列表 -->
+            <template x-if="!sessionsLoading && sessions.length > 0">
+              <div>
+                <template x-for="group in groupedSessions" :key="group.group">
+                  <div>
+                    <!-- 分组标题 -->
+                    <div class="px-3 py-1.5 themed-bg-subtle border-b text-[10px] font-medium themed-text-muted flex items-center gap-1.5">
+                      <span x-text="group.icon"></span>
+                      <span x-text="group.group"></span>
+                      <span class="ml-auto" x-text="group.sessions.length"></span>
+                    </div>
+                    <!-- 组内会话卡片 -->
+                    <template x-for="session in group.sessions" :key="session.customer_service_session_id">
+                      <div @click="selectSession(session)"
+                           :class="{ 'themed-bg-primary-light border-l-4 themed-border-primary': String(selectedSession?.customer_service_session_id) === String(session.customer_service_session_id) }"
+                           class="px-3 py-2.5 border-b cursor-pointer themed-hover-bg transition-colors">
+                        <div class="flex items-start gap-2.5">
+                          <!-- 头像 + 等待时长指示器 -->
+                          <div class="flex-shrink-0 relative">
+                            <div class="w-9 h-9 rounded-full themed-bg-primary flex items-center justify-center text-white text-sm font-medium shadow-sm">
+                              <span x-text="(session.user?.nickname || '用').charAt(0)"></span>
+                            </div>
+                            <!-- 等待时长颜色指示点 -->
+                            <span x-show="session.status === 'waiting'"
+                                  class="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white"
+                                  :class="getSessionWaitColor(session)"></span>
+                          </div>
+                          <!-- 内容 -->
+                          <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between">
+                              <span class="text-sm font-medium themed-text truncate" x-text="session.user?.mobile || session.user?.nickname || '用户' + (session.user?.user_id || '')"></span>
+                              <span class="text-[10px] themed-text-hint flex-shrink-0 ml-2" x-text="formatDate(session.updated_at)"></span>
+                            </div>
+                            <div class="flex items-center justify-between mt-0.5">
+                              <p class="text-xs themed-text-muted truncate pr-2" x-text="getSessionLastMessage(session)"></p>
+                              <div class="flex items-center gap-1.5 flex-shrink-0">
+                                <span class="w-1.5 h-1.5 rounded-full"
+                                      :class="{ 'bg-yellow-400': session.status === 'waiting', 'bg-green-400': session.status === 'active', 'bg-gray-300': session.status === 'closed', 'bg-blue-400': session.status === 'assigned' }"></span>
+                                <span x-show="session.unread_count > 0"
+                                      class="themed-bg-primary text-white text-[10px] leading-none min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1"
+                                      x-text="session.unread_count > 99 ? '99+' : session.unread_count"></span>
+                              </div>
+                            </div>
+                            <!-- 等待时长 + 问题标签 -->
+                            <div class="flex items-center gap-1 mt-1 flex-wrap">
+                              <span x-show="session.status === 'waiting'"
+                                    class="text-[10px] px-1.5 py-0.5 rounded-full"
+                                    :class="getWaitUrgencyClass(Math.floor((Date.now() - new Date(session.created_at).getTime()) / 60000))"
+                                    x-text="'⏱ ' + getSessionWaitTime(session)"></span>
+                              <template x-for="tag in getSessionTags(session)" :key="tag.label">
+                                <span class="text-[10px] px-1.5 py-0.5 rounded-full themed-bg-subtle themed-text-muted" x-text="tag.icon + tag.label"></span>
+                              </template>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+
+          <!-- 会话数量统计 -->
+          <div class="flex-shrink-0 px-3 py-2 border-t themed-bg-subtle text-[10px] themed-text-hint text-center">
+            共 <span x-text="sessions.length"></span> 个会话
+          </div>
+        </div>
+
+        <!-- ==================== B区：多Tab工作区（中栏 6/12） ==================== -->
+        <div class="col-span-6 themed-card rounded-lg shadow-sm overflow-hidden flex flex-col border themed-border-light">
+
+          <!-- B区 Tab 栏（有Tab时显示） -->
+          <div x-show="work_tabs.length > 0" class="flex-shrink-0 flex items-center border-b themed-border-light overflow-x-auto" style="scrollbar-width:thin;">
+            <template x-for="tab in work_tabs" :key="tab.id">
+              <div class="flex items-center px-3 py-2 cursor-pointer border-b-2 text-xs whitespace-nowrap"
+                   :class="active_work_tab === tab.id ? 'themed-border-primary themed-text-primary font-medium' : 'border-transparent themed-text-muted hover:themed-text'"
+                   @click="active_work_tab = tab.id">
+                <span x-text="tab.type === 'chat' ? '💬' : '📦'" class="mr-1"></span>
+                <span x-text="tab.label" class="max-w-[100px] truncate"></span>
+                <button @click.stop="closeWorkTab(tab.id)" class="ml-1.5 text-[10px] hover:text-red-500 opacity-60 hover:opacity-100">✕</button>
+              </div>
+            </template>
+          </div>
+
+          <!-- B区：订单详情Tab内容（当激活的是订单Tab时显示） -->
+          <template x-for="tab in work_tabs.filter(t => t.type === 'order')" :key="tab.id">
+            <div x-show="active_work_tab === tab.id" class="flex-1 overflow-y-auto p-4">
+              <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-sm font-medium themed-text" x-text="'订单详情 - ' + (tab.data?.order_no || tab.data?.order_id)"></h3>
+                  <span class="text-[10px] px-2 py-0.5 rounded"
+                        :class="tab.data?.status === 'completed' || tab.data?.status === 'fulfilled' ? 'bg-green-100 text-green-700' : tab.data?.status === 'cancelled' || tab.data?.status === 'expired' ? 'bg-gray-100 text-gray-500' : 'bg-yellow-100 text-yellow-700'"
+                        x-text="tab.data?.status"></span>
+                </div>
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                  <div><span class="themed-text-muted">订单类型：</span><span class="themed-text" x-text="getOrderTypeLabel(tab.data?.order_type)"></span></div>
+                  <div><span class="themed-text-muted">订单号：</span><span class="themed-text font-mono" x-text="tab.data?.order_no || tab.data?.order_id"></span></div>
+                  <div><span class="themed-text-muted">金额/数量：</span><span class="themed-text" x-text="tab.data?.amount || '-'"></span></div>
+                  <div><span class="themed-text-muted">摘要：</span><span class="themed-text" x-text="tab.data?.summary || '-'"></span></div>
+                  <div><span class="themed-text-muted">关联工单：</span><span class="themed-text" x-text="(tab.data?.issue_count || 0) + ' 个'"></span></div>
+                  <div><span class="themed-text-muted">创建时间：</span><span class="themed-text" x-text="formatDate(tab.data?.created_at)"></span></div>
+                </div>
+                <div class="border-t themed-border-light pt-3">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium themed-text">关联工单</span>
+                    <button @click="showIssueModal = true; issueModalMode = 'create'; issueForm.user_id = _getContextUserId(); issueForm.issue_type = tab.data?.order_type === 'trade' ? 'trade' : tab.data?.order_type === 'consumption' ? 'consumption' : 'item'; issueForm.order_type = tab.data?.order_type; issueForm.order_id = tab.data?.order_id"
+                            class="px-3 py-1.5 text-xs themed-btn-primary rounded">
+                      📋 创建工单
+                    </button>
+                  </div>
+                  <div x-show="order_linked_issues.length === 0" class="text-xs themed-text-hint py-2">暂无关联工单</div>
+                  <template x-for="issue in order_linked_issues" :key="issue.issue_id">
+                    <div class="text-xs py-1.5 border-b themed-border-light">
+                      <div class="flex items-center justify-between">
+                        <span class="themed-text font-medium" x-text="'#' + issue.issue_id + ' ' + issue.title"></span>
+                        <span class="px-1 py-0.5 rounded text-[10px]"
+                              :class="{'bg-blue-100 text-blue-700': issue.status==='open', 'bg-yellow-100 text-yellow-700': issue.status==='processing', 'bg-green-100 text-green-700': issue.status==='resolved'}"
+                              x-text="{'open':'待处理','processing':'处理中','resolved':'已解决','closed':'已关闭'}[issue.status] || issue.status">
+                        </span>
+                      </div>
+                      <span class="themed-text-hint" x-text="formatDate(issue.created_at)"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- B区：聊天内容（无Tab时显示原始聊天界面，有Tab时仅在聊天Tab激活时显示） -->
+          <div x-show="work_tabs.length === 0 || (getActiveTab()?.type === 'chat')" class="flex-1 flex flex-col min-h-0">
+
+          <!-- 未选中状态 -->
+          <div x-show="!selectedSession" class="flex-1 flex flex-col items-center justify-center themed-text-hint">
+            <svg class="w-20 h-20 mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+            <p class="text-base font-medium mb-1">选择一个会话开始对话</p>
+            <p class="text-xs">从左侧列表中选择用户会话</p>
+          </div>
+
+          <!-- 已选中状态 -->
+          <template x-if="selectedSession">
+            <div class="flex flex-col h-full">
+              <!-- 聊天头部 -->
+              <div class="flex-shrink-0 px-4 py-2.5 border-b flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-full themed-bg-primary flex items-center justify-center text-white text-sm font-medium">
+                    <span x-text="(currentChatUser.nickname || '用').charAt(0)"></span>
+                  </div>
+                  <div>
+                    <p class="text-sm font-medium themed-text" x-text="currentChatUser.nickname || '用户'"></p>
+                    <p class="text-[10px] themed-text-hint" x-text="currentChatUser.mobile ? maskPhone(currentChatUser.mobile) : ''"></p>
+                  </div>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                        :class="{
+                          'bg-green-100 text-green-700': selectedSession?.status === 'active',
+                          'bg-yellow-100 text-yellow-700': selectedSession?.status === 'waiting',
+                          'bg-blue-100 text-blue-700': selectedSession?.status === 'assigned',
+                          'bg-gray-100 text-gray-500': selectedSession?.status === 'closed'
+                        }"
+                        x-text="{ waiting: '待接入', assigned: '已分配', active: '进行中', closed: '已关闭' }[selectedSession?.status] || selectedSession?.status">
+                  </span>
+                </div>
+                <!-- GM操作按钮组 -->
+                <div class="flex items-center gap-1">
+                  <button @click="openCompensationModal(_getContextUserId(), currentSessionId)" class="p-2 rounded-lg themed-hover-bg text-orange-400 hover:text-orange-600 transition-colors" title="发放补偿">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/></svg>
+                  </button>
+                  <button @click="viewUserInfo()" class="p-2 rounded-lg themed-hover-bg themed-text-muted hover:themed-text-primary transition-colors" title="查看用户资料">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                  </button>
+                  <button @click="transferSession()" class="p-2 rounded-lg themed-hover-bg themed-text-muted hover:themed-text-primary transition-colors" title="转接会话">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                  </button>
+                  <button @click="closeSession()" class="p-2 rounded-lg themed-hover-bg text-red-400 hover:text-red-600 transition-colors" title="关闭会话">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 消息列表 -->
+              <div class="flex-1 overflow-y-auto px-4 py-3 space-y-3 themed-bg-subtle" x-ref="messageContainer">
+                <div x-show="loadingOverlay" class="flex justify-center py-8">
+                  <div class="dots-loading"><span></span><span></span><span></span></div>
+                </div>
+
+                <template x-for="(msg, idx) in messages" :key="msg.chat_message_id || idx">
+                  <div>
+                    <!-- 系统消息（统一由 message_source==='system' 判定；message_type 不再含 system） -->
+                    <template x-if="msg.message_source === 'system'">
+                      <div class="flex justify-center">
+                        <span class="text-[10px] themed-text-hint bg-black/5 px-3 py-1 rounded-full" x-text="msg.content"></span>
+                      </div>
+                    </template>
+
+                    <!-- 用户消息（左） -->
+                    <template x-if="msg.message_source !== 'system' && msg.sender_type === 'user'">
+                      <div class="flex items-end gap-2 max-w-[75%]">
+                        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white text-[10px] font-medium">
+                          用户
+                        </div>
+                        <div>
+                          <div class="bg-yellow-50 border border-yellow-200 rounded-2xl rounded-bl-md px-3 py-2 shadow-sm">
+                            <!-- 图片消息：URL 来自 metadata.image_url（content 为占位 [图片]） -->
+                            <template x-if="msg.message_type === 'image'">
+                              <img :src="msg.metadata?.image_url" alt="用户发送的图片" @click="openImagePreview(msg.metadata?.image_url, '用户发送的图片')" class="max-w-[200px] max-h-[200px] rounded-lg object-cover cursor-pointer" loading="lazy">
+                            </template>
+                            <!-- 文件消息：从 metadata 渲染文件卡片（content 为真实文件名） -->
+                            <template x-if="msg.message_type === 'file'">
+                              <a :href="msg.metadata?.file_url" target="_blank" rel="noopener" class="flex items-center gap-2 text-sm text-blue-600 hover:underline">
+                                <span>📎</span><span x-text="msg.content || msg.metadata?.file_name || '文件'"></span>
+                              </a>
+                            </template>
+                            <!-- 位置消息：地址卡片（content 为可读地址，坐标在 metadata） -->
+                            <template x-if="msg.message_type === 'location'">
+                              <div class="text-sm themed-text">📍 <span x-text="msg.content || msg.metadata?.address || '位置'"></span></div>
+                            </template>
+                            <!-- 文本消息 -->
+                            <template x-if="!['image','file','location'].includes(msg.message_type)">
+                              <p class="text-sm themed-text break-words whitespace-pre-wrap" x-text="msg.content || ''"></p>
+                            </template>
+                          </div>
+                          <!-- 图片下载按钮（框外右下角） -->
+                          <template x-if="msg.message_type === 'image'">
+                            <div class="flex justify-end mt-1">
+                              <button @click.stop="downloadPreviewImage(msg.metadata?.image_url)"
+                                      class="w-7 h-7 flex items-center justify-center rounded-full bg-black/40 hover:bg-black/65 text-white text-sm shadow"
+                                      title="下载图片">⬇</button>
+                            </div>
+                          </template>
+                          <p class="text-[10px] themed-text-hint mt-1 ml-1" x-text="formatDate(msg.created_at)"></p>
+                        </div>
+                      </div>
+                    </template>
+
+                    <!-- 管理员消息（右） -->
+                    <template x-if="msg.message_source !== 'system' && msg.sender_type === 'admin'">
+                      <div class="flex items-end gap-2 max-w-[75%] ml-auto flex-row-reverse">
+                        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-medium">
+                          客服
+                        </div>
+                        <div>
+                          <div class="bg-white border border-gray-200 text-gray-800 rounded-2xl rounded-br-md px-3 py-2 shadow-sm">
+                            <!-- 图片消息：URL 来自 metadata.image_url（content 为占位 [图片]） -->
+                            <template x-if="msg.message_type === 'image'">
+                              <img :src="msg.metadata?.image_url" alt="客服发送的图片" @click="openImagePreview(msg.metadata?.image_url, '客服发送的图片')" class="max-w-[200px] max-h-[200px] rounded-lg object-cover cursor-pointer" loading="lazy">
+                            </template>
+                            <!-- 文件消息：从 metadata 渲染文件卡片（content 为真实文件名） -->
+                            <template x-if="msg.message_type === 'file'">
+                              <a :href="msg.metadata?.file_url" target="_blank" rel="noopener" class="flex items-center gap-2 text-sm text-blue-600 hover:underline">
+                                <span>📎</span><span x-text="msg.content || msg.metadata?.file_name || '文件'"></span>
+                              </a>
+                            </template>
+                            <!-- 位置消息：地址卡片 -->
+                            <template x-if="msg.message_type === 'location'">
+                              <div class="text-sm">📍 <span x-text="msg.content || msg.metadata?.address || '位置'"></span></div>
+                            </template>
+                            <!-- 文本消息 -->
+                            <template x-if="!['image','file','location'].includes(msg.message_type)">
+                              <p class="text-sm break-words whitespace-pre-wrap" x-text="msg.content || ''"></p>
+                            </template>
+                          </div>
+                          <!-- 图片下载按钮（框外左下角，与右对齐气泡呼应） -->
+                          <template x-if="msg.message_type === 'image'">
+                            <div class="flex justify-start mt-1">
+                              <button @click.stop="downloadPreviewImage(msg.metadata?.image_url)"
+                                      class="w-7 h-7 flex items-center justify-center rounded-full bg-black/40 hover:bg-black/65 text-white text-sm shadow"
+                                      title="下载图片">⬇</button>
+                            </div>
+                          </template>
+                          <p class="text-[10px] themed-text-hint mt-1 text-right mr-1" x-text="formatDate(msg.created_at)"></p>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+
+                <div x-show="!loadingOverlay && messages.length === 0" class="flex flex-col items-center justify-center py-12 themed-text-hint">
+                  <p class="text-sm">暂无消息记录</p>
+                </div>
+              </div>
+
+              <!-- 快捷回复 + 模板库 + 输入框 -->
+              <div class="flex-shrink-0 border-t themed-card">
+                <!-- 消息模板库面板（点击展开） -->
+                <div x-show="showTemplatePanel" x-cloak class="border-b max-h-48 overflow-y-auto px-4 py-2">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium themed-text">📋 消息模板库</span>
+                    <div class="flex items-center gap-2">
+                      <input type="text" x-model="templateFilter" placeholder="搜索模板..." class="text-xs border rounded px-2 py-1 themed-input w-32">
+                      <button @click="showTemplatePanel = false" class="text-xs themed-text-hint hover:themed-text">&times;</button>
+                    </div>
+                  </div>
+                  <template x-if="templatesLoading">
+                    <p class="text-xs themed-text-hint text-center py-2">加载中...</p>
+                  </template>
+                  <template x-if="!templatesLoading && filteredTemplates.length === 0">
+                    <p class="text-xs themed-text-hint text-center py-2">暂无模板数据，请在系统设置中配置</p>
+                  </template>
+                  <template x-for="cat in filteredTemplates" :key="cat.category">
+                    <div class="mb-2">
+                      <p class="text-[10px] font-medium themed-text-muted mb-1" x-text="cat.category || cat.name || '通用'"></p>
+                      <div class="flex flex-wrap gap-1">
+                        <template x-for="tpl in (cat.templates || cat.items || [])" :key="tpl.title || tpl.content">
+                          <button @click="selectTemplate(tpl.content)"
+                                  class="text-[11px] px-2 py-1 rounded border themed-border-light themed-hover-bg themed-text-muted hover:themed-text-primary transition-colors"
+                                  :title="tpl.content"
+                                  x-text="tpl.title || tpl.content?.substring(0, 15) + '...'">
+                          </button>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+                <!-- 快捷回复条 + 模板按钮 -->
+                <div class="px-4 pt-2 pb-1 flex items-center gap-1.5 overflow-x-auto">
+                  <button @click="toggleTemplatePanel()" class="flex-shrink-0 text-[11px] px-2.5 py-1 rounded-full border themed-border-light themed-hover-bg themed-text-muted hover:themed-text-primary transition-colors font-medium" title="消息模板库">
+                    📋 模板
+                  </button>
+                  <span class="text-gray-300">|</span>
+                  <span class="text-[10px] themed-text-hint flex-shrink-0 mr-1">快捷:</span>
+                  <template x-for="(qr, qi) in quickReplies" :key="qi">
+                    <button @click="insertQuickReply(qr.content)"
+                            class="flex-shrink-0 text-[11px] px-2.5 py-1 rounded-full border themed-border-light themed-hover-bg themed-text-muted hover:themed-text-primary transition-colors"
+                            x-text="qr.text">
+                    </button>
+                  </template>
+                </div>
+                <!-- 输入区 -->
+                <div class="px-4 pb-3 pt-1">
+                  <div class="flex items-end gap-2">
+                    <!-- 图片上传：隐藏 input + 图标按钮，复用 imageUploadMixin -->
+                    <input type="file" x-ref="csImageInput" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" @change="sendImageMessage($event)">
+                    <button @click="$refs.csImageInput.click()"
+                            :disabled="!selectedSession || selectedSession?.status === 'closed' || image_uploading"
+                            class="flex-shrink-0 w-10 h-10 flex items-center justify-center text-lg border rounded-xl themed-border-light themed-hover-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            :title="image_uploading ? '图片上传中...' : '发送图片'">
+                      <span x-show="!image_uploading">🖼️</span>
+                      <span x-show="image_uploading" x-cloak class="text-xs">⏳</span>
+                    </button>
+                    <textarea x-model="messageInput"
+                              @keydown.enter.prevent="if(!$event.shiftKey) sendMessage()"
+                              placeholder="输入消息...（Enter 发送，Shift+Enter 换行）"
+                              rows="1"
+                              class="flex-1 px-3 py-2 text-sm border rounded-xl themed-input resize-none max-h-24 leading-relaxed"
+                              :disabled="!selectedSession || selectedSession?.status === 'closed'"
+                              @input="$el.style.height = 'auto'; $el.style.height = Math.min($el.scrollHeight, 96) + 'px'"
+                    ></textarea>
+                    <button @click="sendMessage()"
+                            :disabled="!selectedSession || !messageInput.trim() || selectedSession?.status === 'closed'"
+                            class="flex-shrink-0 px-5 py-2 text-sm themed-btn-primary rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium">
+                      发送
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+          </div><!-- 关闭 B区聊天内容容器 -->
+        </div>
+
+        <!-- ==================== C区：用户上下文智能面板（右栏 3/12） ==================== -->
+        <div class="col-span-3 themed-card rounded-lg shadow-sm overflow-hidden flex flex-col border themed-border-light">
+          <!-- 未选中会话 -->
+          <div x-show="!selectedSession" class="flex-1 flex flex-col items-center justify-center themed-text-hint">
+            <svg class="w-10 h-10 mb-2 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            <p class="text-xs">选择会话查看用户上下文</p>
+          </div>
+
+          <!-- 已选中会话 - 8Tab 面板 -->
+          <div x-show="selectedSession" class="flex flex-col h-full">
+            <!-- 用户画像摘要卡片 -->
+            <div class="flex-shrink-0 px-3 py-2 border-b">
+              <div class="flex items-center gap-2">
+                <div class="w-10 h-10 rounded-full themed-bg-primary flex items-center justify-center text-white text-sm font-medium shadow-sm">
+                  <span x-text="(currentChatUser.nickname || '用').charAt(0)"></span>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium themed-text truncate" x-text="currentChatUser.nickname || '用户'"></p>
+                  <p class="text-[10px] themed-text-muted" x-text="'ID:' + (selectedSession?.user?.user_id || selectedSession?.user_id || '-') + ' | ' + (currentChatUser.mobile ? maskPhone(currentChatUser.mobile) : '')"></p>
+                </div>
+                <button @click="runDiagnose()" class="flex-shrink-0 px-2 py-1 text-[10px] bg-blue-500 text-white rounded hover:bg-blue-600" title="一键诊断">
+                  🔍 诊断
+                </button>
+              </div>
+              <!-- 统计摘要（C2C 交易统计已随 C2C 下线移除） -->
+              <div x-show="context_summary?.stats" class="flex items-center gap-2 mt-1.5 text-[10px] themed-text-muted">
+                <span>🎰<span x-text="context_summary?.stats?.lottery_count || context_summary?.stats?.draw_count || 0"></span>次回馈</span>
+                <span>📝<span x-text="context_summary?.stats?.feedback_count || 0"></span>次反馈</span>
+                <span>🎒<span x-text="context_summary?.stats?.item_count || 0"></span>件物品</span>
+              </div>
+            </div>
+
+            <!-- 诊断结果横幅 -->
+            <template x-if="context_diagnose && context_diagnose.overall_level !== 'ok'">
+              <div class="flex-shrink-0 px-3 py-1.5 text-[11px] border-b"
+                   :class="context_diagnose.overall_level === 'error' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'">
+                <span x-text="getDiagnoseIcon(context_diagnose.overall_level)"></span>
+                发现 <span x-text="context_diagnose.issue_count" class="font-bold"></span> 个问题
+                <template x-for="issue in (context_diagnose.issues || []).slice(0, 2)" :key="issue.message">
+                  <span class="ml-1">· <span x-text="issue.message"></span></span>
+                </template>
+              </div>
+            </template>
+
+            <!-- Tab 导航 -->
+            <div class="flex-shrink-0 border-b">
+              <div class="flex overflow-x-auto px-1" style="scrollbar-width: thin;">
+                <template x-for="tab in [
+                  {key:'assets', icon:'💎', label:'资产'},
+                  {key:'backpack', icon:'🎒', label:'背包'},
+                  {key:'lottery', icon:'🎰', label:'回馈'},
+                  {key:'trades', icon:'🔄', label:'交易'},
+                  {key:'disputes', icon:'⚖️', label:'纠纷'},
+                  {key:'timeline', icon:'📋', label:'记录'},
+                  {key:'risk', icon:'⚠️', label:'风控'},
+                  {key:'history', icon:'📜', label:'历史'},
+                  {key:'notes', icon:'📝', label:'备注'},
+                  {key:'orders', icon:'📦', label:'订单'},
+                  {key:'order_issues', icon:'🎫', label:'订单工单'}
+                ]" :key="tab.key">
+                  <button @click="loadContextTab(tab.key)"
+                          :class="context_active_tab === tab.key ? 'border-b-2 themed-border-primary themed-text-primary font-medium' : 'themed-text-muted hover:themed-text'"
+                          class="flex-shrink-0 px-2 py-2 text-[11px] text-center whitespace-nowrap transition-colors">
+                    <span x-text="tab.icon"></span>
+                    <span x-text="tab.label"></span>
+                  </button>
+                </template>
+              </div>
+            </div>
+
+            <!-- Tab 内容区域 -->
+            <div class="flex-1 overflow-y-auto p-3">
+              <div x-show="context_loading" class="flex justify-center py-8">
+                <div class="dots-loading"><span></span><span></span><span></span></div>
+              </div>
+
+              <!-- 资产 Tab -->
+              <div x-show="!context_loading && context_active_tab === 'assets'">
+                <template x-if="context_assets">
+                  <div class="space-y-3">
+                    <p class="text-[10px] themed-text-hint uppercase tracking-wider">资产余额</p>
+                    <template x-for="balance in (context_assets?.balances || [])" :key="balance.account_asset_balance_id">
+                      <div class="flex justify-between items-center text-sm py-1 border-b themed-border-light">
+                        <span class="themed-text-muted text-xs" x-text="balance.asset_type?.display_name || balance.asset_code"></span>
+                        <div class="text-right">
+                          <span class="themed-text font-medium text-xs" x-text="Number(balance.available_amount || 0).toLocaleString()"></span>
+                          <span x-show="Number(balance.frozen_amount) > 0" class="text-[10px] text-orange-500 ml-1" x-text="'(冻结:' + Number(balance.frozen_amount).toLocaleString() + ')'"></span>
+                        </div>
+                      </div>
+                    </template>
+                    <p x-show="!context_assets?.balances?.length" class="text-xs themed-text-hint text-center py-4">暂无资产数据</p>
+                  </div>
+                </template>
+              </div>
+
+              <!-- 背包 Tab -->
+              <div x-show="!context_loading && context_active_tab === 'backpack'">
+                <template x-if="context_backpack">
+                  <div class="space-y-2">
+                    <p class="text-[10px] themed-text-hint">共 <span x-text="context_backpack.count || 0" class="font-medium"></span> 件物品</p>
+                    <template x-for="item in (context_backpack.rows || [])" :key="item.item_id">
+                      <div class="flex items-center justify-between text-xs py-1.5 border-b themed-border-light">
+                        <div class="flex items-center gap-1.5">
+                          <span class="themed-text" x-text="item.item_name || '未知物品'"></span>
+                          <span class="text-[10px] themed-text-hint" x-text="item.rarity_code || ''"></span>
+                        </div>
+                        <span class="px-1.5 py-0.5 rounded text-[10px]"
+                              :class="{
+                                'bg-green-100 text-green-700': item.status === 'available',
+                                'bg-yellow-100 text-yellow-700': item.status === 'held',
+                                'bg-gray-100 text-gray-500': !['available','held'].includes(item.status)
+                              }"
+                              x-text="{'available':'可用','held':'🔒锁定中','used':'已使用','expired':'已过期','destroyed':'已销毁'}[item.status] || item.status">
+                        </span>
+                      </div>
+                    </template>
+                    <p x-show="!context_backpack.rows || !context_backpack.rows.length" class="text-xs themed-text-hint text-center py-4">暂无物品</p>
+                  </div>
+                </template>
+              </div>
+
+              <!-- 回馈 Tab -->
+              <div x-show="!context_loading && context_active_tab === 'lottery'">
+                <template x-if="context_lottery">
+                  <div class="space-y-3">
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                      <div class="themed-bg-subtle rounded p-2 text-center">
+                        <p class="themed-text-hint text-[10px]">总回馈</p>
+                        <p class="font-bold themed-text" x-text="context_lottery?.summary?.total_draws || 0"></p>
+                      </div>
+                      <div class="themed-bg-subtle rounded p-2 text-center">
+                        <p class="themed-text-hint text-[10px]">保底触发</p>
+                        <p class="font-bold themed-text" x-text="context_lottery?.summary?.guarantee_triggered_count || 0"></p>
+                      </div>
+                    </div>
+                    <div x-show="context_lottery?.summary?.tier_distribution">
+                      <p class="text-[10px] themed-text-hint mb-1">档位分布</p>
+                      <template x-for="[tier, count] in Object.entries(context_lottery?.summary?.tier_distribution || {})" :key="tier">
+                        <div class="flex items-center justify-between text-xs py-0.5">
+                          <span :class="{'text-red-500':tier==='high','text-yellow-500':tier==='mid','text-green-500':tier==='low','text-gray-500':tier==='fallback'}" x-text="{'high':'高档位','mid':'中档位','low':'低档位','fallback':'保底'}[tier] || tier"></span>
+                          <span class="font-medium" x-text="count + '次'"></span>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <!-- 交易 Tab -->
+              <div x-show="!context_loading && context_active_tab === 'trades'">
+                <template x-if="context_trades">
+                  <div class="space-y-3">
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                      <div class="themed-bg-subtle rounded p-2 text-center">
+                        <p class="themed-text-hint text-[10px]">买入</p>
+                        <p class="font-bold" x-text="context_trades?.stats?.buy_count || 0"></p>
+                      </div>
+                      <div class="themed-bg-subtle rounded p-2 text-center">
+                        <p class="themed-text-hint text-[10px]">卖出</p>
+                        <p class="font-bold" x-text="context_trades?.stats?.sell_count || 0"></p>
+                      </div>
+                    </div>
+                    <p class="text-[10px] themed-text-hint">
+                      完成: <span x-text="context_trades?.stats?.completed_count || 0" class="font-medium"></span> |
+                      取消: <span x-text="context_trades?.stats?.cancelled_count || 0" class="font-medium"></span>
+                    </p>
+                  </div>
+                </template>
+              </div>
+
+              <!-- 记录 Tab -->
+              <div x-show="!context_loading && context_active_tab === 'timeline'">
+                <template x-if="context_timeline">
+                  <div class="space-y-2">
+                    <template x-for="(entry, idx) in (context_timeline?.rows || [])" :key="'tl_' + idx">
+                      <div class="text-xs py-1.5 border-b themed-border-light">
+                        <div class="flex items-center gap-1.5">
+                          <span x-text="{'consumption':'💳','feedback':'📝','lottery':'🎰'}[entry.type] || '📋'"></span>
+                          <span class="themed-text-muted" x-text="formatDate(entry.created_at)"></span>
+                        </div>
+                        <p class="themed-text mt-0.5 truncate" x-text="entry.type === 'feedback' ? (entry.data?.content || '') : (entry.type === 'lottery' ? ('回馈 - ' + (entry.data?.prize_name || {'high':'高档','mid':'中档','low':'低档','fallback':'保底'}[entry.data?.reward_tier] || entry.data?.reward_tier || '')) : '消费记录')"></p>
+                      </div>
+                    </template>
+                    <p x-show="!context_timeline?.rows?.length" class="text-xs themed-text-hint text-center py-4">暂无记录</p>
+                  </div>
+                </template>
+              </div>
+
+              <!-- 风控 Tab -->
+              <div x-show="!context_loading && context_active_tab === 'risk'">
+                <template x-if="context_risk">
+                  <div class="space-y-3">
+                    <div x-show="context_risk?.risk_profile">
+                      <p class="text-[10px] themed-text-hint mb-1">风险等级</p>
+                      <p class="text-sm font-medium" x-text="context_risk?.risk_profile?.risk_level || '无数据'"></p>
+                    </div>
+                    <div x-show="!context_risk?.risk_profile" class="text-xs themed-text-hint text-center py-4">
+                      该用户暂无风控画像
+                    </div>
+                    <div x-show="context_risk?.alerts?.length > 0">
+                      <p class="text-[10px] themed-text-hint mb-1">历史告警</p>
+                      <template x-for="alert in (context_risk?.alerts || [])" :key="alert.risk_alert_id">
+                        <div class="text-xs py-1 border-b themed-border-light">
+                          <span class="text-red-500">⚠️</span>
+                          <span x-text="alert.alert_type || '告警'"></span>
+                          <span class="themed-text-hint ml-1" x-text="formatDate(alert.created_at)"></span>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <!-- 历史会话 Tab -->
+              <div x-show="!context_loading && context_active_tab === 'history'">
+                <template x-if="context_history">
+                  <div class="space-y-2">
+                    <p class="text-[10px] themed-text-hint">共 <span x-text="context_history?.count || 0"></span> 次会话</p>
+                    <template x-for="session in (context_history?.rows || [])" :key="session.customer_service_session_id">
+                      <div class="text-xs py-2 border-b themed-border-light">
+                        <div class="flex items-center justify-between">
+                          <span class="themed-text" x-text="formatDate(session.created_at)"></span>
+                          <span class="px-1.5 py-0.5 rounded text-[10px]"
+                                :class="{'bg-green-100 text-green-700': session.status==='closed', 'bg-yellow-100 text-yellow-700': session.status==='waiting', 'bg-blue-100 text-blue-700': session.status==='active'}"
+                                x-text="{'waiting':'等待中','assigned':'已分配','active':'进行中','closed':'已关闭'}[session.status] || session.status">
+                          </span>
+                        </div>
+                        <p x-show="session.last_message_preview" class="themed-text-muted mt-0.5 truncate" x-text="getSessionLastMessage(session)"></p>
+                        <p x-show="session.resolution_summary" class="text-green-600 mt-0.5" x-text="'处理: ' + session.resolution_summary"></p>
+                        <div class="flex items-center gap-2 mt-0.5 themed-text-hint">
+                          <span x-text="'客服: ' + (session.admin?.nickname || '-')"></span>
+                          <span x-show="session.satisfaction_score">⭐<span x-text="session.satisfaction_score"></span></span>
+                          <span x-text="session.message_count + '条消息'"></span>
+                        </div>
+                      </div>
+                    </template>
+                    <p x-show="!context_history?.rows?.length" class="text-xs themed-text-hint text-center py-4">暂无历史会话</p>
+                  </div>
+                </template>
+              </div>
+
+              <!-- 纠纷 Tab -->
+              <div x-show="!context_loading && context_active_tab === 'disputes'">
+                <div class="space-y-3">
+                  <!-- 纠纷统计 -->
+                  <div class="grid grid-cols-3 gap-2">
+                    <div class="text-center p-2 bg-red-50 rounded">
+                      <p class="text-lg font-bold text-red-600" x-text="dispute_stats?.open || 0"></p>
+                      <p class="text-[10px] text-gray-500">待处理</p>
+                    </div>
+                    <div class="text-center p-2 bg-yellow-50 rounded">
+                      <p class="text-lg font-bold text-yellow-600" x-text="dispute_stats?.processing || 0"></p>
+                      <p class="text-[10px] text-gray-500">处理中</p>
+                    </div>
+                    <div class="text-center p-2 bg-green-50 rounded">
+                      <p class="text-lg font-bold text-green-600" x-text="dispute_stats?.resolved || 0"></p>
+                      <p class="text-[10px] text-gray-500">已解决</p>
+                    </div>
+                  </div>
+
+                  <!-- 纠纷列表 -->
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <p class="text-[10px] themed-text-hint">交易纠纷列表</p>
+                      <button @click="loadDisputes()" class="text-[10px] themed-text-primary hover:underline">刷新</button>
+                    </div>
+                    <div x-show="disputes.length === 0" class="text-center py-4 text-xs themed-text-muted">暂无纠纷记录</div>
+                    <div class="space-y-2 max-h-64 overflow-y-auto">
+                      <template x-for="d in disputes" :key="d.trade_dispute_id">
+                        <div class="text-xs p-2 rounded border themed-border-light hover:bg-gray-50 cursor-pointer" @click="viewDisputeDetail(d)">
+                          <div class="flex items-center justify-between mb-1">
+                            <span class="font-medium themed-text" x-text="'#' + d.trade_dispute_id + ' ' + (d.title || '交易纠纷')"></span>
+                            <span class="px-1 py-0.5 rounded text-[10px]"
+                                  :class="{'bg-red-100 text-red-700': d.status==='open', 'bg-yellow-100 text-yellow-700': d.status==='reviewing', 'bg-orange-100 text-orange-700': d.status==='arbitrating', 'bg-green-100 text-green-700': d.status==='resolved', 'bg-gray-100 text-gray-700': d.status==='rejected'}"
+                                  x-text="{'open':'待处理','reviewing':'审核中','arbitrating':'仲裁中','resolved':'已解决','rejected':'已驳回'}[d.status] || d.status">
+                            </span>
+                          </div>
+                          <div class="flex items-center gap-2 themed-text-hint">
+                            <span x-text="{'item_not_received':'未收到物品','item_mismatch':'物品不符','quality_issue':'质量问题','fraud':'欺诈','other':'其他'}[d.dispute_type] || d.dispute_type || '-'"></span>
+                            <span x-text="formatDate(d.created_at)"></span>
+                          </div>
+                          <!-- 操作按钮 -->
+                          <div class="flex gap-1 mt-1.5" x-show="d.status === 'open' || d.status === 'reviewing'">
+                            <button x-show="d.status === 'open'" @click.stop="acceptDisputeAction(d)" class="px-2 py-0.5 text-[10px] bg-blue-500 text-white rounded hover:bg-blue-600">受理</button>
+                            <button @click.stop="resolveDisputeAction(d)" class="px-2 py-0.5 text-[10px] bg-green-500 text-white rounded hover:bg-green-600">解决</button>
+                            <button @click.stop="escalateDisputeAction(d)" class="px-2 py-0.5 text-[10px] bg-orange-500 text-white rounded hover:bg-orange-600">升级仲裁</button>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 备注/工单 Tab -->
+              <div x-show="!context_loading && context_active_tab === 'notes'">
+                <div class="space-y-3">
+                  <!-- 工单列表 -->
+                  <div x-show="context_issues.length > 0">
+                    <p class="text-[10px] themed-text-hint mb-1">关联工单</p>
+                    <template x-for="issue in context_issues" :key="issue.issue_id">
+                      <div class="text-xs py-1.5 border-b themed-border-light">
+                        <div class="flex items-center justify-between">
+                          <span class="themed-text font-medium" x-text="'#' + issue.issue_id + ' ' + issue.title"></span>
+                          <span class="px-1 py-0.5 rounded text-[10px]"
+                                :class="{'bg-blue-100 text-blue-700': issue.status==='open', 'bg-yellow-100 text-yellow-700': issue.status==='processing', 'bg-green-100 text-green-700': issue.status==='resolved'}"
+                                x-text="{'open':'待处理','processing':'处理中','resolved':'已解决','closed':'已关闭'}[issue.status] || issue.status">
+                          </span>
+                        </div>
+                        <span class="themed-text-hint" x-text="formatDate(issue.created_at)"></span>
+                      </div>
+                    </template>
+                  </div>
+
+                  <!-- 历史备注列表 -->
+                  <div x-show="context_notes.length > 0">
+                    <p class="text-[10px] themed-text-hint mb-1">内部备注（仅客服可见）</p>
+                    <div class="max-h-48 overflow-y-auto space-y-1.5">
+                      <template x-for="note in context_notes" :key="note.note_id">
+                        <div class="text-xs p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800">
+                          <div class="flex items-center justify-between mb-1">
+                            <span class="font-medium themed-text" x-text="note.author?.nickname || '客服'"></span>
+                            <span class="text-[10px] themed-text-hint" x-text="formatDate(note.created_at)"></span>
+                          </div>
+                          <p class="themed-text whitespace-pre-wrap" x-text="note.content"></p>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- 添加备注 -->
+                  <div>
+                    <p class="text-[10px] themed-text-hint mb-1">添加内部备注（仅客服可见）</p>
+                    <textarea x-model="new_note_content" rows="2" class="w-full text-xs border rounded themed-input px-2 py-1.5 resize-none" placeholder="输入备注内容..."></textarea>
+                    <button @click="addNote()" :disabled="!new_note_content.trim()" class="mt-1 w-full px-2 py-1.5 text-[11px] themed-btn-primary rounded disabled:opacity-40">
+                      保存备注
+                    </button>
+                  </div>
+
+                  <!-- 创建工单（统一调用弹窗，与订单详情共用一套表单逻辑） -->
+                  <div class="border-t themed-border-light pt-2">
+                    <p class="text-[10px] themed-text-hint mb-1">创建工单</p>
+                    <button @click="openCreateIssueModal(_getContextUserId(), selectedSession?.customer_service_session_id)"
+                            :disabled="!_getContextUserId()"
+                            class="w-full px-2 py-1.5 text-[11px] border themed-border rounded themed-hover-bg disabled:opacity-40">
+                      📋 创建工单
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ===== C区「订单」Tab：当前用户的订单概览 ===== -->
+              <div x-show="!context_loading && context_active_tab === 'orders'">
+                <div class="space-y-2">
+                  <div x-show="user_orders.length === 0" class="text-center py-4 themed-text-hint text-xs">暂无订单数据</div>
+                  <template x-for="order in user_orders.slice(0, 10)" :key="order.order_type + '_' + order.order_id">
+                    <div class="text-xs py-1.5 border-b themed-border-light cursor-pointer themed-hover-bg" @click="openOrderTab(order)">
+                      <div class="flex items-center justify-between">
+                        <span class="themed-text font-medium" x-text="getOrderTypeIcon(order.order_type) + ' ' + (order.order_no || order.order_id)"></span>
+                        <span class="px-1 py-0.5 rounded text-[10px]"
+                              :class="order.status === 'completed' || order.status === 'fulfilled' || order.status === 'approved' ? 'bg-green-100 text-green-700' : order.status === 'cancelled' || order.status === 'expired' ? 'bg-gray-100 text-gray-500' : 'bg-yellow-100 text-yellow-700'"
+                              x-text="order.status"></span>
+                      </div>
+                      <div class="flex items-center justify-between mt-0.5">
+                        <span class="themed-text-muted" x-text="order.summary"></span>
+                        <span class="themed-text-hint" x-text="formatDate(order.created_at)"></span>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- ===== C区「订单工单」Tab：当前选中订单的关联工单 ===== -->
+              <div x-show="!context_loading && context_active_tab === 'order_issues'">
+                <div class="space-y-2">
+                  <p class="text-[10px] themed-text-hint">选中A区订单后，此处显示该订单的关联工单</p>
+                  <div x-show="order_linked_issues.length === 0" class="text-center py-4 themed-text-hint text-xs">暂无关联工单</div>
+                  <template x-for="issue in order_linked_issues" :key="issue.issue_id">
+                    <div class="text-xs py-1.5 border-b themed-border-light">
+                      <div class="flex items-center justify-between">
+                        <span class="themed-text font-medium" x-text="'#' + issue.issue_id + ' ' + issue.title"></span>
+                        <span class="px-1 py-0.5 rounded text-[10px]"
+                              :class="{'bg-blue-100 text-blue-700': issue.status==='open', 'bg-yellow-100 text-yellow-700': issue.status==='processing', 'bg-green-100 text-green-700': issue.status==='resolved'}"
+                              x-text="{'open':'待处理','processing':'处理中','resolved':'已解决','closed':'已关闭'}[issue.status] || issue.status">
+                        </span>
+                      </div>
+                      <span class="themed-text-hint" x-text="formatDate(issue.created_at)"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ==================== Modal 组件区域 ==================== -->
+
+    <!-- 补偿发放弹窗 -->
+    <div x-show="showCompensationModal"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="closeCompensationModal()"></div>
+      <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-md mx-4 z-10">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold flex items-center gap-2">
+            🎁 快捷补偿
+          </h5>
+          <button @click="closeCompensationModal()" class="themed-text-hint hover:themed-text text-xl leading-none">&times;</button>
+        </div>
+        <div class="p-5 space-y-4">
+          <!-- 补偿原因 -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">补偿原因 <span class="text-red-500">*</span></label>
+            <select x-model="compensationForm.reason" class="w-full px-3 py-2 border rounded-lg themed-select text-sm">
+              <option value="">请选择原因</option>
+              <option value="交易异常">交易异常</option>
+              <option value="回馈异常">回馈异常</option>
+              <option value="系统故障">系统故障</option>
+              <option value="客户补偿">客户补偿</option>
+              <option value="其他">其他</option>
+            </select>
+          </div>
+          <!-- 补偿项目 -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="text-sm font-medium themed-text-secondary">补偿内容</label>
+              <button @click="addCompensationItem()" class="text-xs text-blue-500 hover:text-blue-700">+ 添加项目</button>
+            </div>
+            <template x-for="(item, idx) in compensationForm.items" :key="idx">
+              <div class="flex items-center gap-2 mb-2">
+                <select x-model="item.type" class="w-20 text-xs border rounded themed-select px-1 py-1.5">
+                  <option value="asset">资产</option>
+                  <option value="item">物品</option>
+                </select>
+                <input x-show="item.type === 'asset'" x-model="item.asset_code" placeholder="star_stone" class="flex-1 text-xs border rounded themed-input px-2 py-1.5">
+                <input x-show="item.type === 'item'" x-model="item.template_id" placeholder="物品模板ID" class="flex-1 text-xs border rounded themed-input px-2 py-1.5">
+                <input type="number" x-model.number="item.amount" placeholder="数量" min="1" class="w-20 text-xs border rounded themed-input px-2 py-1.5">
+                <button @click="removeCompensationItem(idx)" class="text-red-400 hover:text-red-600 text-xs">✕</button>
+              </div>
+            </template>
+          </div>
+        </div>
+        <div class="p-4 border-t themed-bg-base rounded-b-xl flex justify-end space-x-3">
+          <button @click="closeCompensationModal()" class="px-4 py-2 text-sm themed-bg-muted themed-text-secondary rounded-lg hover:opacity-80">取消</button>
+          <button @click="submitCompensation()" :disabled="compensationSubmitting || !compensationForm.reason" class="px-4 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50">
+            <span x-show="compensationSubmitting">发放中...</span>
+            <span x-show="!compensationSubmitting">确认发放</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 工单创建弹窗 -->
+    <div x-show="showIssueModal"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="closeIssueModal()"></div>
+      <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-md mx-4 z-10">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold flex items-center gap-2">
+            📋 创建工单
+          </h5>
+          <button @click="closeIssueModal()" class="themed-text-hint hover:themed-text text-xl leading-none">&times;</button>
+        </div>
+        <div class="p-5 space-y-4">
+          <div x-show="issueForm.order_type" class="text-xs themed-bg-subtle rounded-lg p-2">
+            <span class="themed-text-muted">关联订单：</span>
+            <span class="themed-text font-medium" x-text="getOrderTypeLabel(issueForm.order_type) + ' #' + (issueForm.order_id || '')"></span>
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">用户ID <span class="text-red-500">*</span></label>
+            <input type="number" x-model.number="issueForm.user_id" placeholder="输入用户ID（如已选会话/订单会自动带入）" class="w-full px-3 py-2 border rounded-lg themed-input text-sm">
+            <p x-show="!issueForm.user_id" class="text-[11px] text-red-500 mt-1">未识别到用户，请先选择会话或搜索用户订单，或在此手动输入用户ID</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">问题类型 <span class="text-red-500">*</span></label>
+            <select x-model="issueForm.issue_type" class="w-full px-3 py-2 border rounded-lg themed-select text-sm">
+              <option value="trade">交易问题</option>
+              <option value="asset">资产问题</option>
+              <option value="consumption">消费问题</option>
+              <option value="item">物品问题</option>
+              <option value="lottery">回馈问题</option>
+              <option value="account">账号问题</option>
+              <option value="feedback">意见反馈</option>
+              <option value="other">其他</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">优先级</label>
+            <select x-model="issueForm.priority" class="w-full px-3 py-2 border rounded-lg themed-select text-sm">
+              <option value="low">低</option>
+              <option value="medium">中</option>
+              <option value="high">高</option>
+              <option value="urgent">紧急</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">标题 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="issueForm.title" placeholder="简要描述问题" class="w-full px-3 py-2 border rounded-lg themed-input text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">描述</label>
+            <textarea x-model="issueForm.description" rows="3" placeholder="详细描述问题情况（可选）" class="w-full px-3 py-2 border rounded-lg themed-input text-sm resize-none"></textarea>
+          </div>
+        </div>
+        <div class="p-4 border-t themed-bg-base rounded-b-xl flex justify-end space-x-3">
+          <button @click="closeIssueModal()" class="px-4 py-2 text-sm themed-bg-muted themed-text-secondary rounded-lg hover:opacity-80">取消</button>
+          <button @click="submitCreateIssue()" :disabled="issueSubmitting || !issueForm.title?.trim() || !issueForm.user_id" class="px-4 py-2 text-sm themed-btn-primary rounded-lg disabled:opacity-50">
+            <span x-show="issueSubmitting">创建中...</span>
+            <span x-show="!issueSubmitting">确认创建</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 转接会话模态框 -->
+    <div x-ref="transferModal"
+         x-show="isModalOpen('transferModal')"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('transferModal')"></div>
+      <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-sm mx-4 z-10">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold flex items-center gap-2">
+            <svg class="w-5 h-5 themed-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+            转接会话
+          </h5>
+          <button @click="hideModal('transferModal')" class="themed-text-hint hover:themed-text text-xl leading-none">&times;</button>
+        </div>
+        <form @submit.prevent="submitTransfer()">
+          <div class="p-5 space-y-4">
+            <p class="text-sm themed-text-muted">将当前会话转接给其他客服人员</p>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">选择客服 <span class="text-red-500">*</span></label>
+              <select x-model="transferTargetId" class="w-full px-3 py-2 border rounded-lg themed-select text-sm" required>
+                <option value="">请选择接收客服</option>
+                <template x-for="admin in adminList" :key="admin.user_id">
+                  <option :value="admin.user_id" x-text="admin.nickname || admin.username || ('ID: ' + admin.user_id)"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+          <div class="p-4 border-t themed-bg-base rounded-b-xl flex justify-end space-x-3">
+            <button type="button" @click="hideModal('transferModal')" class="px-4 py-2 text-sm themed-bg-muted themed-text-secondary rounded-lg hover:opacity-80">取消</button>
+            <button type="submit" class="px-4 py-2 text-sm themed-btn-primary rounded-lg disabled:opacity-50" :disabled="submitting || !transferTargetId">
+              确认转接
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 用户信息模态框 -->
+    <div x-ref="user_info_modal"
+         x-show="isModalOpen('user_info_modal')"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('user_info_modal')"></div>
+      <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-md mx-4 z-10">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold flex items-center gap-2">
+            <svg class="w-5 h-5 themed-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            用户详细资料
+          </h5>
+          <button @click="hideModal('user_info_modal')" class="themed-text-hint hover:themed-text text-xl leading-none">&times;</button>
+        </div>
+        <div class="p-6" x-show="user_info_data">
+          <div class="text-center mb-5">
+            <div class="w-16 h-16 themed-bg-primary rounded-full mx-auto flex items-center justify-center text-white text-2xl font-medium shadow-md">
+              <span x-text="(user_info_data?.nickname || '?').charAt(0)"></span>
+            </div>
+            <h4 class="font-semibold mt-2 themed-text" x-text="user_info_data?.nickname || '用户' + user_info_data?.user_id"></h4>
+          </div>
+          <div class="space-y-2.5">
+            <template x-for="item in [
+              { label: '用户ID', value: user_info_data?.user_id, mono: true },
+              { label: '手机号', value: user_info_data?.phone || user_info_data?.mobile || '-' },
+              { label: '性别', value: user_info_data?.gender === 1 ? '男' : user_info_data?.gender === 2 ? '女' : '未知' },
+              { label: '注册时间', value: formatDate(user_info_data?.created_at) },
+              { label: '账户状态', value: user_info_data?.status === 'active' ? '正常' : '禁用', status: user_info_data?.status },
+              { label: '总回馈次数', value: user_info_data?.draw_count || 0 },
+              { label: '发放次数', value: user_info_data?.win_count || 0 }
+            ]" :key="item.label">
+              <div class="flex justify-between items-center py-1.5 border-b themed-border-light last:border-0">
+                <span class="text-sm themed-text-muted" x-text="item.label"></span>
+                <span class="text-sm font-medium"
+                      :class="{ 'font-mono text-xs': item.mono, 'text-green-600': item.status === 'active', 'text-red-600': item.status && item.status !== 'active' }"
+                      x-text="item.value"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+        <div class="p-4 border-t themed-bg-base rounded-b-xl flex justify-end">
+          <button @click="hideModal('user_info_modal')" class="px-4 py-2 text-sm themed-bg-muted themed-text-secondary rounded-lg hover:opacity-80">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图片预览弹窗（点击聊天图片放大，带关闭按钮；复用统一 modal 系统） -->
+    <div x-ref="imagePreviewModal"
+         x-show="isModalOpen('imagePreviewModal')"
+         x-cloak
+         class="fixed inset-0 z-[60] flex items-center justify-center"
+         style="display: none;"
+         @keydown.escape.window="closeImagePreview()">
+      <div class="fixed inset-0 bg-black/80" @click="closeImagePreview()"></div>
+      <div class="relative z-10 max-w-[90vw] max-h-[90vh] flex items-center justify-center">
+        <!-- 操作按钮组：下载 + 关闭 -->
+        <div class="absolute -top-10 right-0 flex items-center gap-3">
+          <button @click="downloadPreviewImage()"
+                  class="text-white/80 hover:text-white text-sm flex items-center gap-1"
+                  title="下载图片">
+            <span class="text-xl leading-none">⬇</span><span>下载</span>
+          </button>
+          <button @click="closeImagePreview()"
+                  class="text-white/80 hover:text-white text-3xl font-light leading-none"
+                  title="关闭">✕</button>
+        </div>
+        <img :src="previewImageUrl"
+             :alt="previewImageAlt"
+             class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+             @click.stop />
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 页面脚本 -->
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+</body>
+</html>

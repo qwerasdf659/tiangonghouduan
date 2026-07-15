@@ -1,0 +1,1244 @@
+[
+  {
+    "account_id": "1",
+    "account_type": "system",
+    "user_id": null,
+    "system_code": "SYSTEM_PLATFORM_FEE",
+    "status": "active",
+    "created_at": "2025-12-16 00:36:41",
+    "updated_at": "2025-12-16 00:36:41"
+  },
+  {
+    "account_id": "2",
+    "account_type": "system",
+    "user_id": null,
+    "system_code": "SYSTEM_MINT",
+    "status": "active",
+    "created_at": "2025-12-16 00:36:41",
+    "updated_at": "2025-12-16 00:36:41"
+  },
+  {
+    "account_id": "3",
+    "account_type": "system",
+    "user_id": null,
+    "system_code": "SYSTEM_BURN",
+    "status": "active",
+    "created_at": "2025-12-16 00:36:41",
+    "updated_at": "2025-12-16 00:36:41"
+  },
+  {
+    "account_id": "4",
+    "account_type": "system",
+    "user_id": null,
+    "system_code": "SYSTEM_ESCROW",
+    "status": "active",
+    "created_at": "2025-12-16 00:36:41",
+    "updated_at": "2025-12-16 00:36:41"
+  },
+  {
+    "account_id": "5",
+    "account_type": "user",
+    "user_id": 31,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2025-12-16 01:32:16",
+    "updated_at": "2025-12-16 01:32:16"
+  },
+  {
+    "account_id": "6",
+    "account_type": "user",
+    "user_id": 10201,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2025-12-16 02:55:38",
+    "updated_at": "2025-12-16 02:55:38"
+  },
+  {
+    "account_id": "7",
+    "account_type": "user",
+    "user_id": 32,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2025-12-18 00:18:30",
+    "updated_at": "2025-12-18 00:18:30"
+  },
+  {
+    "account_id": "8",
+    "account_type": "user",
+    "user_id": 10249,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2025-12-18 00:36:45",
+    "updated_at": "2025-12-18 00:36:45"
+  },
+  {
+    "account_id": "9",
+    "account_type": "user",
+    "user_id": 10250,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2025-12-18 00:36:45",
+    "updated_at": "2025-12-18 00:36:45"
+  },
+  {
+    "account_id": "11",
+    "account_type": "user",
+    "user_id": 10252,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2025-12-18 00:37:37",
+    "updated_at": "2025-12-18 00:37:37"
+  },
+  {
+    "account_id": "12",
+    "account_type": "system",
+    "user_id": null,
+    "system_code": "SYSTEM_RESERVE",
+    "status": "active",
+    "created_at": "2025-12-21 03:29:17",
+    "updated_at": "2025-12-21 03:29:17"
+  },
+  {
+    "account_id": "13",
+    "account_type": "user",
+    "user_id": 9992,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2025-12-22 08:48:34",
+    "updated_at": "2025-12-22 08:48:34"
+  },
+  {
+    "account_id": "14",
+    "account_type": "user",
+    "user_id": 10011,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2025-12-30 21:41:40",
+    "updated_at": "2025-12-30 21:41:40"
+  },
+  {
+    "account_id": "15",
+    "account_type": "system",
+    "user_id": null,
+    "system_code": "SYSTEM_CAMPAIGN_POOL",
+    "status": "active",
+    "created_at": "2026-01-04 04:38:58",
+    "updated_at": "2026-01-04 04:38:58"
+  },
+  {
+    "account_id": "16",
+    "account_type": "user",
+    "user_id": 10845,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-06 21:46:25",
+    "updated_at": "2026-01-06 21:46:25"
+  },
+  {
+    "account_id": "17",
+    "account_type": "user",
+    "user_id": 10996,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-09 08:59:58",
+    "updated_at": "2026-01-09 08:59:58"
+  },
+  {
+    "account_id": "18",
+    "account_type": "user",
+    "user_id": 10997,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-09 08:59:58",
+    "updated_at": "2026-01-09 08:59:58"
+  },
+  {
+    "account_id": "19",
+    "account_type": "user",
+    "user_id": 10998,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-09 08:59:58",
+    "updated_at": "2026-01-09 08:59:58"
+  },
+  {
+    "account_id": "20",
+    "account_type": "user",
+    "user_id": 33,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-09 09:32:59",
+    "updated_at": "2026-01-09 09:32:59"
+  },
+  {
+    "account_id": "21",
+    "account_type": "user",
+    "user_id": 34,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-09 09:33:02",
+    "updated_at": "2026-01-09 09:33:02"
+  },
+  {
+    "account_id": "22",
+    "account_type": "user",
+    "user_id": 35,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-09 09:36:18",
+    "updated_at": "2026-01-09 09:36:18"
+  },
+  {
+    "account_id": "23",
+    "account_type": "user",
+    "user_id": 36,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-09 09:38:51",
+    "updated_at": "2026-01-09 09:38:51"
+  },
+  {
+    "account_id": "24",
+    "account_type": "user",
+    "user_id": 37,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-09 09:39:57",
+    "updated_at": "2026-01-09 09:39:57"
+  },
+  {
+    "account_id": "25",
+    "account_type": "user",
+    "user_id": 11114,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-21 21:06:09",
+    "updated_at": "2026-01-21 21:06:09"
+  },
+  {
+    "account_id": "26",
+    "account_type": "user",
+    "user_id": 135,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-21 21:15:45",
+    "updated_at": "2026-01-21 21:15:45"
+  },
+  {
+    "account_id": "27",
+    "account_type": "user",
+    "user_id": 11131,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-23 04:39:22",
+    "updated_at": "2026-01-23 04:39:22"
+  },
+  {
+    "account_id": "28",
+    "account_type": "user",
+    "user_id": 11132,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-23 18:03:49",
+    "updated_at": "2026-01-23 18:03:49"
+  },
+  {
+    "account_id": "37",
+    "account_type": "user",
+    "user_id": 11172,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-28 20:25:29",
+    "updated_at": "2026-01-28 20:25:29"
+  },
+  {
+    "account_id": "46",
+    "account_type": "user",
+    "user_id": 11187,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-28 20:31:51",
+    "updated_at": "2026-01-28 20:31:51"
+  },
+  {
+    "account_id": "47",
+    "account_type": "user",
+    "user_id": 11188,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-28 20:32:05",
+    "updated_at": "2026-01-28 20:32:05"
+  },
+  {
+    "account_id": "48",
+    "account_type": "user",
+    "user_id": 11189,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-28 20:33:32",
+    "updated_at": "2026-01-28 20:33:32"
+  },
+  {
+    "account_id": "49",
+    "account_type": "user",
+    "user_id": 11190,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-28 20:45:31",
+    "updated_at": "2026-01-28 20:45:31"
+  },
+  {
+    "account_id": "54",
+    "account_type": "user",
+    "user_id": 11198,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-28 20:49:49",
+    "updated_at": "2026-01-28 20:49:49"
+  },
+  {
+    "account_id": "59",
+    "account_type": "user",
+    "user_id": 11206,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-28 21:01:01",
+    "updated_at": "2026-01-28 21:01:01"
+  },
+  {
+    "account_id": "68",
+    "account_type": "user",
+    "user_id": 11221,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-28 21:01:50",
+    "updated_at": "2026-01-28 21:01:50"
+  },
+  {
+    "account_id": "77",
+    "account_type": "user",
+    "user_id": 11236,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-28 21:24:07",
+    "updated_at": "2026-01-28 21:24:07"
+  },
+  {
+    "account_id": "78",
+    "account_type": "user",
+    "user_id": 11237,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-28 22:55:01",
+    "updated_at": "2026-01-28 22:55:01"
+  },
+  {
+    "account_id": "83",
+    "account_type": "user",
+    "user_id": 11245,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-28 22:58:36",
+    "updated_at": "2026-01-28 22:58:36"
+  },
+  {
+    "account_id": "88",
+    "account_type": "user",
+    "user_id": 11254,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-28 23:17:08",
+    "updated_at": "2026-01-28 23:17:08"
+  },
+  {
+    "account_id": "97",
+    "account_type": "user",
+    "user_id": 11270,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-29 00:39:31",
+    "updated_at": "2026-01-29 00:39:31"
+  },
+  {
+    "account_id": "98",
+    "account_type": "user",
+    "user_id": 11271,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-29 00:39:34",
+    "updated_at": "2026-01-29 00:39:34"
+  },
+  {
+    "account_id": "103",
+    "account_type": "user",
+    "user_id": 11279,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-29 00:55:34",
+    "updated_at": "2026-01-29 00:55:34"
+  },
+  {
+    "account_id": "112",
+    "account_type": "user",
+    "user_id": 11295,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-29 01:08:07",
+    "updated_at": "2026-01-29 01:08:07"
+  },
+  {
+    "account_id": "113",
+    "account_type": "user",
+    "user_id": 11296,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-29 06:03:41",
+    "updated_at": "2026-01-29 06:03:41"
+  },
+  {
+    "account_id": "122",
+    "account_type": "user",
+    "user_id": 11333,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-29 07:24:35",
+    "updated_at": "2026-01-29 07:24:35"
+  },
+  {
+    "account_id": "131",
+    "account_type": "user",
+    "user_id": 11373,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-30 20:40:57",
+    "updated_at": "2026-01-30 20:40:57"
+  },
+  {
+    "account_id": "132",
+    "account_type": "user",
+    "user_id": 11375,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-30 21:52:51",
+    "updated_at": "2026-01-30 21:52:51"
+  },
+  {
+    "account_id": "133",
+    "account_type": "user",
+    "user_id": 11377,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-01-31 06:01:40",
+    "updated_at": "2026-01-31 06:01:40"
+  },
+  {
+    "account_id": "134",
+    "account_type": "user",
+    "user_id": 11379,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-02-01 20:23:40",
+    "updated_at": "2026-02-01 20:23:40"
+  },
+  {
+    "account_id": "139",
+    "account_type": "user",
+    "user_id": 11393,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-02-02 04:35:34",
+    "updated_at": "2026-02-02 04:35:34"
+  },
+  {
+    "account_id": "140",
+    "account_type": "user",
+    "user_id": 11394,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-02-02 04:38:04",
+    "updated_at": "2026-02-02 04:38:04"
+  },
+  {
+    "account_id": "154",
+    "account_type": "user",
+    "user_id": 11434,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-02-04 04:45:37",
+    "updated_at": "2026-02-04 04:45:37"
+  },
+  {
+    "account_id": "155",
+    "account_type": "user",
+    "user_id": 11435,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-02-04 04:45:49",
+    "updated_at": "2026-02-04 04:45:49"
+  },
+  {
+    "account_id": "164",
+    "account_type": "user",
+    "user_id": 11460,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-02-04 09:03:39",
+    "updated_at": "2026-02-04 09:03:39"
+  },
+  {
+    "account_id": "173",
+    "account_type": "user",
+    "user_id": 11486,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-02-05 18:56:54",
+    "updated_at": "2026-02-05 18:56:54"
+  },
+  {
+    "account_id": "174",
+    "account_type": "user",
+    "user_id": 11493,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-02-15 02:02:39",
+    "updated_at": "2026-02-15 02:02:39"
+  },
+  {
+    "account_id": "175",
+    "account_type": "user",
+    "user_id": 10001,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-02-18 23:39:33",
+    "updated_at": "2026-02-18 23:39:33"
+  },
+  {
+    "account_id": "176",
+    "account_type": "user",
+    "user_id": 11494,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-02-18 23:39:33",
+    "updated_at": "2026-02-18 23:39:33"
+  },
+  {
+    "account_id": "181",
+    "account_type": "user",
+    "user_id": 11508,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-02-19 00:55:44",
+    "updated_at": "2026-02-19 00:55:44"
+  },
+  {
+    "account_id": "186",
+    "account_type": "user",
+    "user_id": 11522,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-02-20 18:14:43",
+    "updated_at": "2026-02-20 18:14:43"
+  },
+  {
+    "account_id": "187",
+    "account_type": "user",
+    "user_id": 11524,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-02-20 21:45:49",
+    "updated_at": "2026-02-20 21:45:49"
+  },
+  {
+    "account_id": "192",
+    "account_type": "user",
+    "user_id": 11538,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-02-21 01:50:42",
+    "updated_at": "2026-02-21 01:50:42"
+  },
+  {
+    "account_id": "197",
+    "account_type": "user",
+    "user_id": 11552,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-02-21 20:06:31",
+    "updated_at": "2026-02-21 20:06:31"
+  },
+  {
+    "account_id": "230",
+    "account_type": "user",
+    "user_id": 11660,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-02-23 17:18:02",
+    "updated_at": "2026-02-23 17:18:02"
+  },
+  {
+    "account_id": "239",
+    "account_type": "system",
+    "user_id": null,
+    "system_code": "SYSTEM_EXCHANGE",
+    "status": "disabled",
+    "created_at": "2026-02-24 01:47:02",
+    "updated_at": "2026-04-06 04:30:00"
+  },
+  {
+    "account_id": "248",
+    "account_type": "user",
+    "user_id": 11710,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-02-24 03:41:59",
+    "updated_at": "2026-02-24 03:41:59"
+  },
+  {
+    "account_id": "265",
+    "account_type": "user",
+    "user_id": 11760,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-02 09:36:52",
+    "updated_at": "2026-03-02 09:36:52"
+  },
+  {
+    "account_id": "266",
+    "account_type": "user",
+    "user_id": 11762,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-03 03:58:52",
+    "updated_at": "2026-03-03 03:58:52"
+  },
+  {
+    "account_id": "303",
+    "account_type": "user",
+    "user_id": 11882,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-06 15:09:24",
+    "updated_at": "2026-03-06 15:09:24"
+  },
+  {
+    "account_id": "304",
+    "account_type": "user",
+    "user_id": 11884,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-06 15:11:36",
+    "updated_at": "2026-03-06 15:11:36"
+  },
+  {
+    "account_id": "309",
+    "account_type": "user",
+    "user_id": 11898,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-06 16:01:50",
+    "updated_at": "2026-03-06 16:01:50"
+  },
+  {
+    "account_id": "310",
+    "account_type": "user",
+    "user_id": 11900,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-06 17:22:20",
+    "updated_at": "2026-03-06 17:22:20"
+  },
+  {
+    "account_id": "319",
+    "account_type": "user",
+    "user_id": 11926,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-09 01:38:37",
+    "updated_at": "2026-03-09 01:38:37"
+  },
+  {
+    "account_id": "320",
+    "account_type": "user",
+    "user_id": 11927,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-09 01:38:54",
+    "updated_at": "2026-03-09 01:38:54"
+  },
+  {
+    "account_id": "325",
+    "account_type": "user",
+    "user_id": 11940,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-09 05:12:00",
+    "updated_at": "2026-03-09 05:12:00"
+  },
+  {
+    "account_id": "326",
+    "account_type": "user",
+    "user_id": 11941,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-10 06:51:45",
+    "updated_at": "2026-03-10 06:51:45"
+  },
+  {
+    "account_id": "327",
+    "account_type": "user",
+    "user_id": 11942,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-10 07:20:52",
+    "updated_at": "2026-03-10 07:20:52"
+  },
+  {
+    "account_id": "332",
+    "account_type": "user",
+    "user_id": 11955,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-10 09:11:55",
+    "updated_at": "2026-03-10 09:11:55"
+  },
+  {
+    "account_id": "333",
+    "account_type": "user",
+    "user_id": 11957,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-14 04:50:11",
+    "updated_at": "2026-03-14 04:50:11"
+  },
+  {
+    "account_id": "342",
+    "account_type": "user",
+    "user_id": 11983,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-14 05:19:16",
+    "updated_at": "2026-03-14 05:19:16"
+  },
+  {
+    "account_id": "363",
+    "account_type": "user",
+    "user_id": 12050,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-17 08:41:05",
+    "updated_at": "2026-03-17 08:41:05"
+  },
+  {
+    "account_id": "368",
+    "account_type": "user",
+    "user_id": 12069,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-17 08:54:39",
+    "updated_at": "2026-03-17 08:54:39"
+  },
+  {
+    "account_id": "377",
+    "account_type": "user",
+    "user_id": 12090,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-21 00:53:02",
+    "updated_at": "2026-03-21 00:53:02"
+  },
+  {
+    "account_id": "394",
+    "account_type": "user",
+    "user_id": 12141,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-21 07:30:24",
+    "updated_at": "2026-03-21 07:30:24"
+  },
+  {
+    "account_id": "399",
+    "account_type": "user",
+    "user_id": 12160,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-21 08:32:57",
+    "updated_at": "2026-03-21 08:32:57"
+  },
+  {
+    "account_id": "404",
+    "account_type": "user",
+    "user_id": 12174,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-22 07:14:02",
+    "updated_at": "2026-03-22 07:14:02"
+  },
+  {
+    "account_id": "409",
+    "account_type": "user",
+    "user_id": 12188,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 00:02:52",
+    "updated_at": "2026-03-23 00:02:52"
+  },
+  {
+    "account_id": "410",
+    "account_type": "user",
+    "user_id": 12189,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 00:03:23",
+    "updated_at": "2026-03-23 00:03:23"
+  },
+  {
+    "account_id": "419",
+    "account_type": "user",
+    "user_id": 12216,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 05:59:13",
+    "updated_at": "2026-03-23 05:59:13"
+  },
+  {
+    "account_id": "420",
+    "account_type": "user",
+    "user_id": 12217,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 06:00:52",
+    "updated_at": "2026-03-23 06:00:52"
+  },
+  {
+    "account_id": "421",
+    "account_type": "user",
+    "user_id": 12218,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 08:05:31",
+    "updated_at": "2026-03-23 08:05:31"
+  },
+  {
+    "account_id": "422",
+    "account_type": "user",
+    "user_id": 12219,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 08:06:54",
+    "updated_at": "2026-03-23 08:06:54"
+  },
+  {
+    "account_id": "423",
+    "account_type": "user",
+    "user_id": 12220,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 08:10:04",
+    "updated_at": "2026-03-23 08:10:04"
+  },
+  {
+    "account_id": "428",
+    "account_type": "user",
+    "user_id": 12233,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 08:18:44",
+    "updated_at": "2026-03-23 08:18:44"
+  },
+  {
+    "account_id": "433",
+    "account_type": "user",
+    "user_id": 12246,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 08:23:26",
+    "updated_at": "2026-03-23 08:23:26"
+  },
+  {
+    "account_id": "434",
+    "account_type": "user",
+    "user_id": 12247,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 08:25:51",
+    "updated_at": "2026-03-23 08:25:51"
+  },
+  {
+    "account_id": "435",
+    "account_type": "user",
+    "user_id": 12248,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 08:26:35",
+    "updated_at": "2026-03-23 08:26:35"
+  },
+  {
+    "account_id": "436",
+    "account_type": "user",
+    "user_id": 12249,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 08:29:56",
+    "updated_at": "2026-03-23 08:29:56"
+  },
+  {
+    "account_id": "437",
+    "account_type": "user",
+    "user_id": 12250,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 08:30:35",
+    "updated_at": "2026-03-23 08:30:35"
+  },
+  {
+    "account_id": "442",
+    "account_type": "user",
+    "user_id": 12263,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 08:36:33",
+    "updated_at": "2026-03-23 08:36:33"
+  },
+  {
+    "account_id": "443",
+    "account_type": "user",
+    "user_id": 12265,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 08:43:00",
+    "updated_at": "2026-03-23 08:43:00"
+  },
+  {
+    "account_id": "444",
+    "account_type": "user",
+    "user_id": 12266,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 09:24:20",
+    "updated_at": "2026-03-23 09:24:20"
+  },
+  {
+    "account_id": "445",
+    "account_type": "user",
+    "user_id": 12267,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 09:35:48",
+    "updated_at": "2026-03-23 09:35:48"
+  },
+  {
+    "account_id": "446",
+    "account_type": "user",
+    "user_id": 12268,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 09:36:13",
+    "updated_at": "2026-03-23 09:36:13"
+  },
+  {
+    "account_id": "451",
+    "account_type": "user",
+    "user_id": 12282,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 09:40:41",
+    "updated_at": "2026-03-23 09:40:41"
+  },
+  {
+    "account_id": "452",
+    "account_type": "user",
+    "user_id": 12283,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 09:40:48",
+    "updated_at": "2026-03-23 09:40:48"
+  },
+  {
+    "account_id": "453",
+    "account_type": "user",
+    "user_id": 12284,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-23 09:45:04",
+    "updated_at": "2026-03-23 09:45:04"
+  },
+  {
+    "account_id": "458",
+    "account_type": "user",
+    "user_id": 12297,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-24 02:05:26",
+    "updated_at": "2026-03-24 02:05:26"
+  },
+  {
+    "account_id": "463",
+    "account_type": "user",
+    "user_id": 12310,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-24 02:16:57",
+    "updated_at": "2026-03-24 02:16:57"
+  },
+  {
+    "account_id": "464",
+    "account_type": "user",
+    "user_id": 12311,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-24 02:19:27",
+    "updated_at": "2026-03-24 02:19:27"
+  },
+  {
+    "account_id": "473",
+    "account_type": "user",
+    "user_id": 12338,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-24 04:38:44",
+    "updated_at": "2026-03-24 04:38:44"
+  },
+  {
+    "account_id": "478",
+    "account_type": "user",
+    "user_id": 12352,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-24 04:44:34",
+    "updated_at": "2026-03-24 04:44:34"
+  },
+  {
+    "account_id": "479",
+    "account_type": "user",
+    "user_id": 12353,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-24 04:44:47",
+    "updated_at": "2026-03-24 04:44:47"
+  },
+  {
+    "account_id": "488",
+    "account_type": "user",
+    "user_id": 12380,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-03-24 05:16:30",
+    "updated_at": "2026-03-24 05:16:30"
+  },
+  {
+    "account_id": "497",
+    "account_type": "user",
+    "user_id": 12416,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-04-10 06:53:28",
+    "updated_at": "2026-04-10 06:53:28"
+  },
+  {
+    "account_id": "498",
+    "account_type": "user",
+    "user_id": 12418,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-04-20 07:59:12",
+    "updated_at": "2026-04-20 07:59:12"
+  },
+  {
+    "account_id": "499",
+    "account_type": "user",
+    "user_id": 12419,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-04-22 11:38:49",
+    "updated_at": "2026-04-22 11:38:49"
+  },
+  {
+    "account_id": "504",
+    "account_type": "user",
+    "user_id": 12433,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-04-22 11:41:27",
+    "updated_at": "2026-04-22 11:41:27"
+  },
+  {
+    "account_id": "509",
+    "account_type": "user",
+    "user_id": 12447,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-04-23 00:04:38",
+    "updated_at": "2026-04-23 00:04:38"
+  },
+  {
+    "account_id": "514",
+    "account_type": "user",
+    "user_id": 12461,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-04-23 02:52:09",
+    "updated_at": "2026-04-23 02:52:09"
+  },
+  {
+    "account_id": "519",
+    "account_type": "user",
+    "user_id": 12475,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-04-23 02:55:53",
+    "updated_at": "2026-04-23 02:55:53"
+  },
+  {
+    "account_id": "524",
+    "account_type": "user",
+    "user_id": 12489,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-04-23 02:59:25",
+    "updated_at": "2026-04-23 02:59:25"
+  },
+  {
+    "account_id": "529",
+    "account_type": "user",
+    "user_id": 12503,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-04-24 03:36:11",
+    "updated_at": "2026-04-24 03:36:11"
+  },
+  {
+    "account_id": "534",
+    "account_type": "user",
+    "user_id": 12517,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-04-24 07:40:44",
+    "updated_at": "2026-04-24 07:40:44"
+  },
+  {
+    "account_id": "543",
+    "account_type": "user",
+    "user_id": 12548,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-04-25 05:41:33",
+    "updated_at": "2026-04-25 05:41:33"
+  },
+  {
+    "account_id": "552",
+    "account_type": "user",
+    "user_id": 12569,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-04-25 06:32:43",
+    "updated_at": "2026-04-25 06:32:43"
+  },
+  {
+    "account_id": "557",
+    "account_type": "user",
+    "user_id": 12583,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-04-25 06:42:20",
+    "updated_at": "2026-04-25 06:42:20"
+  },
+  {
+    "account_id": "562",
+    "account_type": "user",
+    "user_id": 12597,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-04-27 08:49:07",
+    "updated_at": "2026-04-27 08:49:07"
+  },
+  {
+    "account_id": "563",
+    "account_type": "user",
+    "user_id": 12598,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-04-28 17:47:38",
+    "updated_at": "2026-04-28 17:47:38"
+  },
+  {
+    "account_id": "564",
+    "account_type": "user",
+    "user_id": 12599,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-05-14 05:35:31",
+    "updated_at": "2026-05-14 05:35:31"
+  },
+  {
+    "account_id": "565",
+    "account_type": "user",
+    "user_id": 12600,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-05-26 03:48:01",
+    "updated_at": "2026-05-26 03:48:01"
+  },
+  {
+    "account_id": "574",
+    "account_type": "user",
+    "user_id": 12626,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-06-03 00:28:45",
+    "updated_at": "2026-06-03 00:28:45"
+  },
+  {
+    "account_id": "583",
+    "account_type": "user",
+    "user_id": 12652,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-06-03 01:40:44",
+    "updated_at": "2026-06-03 01:40:44"
+  },
+  {
+    "account_id": "588",
+    "account_type": "user",
+    "user_id": 12668,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-06-03 03:07:51",
+    "updated_at": "2026-06-03 03:07:51"
+  },
+  {
+    "account_id": "597",
+    "account_type": "user",
+    "user_id": 12694,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-06-03 03:43:32",
+    "updated_at": "2026-06-03 03:43:32"
+  },
+  {
+    "account_id": "602",
+    "account_type": "user",
+    "user_id": 12707,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-06-05 05:36:08",
+    "updated_at": "2026-06-05 05:36:08"
+  },
+  {
+    "account_id": "603",
+    "account_type": "user",
+    "user_id": 12708,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-06-05 11:09:51",
+    "updated_at": "2026-06-05 11:09:51"
+  },
+  {
+    "account_id": "620",
+    "account_type": "user",
+    "user_id": 12767,
+    "system_code": null,
+    "status": "active",
+    "created_at": "2026-06-14 23:19:36",
+    "updated_at": "2026-06-14 23:19:36"
+  }
+]

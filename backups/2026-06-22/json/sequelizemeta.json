@@ -1,0 +1,230 @@
+[
+  {
+    "name": "20260322235500-baseline-v4.1.0-squashed.js"
+  },
+  {
+    "name": "20260323012417-add-avg-budget-per-draw-to-hourly-metrics.js"
+  },
+  {
+    "name": "20260323140000-fix-media-attachable-type-category-def.js"
+  },
+  {
+    "name": "20260324160000-create-c2c-auction-tables.js"
+  },
+  {
+    "name": "20260330193219-backfill-trade-orders-idempotency-key-unified.js"
+  },
+  {
+    "name": "20260331112300-create-diy-tables.js"
+  },
+  {
+    "name": "20260331180000-refactor-diy-tables-align-spec.js"
+  },
+  {
+    "name": "20260331200000-create-diy-materials.js"
+  },
+  {
+    "name": "20260401120000-rename-asset-codes-star-stone-core-gem.js"
+  },
+  {
+    "name": "20260401130000-rename-ad-diamond-columns-to-star-stone.js"
+  },
+  {
+    "name": "20260405193939-create-asset-conversion-rules.js"
+  },
+  {
+    "name": "20260405215638-add-display-category-to-asset-conversion-rules.js"
+  },
+  {
+    "name": "20260405224635-alter-description-to-text-in-asset-conversion-rules.js"
+  },
+  {
+    "name": "20260407192705-diy-engine-refactor-phase1.js"
+  },
+  {
+    "name": "20260407230000-diy-engine-refactor-phase2.js"
+  },
+  {
+    "name": "20260408060000-diy-phase3-data-governance.js"
+  },
+  {
+    "name": "20260408120000-diy-enforce-image-requirements.js"
+  },
+  {
+    "name": "20260422030901-add-balance-check-constraints.js"
+  },
+  {
+    "name": "20260422032823-add-balance-check-constraints.js"
+  },
+  {
+    "name": "20260422100100-fill-system-settings-descriptions.js"
+  },
+  {
+    "name": "20260423000000-add-wx-openid-to-users.js"
+  },
+  {
+    "name": "20260425040000-diy-material-code-unify.js"
+  },
+  {
+    "name": "20260425050000-diy-works-idempotency-key-backfill.js"
+  },
+  {
+    "name": "20260429010000-fix-notification-content-chinese.js"
+  },
+  {
+    "name": "20260505000000-drop-bak-conversion-tables.js"
+  },
+  {
+    "name": "20260526000000-create-prize-definitions-and-campaign-prizes.js"
+  },
+  {
+    "name": "20260526000100-add-lottery-campaign-prize-id-to-draws.js"
+  },
+  {
+    "name": "20260526000200-migrate-lottery-presets-fk.js"
+  },
+  {
+    "name": "20260526000300-drop-lottery-prizes-table.js"
+  },
+  {
+    "name": "20260527000000-add-order-polymorphic-to-issues.js"
+  },
+  {
+    "name": "20260601000000-add-device-id-to-auth-sessions.js"
+  },
+  {
+    "name": "20260602000000-create-trade-disputes-and-slim-issues.js"
+  },
+  {
+    "name": "20260602100000-seed-dispute-self-service-risk-config.js"
+  },
+  {
+    "name": "20260604152031-migrate-compliance-c2c-detrade.js"
+  },
+  {
+    "name": "20260605015009-drop-table-lottery-management-settings.js"
+  },
+  {
+    "name": "20260605015010-alter-table-lottery-prize-id-unify.js"
+  },
+  {
+    "name": "20260605020159-create-table-user-growth-levels.js"
+  },
+  {
+    "name": "20260605090000-drop-table-c2c-marketplace.js"
+  },
+  {
+    "name": "20260605100000-alter-table-cs-issue-order-type.js"
+  },
+  {
+    "name": "20260606030000-seed-data-remove-c2c-settings.js"
+  },
+  {
+    "name": "20260606030500-drop-column-user-max-active-listings.js"
+  },
+  {
+    "name": "20260608005113-add-column-item-value-tier.js"
+  },
+  {
+    "name": "20260608005114-create-table-exchange-redeem-requirement.js"
+  },
+  {
+    "name": "20260608005115-add-column-users-mobile-encrypted.js"
+  },
+  {
+    "name": "20260608005116-drop-column-users-mobile.js"
+  },
+  {
+    "name": "20260608005117-add-column-user-addresses-encrypted.js"
+  },
+  {
+    "name": "20260608005118-add-column-users-privacy-consent-at.js"
+  },
+  {
+    "name": "20260608005119-create-table-decoration-system.js"
+  },
+  {
+    "name": "20260608020733-add-column-users-mobile-prefix-suffix-hash.js"
+  },
+  {
+    "name": "20260608032704-seed-data-business-narrative-dict.js"
+  },
+  {
+    "name": "20260608070540-migrate-data-campaign-tier-names.js"
+  },
+  {
+    "name": "20260609000000-change-bid-products-price-asset-code-default.js"
+  },
+  {
+    "name": "20260611043000-add-prop-tab-to-exchange-page-config.js"
+  },
+  {
+    "name": "20260611083214-add-column-exchange-items-min-cost-asset-code.js"
+  },
+  {
+    "name": "20260611083314-add-column-ad-campaigns-announcement-type.js"
+  },
+  {
+    "name": "20260612075717-cleanup-orphan-consumption-approval-chains.js"
+  },
+  {
+    "name": "20260612154711-alter-column-lottery-draws-prize-type-enum.js"
+  },
+  {
+    "name": "20260612160452-add-column-exchange-items-max-quantity-per-order.js"
+  },
+  {
+    "name": "20260613040038-add-column-approval-chain-nodes-exclude-parties.js"
+  },
+  {
+    "name": "20260613040039-seed-data-auditable-type-dictionary.js"
+  },
+  {
+    "name": "20260613040040-seed-data-approval-chain-grading.js"
+  },
+  {
+    "name": "20260613042733-migrate-data-remove-orphan-approval-instance-414.js"
+  },
+  {
+    "name": "20260613071406-seed-data-super-admin-role.js"
+  },
+  {
+    "name": "20260613073700-migrate-data-fix-approval-instance-current-step.js"
+  },
+  {
+    "name": "20260613081244-migrate-data-backfill-history-total-points.js"
+  },
+  {
+    "name": "20260614000000-add-column-exchange-items-fulfillment-type.js"
+  },
+  {
+    "name": "20260614000001-create-table-shipping-tracks.js"
+  },
+  {
+    "name": "20260614065152-alter-column-chat-messages-message-type-add-file.js"
+  },
+  {
+    "name": "20260614201130-alter-column-lottery-campaigns-display-mode-comment.js"
+  },
+  {
+    "name": "20260615083428-add-column-items-is-viewed-first-viewed-at.js"
+  },
+  {
+    "name": "20260620061500-cleanup-data-remove-zombie-trade-dispute-template.js"
+  },
+  {
+    "name": "20260620090000-alter-table-approval-chain-countersign-isolation.js"
+  },
+  {
+    "name": "20260621035513-alter-table-ad-slots-carousel-and-drop-campaign-slide-interval.js"
+  },
+  {
+    "name": "20260621035830-seed-data-ad-slots-top-banner.js"
+  },
+  {
+    "name": "20260621041500-alter-table-redemption-store-voucher-scope.js"
+  },
+  {
+    "name": "20260621081430-alter-ad-bid-logs-target-user-id-nullable.js"
+  }
+]

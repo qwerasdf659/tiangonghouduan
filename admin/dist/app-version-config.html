@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>版本闸门配置 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; } .config-item { transition: all 0.2s ease; border: 1px solid var(--color-border, #dde1e9); } .config-item:hover { border-color: var(--color-primary, #3b82f6); box-shadow: 0 2px 8px rgba(59,130,246,0.08); } .section-help { background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border: 1px solid #bae6fd; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; } .section-help p { color: #0369a1; font-size: 13px; line-height: 1.6; } .warn-help { background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%); border: 1px solid #fcd34d; border-radius: 10px; padding: 12px 16px; } .warn-help p { color: #92400e; font-size: 13px; line-height: 1.6; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/app-version-config-BylHFyQK.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen" x-data="appVersionConfigPage()" x-init="init()" x-cloak>
+
+  <!-- 导航栏 -->
+  <nav class="page-navbar">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="text-blue-200 hover:text-white transition-colors">&larr; 返回工作台</a>
+        <span class="text-lg font-semibold">📱 小程序版本闸门配置</span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6 max-w-3xl">
+
+    <!-- 页面横幅 -->
+    <div class="page-banner mb-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h1>📱 小程序版本闸门配置</h1>
+          <p>配置小程序的最低可用版本与强制更新策略，保存后小程序下次启动自动生效</p>
+        </div>
+        <div class="text-6xl opacity-20 hidden md:block">🚦</div>
+      </div>
+    </div>
+
+    <!-- 操作栏 -->
+    <div class="flex justify-between items-center mb-6">
+      <div class="flex items-center gap-3">
+        <template x-if="configModified">
+          <span class="badge-warning text-xs">&#9889; 有未保存的修改</span>
+        </template>
+      </div>
+      <div class="flex items-center gap-3">
+        <button @click="resetAppVersionConfig()" class="btn btn-outline btn-sm" :disabled="!configModified">
+          &#128260; 重置
+        </button>
+        <button @click="saveAppVersionConfig()" class="action-btn action-btn-primary btn-sm" :disabled="saving || !configModified">
+          <span x-show="saving">&#9203; 保存中...</span>
+          <span x-show="!saving">&#128190; 保存配置</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 加载状态 -->
+    <template x-if="configLoading">
+      <div class="content-section">
+        <div class="empty-state-enhanced">
+          <div class="empty-icon animate-pulse">&#9203;</div>
+          <div class="empty-title">加载配置中...</div>
+          <div class="empty-desc">正在从服务器获取版本闸门配置数据</div>
+        </div>
+      </div>
+    </template>
+
+    <!-- 配置内容 -->
+    <template x-if="config && !configLoading">
+      <div class="content-section animate-fade-in">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">🚦</span>
+            版本闸门参数
+          </div>
+        </div>
+        <div class="content-section-body space-y-6">
+
+          <div class="section-help">
+            <p>&#128161; 小程序每次启动会调用版本闸门接口。仅当用户当前版本「低于最低可用版本」且「开启强制更新」时才会拦截到更新页；接口异常/未开启强更一律放行，绝不误伤正常用户。</p>
+          </div>
+
+          <!-- 最低可用版本 -->
+          <div class="config-item rounded-xl p-4">
+            <label class="form-label text-sm font-semibold">最低可用版本 (min_version)</label>
+            <p class="text-xs text-gray-400 mb-2">低于此版本的用户在开启强更时会被拦截到更新页。格式 x.y.z，如 5.2.0</p>
+            <input type="text" x-model="config.min_version" @input="markConfigModified()" class="form-input text-sm" placeholder="5.2.0">
+          </div>
+
+          <!-- 最新版本 -->
+          <div class="config-item rounded-xl p-4">
+            <label class="form-label text-sm font-semibold">最新版本 (latest_version)</label>
+            <p class="text-xs text-gray-400 mb-2">用于提示「有新版本」，非强制。可留空。格式 x.y.z，如 5.3.0</p>
+            <input type="text" x-model="config.latest_version" @input="markConfigModified()" class="form-input text-sm" placeholder="留空表示不提示新版本">
+          </div>
+
+          <!-- 强制更新开关 -->
+          <div class="config-item rounded-xl p-4" :class="config.force_update ? 'border-amber-300' : ''">
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input type="checkbox" x-model="config.force_update" @change="markConfigModified()" class="form-checkbox">
+              <div>
+                <span class="text-sm font-semibold">开启强制更新 (force_update)</span>
+                <template x-if="config.force_update">
+                  <span class="badge-warning text-xs ml-2">&#9888; 已开启，低版本将被拦截</span>
+                </template>
+              </div>
+            </label>
+            <template x-if="config.force_update">
+              <div class="warn-help mt-3">
+                <p>&#9888; 强制更新已开启：低于「最低可用版本」的用户将无法继续使用，仅在旧版有严重 Bug 时临时开启，平时建议关闭。</p>
+              </div>
+            </template>
+          </div>
+
+          <!-- 更新提示文案 -->
+          <div class="config-item rounded-xl p-4">
+            <label class="form-label text-sm font-semibold">更新提示文案 (update_message)</label>
+            <p class="text-xs text-gray-400 mb-2">拦截更新页展示给用户的提示文字</p>
+            <input type="text" x-model="config.update_message" @input="markConfigModified()" class="form-input text-sm" placeholder="检测到新版本，请更新后继续使用">
+          </div>
+
+          <!-- 平台标识 -->
+          <div class="config-item rounded-xl p-4">
+            <label class="form-label text-sm font-semibold">适用平台 (platform)</label>
+            <p class="text-xs text-gray-400 mb-2">闸门适用的客户端平台标识，默认 miniprogram</p>
+            <input type="text" x-model="config.platform" @input="markConfigModified()" class="form-input text-sm" placeholder="miniprogram">
+          </div>
+
+        </div>
+      </div>
+    </template>
+
+  </div>
+
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+</body>
+</html>

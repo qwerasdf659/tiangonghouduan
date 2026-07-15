@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>资产管理中心 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/asset-management-BZF_R157.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/asset-BmjTKnbE.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 导航栏（深蓝科技风） -->
+  <nav class="page-navbar">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="text-blue-200 hover:text-white transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">💎 资产管理中心</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="assetManagement()" x-init="init()"
+       @edit-material-type="editMaterialType($event.detail)"
+       @toggle-material-status="toggleMaterialTypeStatus($event.detail.asset_code, $event.detail.is_enabled)">
+    
+    <!-- 页面横幅 -->
+    <div class="page-banner mb-6">
+      <h1>💎 资产管理中心</h1>
+      <p>管理系统资产类型、用户余额、流水记录和物品实例</p>
+    </div>
+
+    <!-- 子页面导航（增强Tab样式） -->
+    <div class="enhanced-tabs">
+      <template x-for="page in subPages" :key="page.id">
+        <button 
+          @click="switchPage(page.id)"
+          :class="current_page === page.id ? 'active' : ''"
+          class="tab-item"
+          x-text="page.icon + ' ' + page.name"
+        ></button>
+      </template>
+    </div>
+
+    <!-- 资产类型管理 -->
+    <div x-show="current_page === 'material-types'" x-cloak>
+      <div class="content-section">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">📦</span>
+            资产类型列表
+          </div>
+          <button @click="openAddMaterialTypeModal()" class="action-btn action-btn-primary">
+            ➕ 新增资产类型
+          </button>
+        </div>
+        <!-- data-table: 资产类型列表 -->
+        <div x-data="assetTypesDataTable()" x-init="init()">
+          <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+          <div x-show="hasError" class="p-8 text-center">
+            <p class="text-red-500 mb-2" x-text="error"></p>
+            <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+          </div>
+          <div x-show="hasData" class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="themed-bg-base">
+                <tr>
+                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                        :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                        @click="sort(col)">
+                      <span x-text="col.label"></span>
+                      <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                    </th>
+                  </template>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="(row, idx) in data" :key="row.asset_code || idx">
+                  <tr class="themed-hover-bg">
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                      <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                    </template>
+                    <td class="px-4 py-3">
+                      <div class="flex space-x-2">
+                        <button @click="$dispatch('edit-material-type', row)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                        <button @click="$dispatch('toggle-material-status', row)" class="text-yellow-500 hover:text-yellow-700 text-sm" x-text="row.is_enabled ? '禁用' : '启用'"></button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+            <div class="text-4xl mb-4">📦</div>
+            <p>暂无资产类型</p>
+          </div>
+          <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+            最后更新: <span x-text="lastUpdateTime"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 用户资产查询 -->
+    <div x-show="current_page === 'material-accounts'" x-cloak>
+      <div class="content-section">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">👥</span>
+            用户资产查询
+          </div>
+        </div>
+        <!-- data-table: 用户资产列表 -->
+        <div x-data="assetAccountsDataTable()" x-init="init()">
+          <div class="filter-toolbar">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <input type="text" x-model="activeFilters.mobile" placeholder="手机号" maxlength="11" class="form-input">
+              <input type="text" x-model="activeFilters.asset_code" placeholder="资产代码" class="form-input">
+              <div class="flex space-x-2">
+                <button @click="search()" class="flex-1 action-btn action-btn-primary">🔍 搜索</button>
+                <button @click="handleFilterReset()" class="btn btn-secondary">🔄 重置</button>
+              </div>
+            </div>
+          </div>
+          <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+          <div x-show="hasError" class="p-8 text-center">
+            <p class="text-red-500 mb-2" x-text="error"></p>
+            <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+          </div>
+          <div x-show="hasData" class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="themed-bg-base">
+                <tr>
+                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                        :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                        @click="sort(col)">
+                      <span x-text="col.label"></span>
+                      <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                    </th>
+                  </template>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="(row, idx) in data" :key="row.user_id + '_' + idx">
+                  <tr class="themed-hover-bg">
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                      <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                    </template>
+                    <td class="px-4 py-3">
+                      <a href="asset-adjustment.html" class="themed-text-primary hover:text-blue-700 text-sm">调整</a>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+            <div class="text-4xl mb-4">🔍</div>
+            <p>请输入手机号搜索用户资产</p>
+          </div>
+          <template x-if="total_pages > 1">
+            <div class="p-4 border-t flex justify-between items-center">
+              <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+              <div class="flex space-x-1">
+                <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                <template x-for="p in visiblePages" :key="'ac'+p">
+                  <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                </template>
+                <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+              </div>
+            </div>
+          </template>
+          <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+            最后更新: <span x-text="lastUpdateTime"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 资产流水 -->
+    <div x-show="current_page === 'material-transactions'" x-cloak>
+      <div class="content-section">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">📊</span>
+            资产流水记录
+          </div>
+        </div>
+        <!-- data-table: 资产流水记录 -->
+        <div x-data="assetTransactionsDataTable()" x-init="init()">
+          <div class="filter-toolbar">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <input type="text" x-model="activeFilters.mobile" placeholder="手机号" maxlength="11" class="form-input">
+              <input type="text" x-model="activeFilters.asset_code" placeholder="资产代码" class="form-input">
+              <input type="date" x-model="activeFilters.start_date" class="form-input">
+              <div class="flex space-x-2">
+                <button @click="search()" class="flex-1 action-btn action-btn-primary">🔍 搜索</button>
+                <button @click="handleFilterReset()" class="btn btn-secondary">🔄 重置</button>
+              </div>
+            </div>
+          </div>
+          <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+          <div x-show="hasError" class="p-8 text-center">
+            <p class="text-red-500 mb-2" x-text="error"></p>
+            <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+          </div>
+          <div x-show="hasData" class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="themed-bg-base">
+                <tr>
+                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                        :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                        @click="sort(col)">
+                      <span x-text="col.label"></span>
+                      <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                    </th>
+                  </template>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="(row, idx) in data" :key="row.transaction_id || idx">
+                  <tr class="themed-hover-bg">
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                      <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                    </template>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+            <div class="text-4xl mb-4">💡</div>
+            <p>请输入手机号搜索资产流水</p>
+          </div>
+          <template x-if="total_pages > 1">
+            <div class="p-4 border-t flex justify-between items-center">
+              <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+              <div class="flex space-x-1">
+                <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                <template x-for="p in visiblePages" :key="'at'+p">
+                  <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                </template>
+                <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+              </div>
+            </div>
+          </template>
+          <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+            最后更新: <span x-text="lastUpdateTime"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 物品管理（三表模型） -->
+    <div x-show="current_page === 'items'" x-cloak>
+      <div class="content-section">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">🎁</span>
+            物品模板管理
+          </div>
+        </div>
+        <!-- data-table: 物品模板列表 -->
+        <div x-data="itemsDataTable()" x-init="init()">
+          <div class="filter-toolbar">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <select x-model="activeFilters.template_code" class="form-select">
+                <option value="">全部物品类型</option>
+                <option value="voucher">优惠券</option>
+                <option value="physical">实物商品</option>
+                <option value="collectible">收藏品</option>
+              </select>
+              <select x-model="activeFilters.status" class="form-select">
+                <option value="">全部状态</option>
+                <option value="enabled">启用</option>
+                <option value="disabled">禁用</option>
+              </select>
+              <div class="flex space-x-2">
+                <button @click="search()" class="flex-1 action-btn action-btn-primary">🔍 搜索</button>
+                <button @click="handleFilterReset()" class="btn btn-secondary">🔄 重置</button>
+              </div>
+            </div>
+          </div>
+          <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+          <div x-show="hasError" class="p-8 text-center">
+            <p class="text-red-500 mb-2" x-text="error"></p>
+            <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+          </div>
+          <div x-show="hasData" class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="themed-bg-base">
+                <tr>
+                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                        :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                        @click="sort(col)">
+                      <span x-text="col.label"></span>
+                      <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                    </th>
+                  </template>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="(row, idx) in data" :key="row.item_id || idx">
+                  <tr class="themed-hover-bg">
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                      <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                    </template>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+            <div class="text-4xl mb-4">🎁</div>
+            <p>暂无物品模板数据</p>
+          </div>
+          <template x-if="total_pages > 1">
+            <div class="p-4 border-t flex justify-between items-center">
+              <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+              <div class="flex space-x-1">
+                <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                <template x-for="p in visiblePages" :key="'ii'+p">
+                  <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                </template>
+                <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+              </div>
+            </div>
+          </template>
+          <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+            最后更新: <span x-text="lastUpdateTime"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 虚拟账户 -->
+    <div x-show="current_page === 'virtual-accounts'" x-cloak>
+      <div class="content-section">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">💎</span>
+            虚拟账户查询
+          </div>
+        </div>
+        <!-- data-table: 虚拟账户 -->
+        <div x-data="virtualAccountsDataTable()" x-init="init()">
+          <div class="filter-toolbar">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <input type="text" x-model="activeFilters.mobile" placeholder="手机号" maxlength="11" class="form-input">
+              <select x-model="activeFilters.account_type" class="form-select">
+                <option value="">全部账户类型</option>
+                <option value="star_stone">星石</option>
+                <option value="points">积分</option>
+                <option value="CREDITS">信用点</option>
+              </select>
+              <div class="flex space-x-2">
+                <button @click="search()" class="flex-1 action-btn action-btn-primary">🔍 搜索</button>
+                <button @click="handleFilterReset()" class="btn btn-secondary">🔄 重置</button>
+              </div>
+            </div>
+          </div>
+          <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+          <div x-show="hasError" class="p-8 text-center">
+            <p class="text-red-500 mb-2" x-text="error"></p>
+            <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+          </div>
+          <div x-show="hasData" class="overflow-x-auto">
+            <table class="w-full enhanced-table">
+              <thead>
+                <tr>
+                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                    <th x-text="col.label"></th>
+                  </template>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="(row, idx) in data" :key="row.user_id + '_' + idx">
+                  <tr>
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                      <td x-html="renderCell(row, col)"></td>
+                    </template>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="isEmpty" class="empty-state-enhanced">
+            <div class="empty-icon">💎</div>
+            <div class="empty-title">请输入手机号搜索虚拟账户</div>
+            <div class="empty-desc">在上方搜索框输入用户手机号来查看资产信息</div>
+          </div>
+          <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+            最后更新: <span x-text="lastUpdateTime"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 虚拟交易 -->
+    <div x-show="current_page === 'virtual-transactions'" x-cloak>
+      <div class="content-section">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">📊</span>
+            虚拟交易记录
+          </div>
+        </div>
+        <!-- data-table: 虚拟交易记录 -->
+        <div x-data="virtualTransactionsDataTable()" x-init="init()">
+          <div class="filter-toolbar">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <input type="text" x-model="activeFilters.mobile" placeholder="手机号（必填）" maxlength="11" class="form-input">
+              <select x-model="activeFilters.account_type" class="form-select">
+                <option value="">全部账户类型</option>
+                <option value="star_stone">星石</option>
+                <option value="points">积分</option>
+                <option value="CREDITS">信用点</option>
+              </select>
+              <select x-model="activeFilters.direction" class="form-select">
+                <option value="">全部方向</option>
+                <option value="in">收入</option>
+                <option value="out">支出</option>
+              </select>
+              <div class="flex space-x-2">
+                <button @click="search()" class="flex-1 action-btn action-btn-primary">🔍 搜索</button>
+                <button @click="handleFilterReset()" class="btn btn-secondary">🔄 重置</button>
+              </div>
+            </div>
+          </div>
+          <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+          <div x-show="hasError" class="p-8 text-center">
+            <p class="text-red-500 mb-2" x-text="error"></p>
+            <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+          </div>
+          <div x-show="hasData" class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="themed-bg-base">
+                <tr>
+                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                        :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                        @click="sort(col)">
+                      <span x-text="col.label"></span>
+                      <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                    </th>
+                  </template>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="(row, idx) in data" :key="row.transaction_id || idx">
+                  <tr class="themed-hover-bg">
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                      <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                    </template>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+            <div class="text-4xl mb-4">📊</div>
+            <p>请输入手机号搜索虚拟交易记录</p>
+          </div>
+          <template x-if="total_pages > 1">
+            <div class="p-4 border-t flex justify-between items-center">
+              <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+              <div class="flex space-x-1">
+                <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                <template x-for="p in visiblePages" :key="'vt'+p">
+                  <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                </template>
+                <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+              </div>
+            </div>
+          </template>
+          <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+            最后更新: <span x-text="lastUpdateTime"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 资产统计 -->
+    <div x-show="current_page === 'asset-stats'" x-cloak>
+      <div class="content-section">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">📈</span>
+            资产统计概览
+          </div>
+          <button @click="loadAssetStats()" class="action-btn action-btn-primary" :disabled="loading">
+            <span x-show="loading" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+            <span x-text="loading ? '刷新中...' : '🔄 刷新统计'"></span>
+          </button>
+        </div>
+        <div class="p-6">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="gradient-stat-card gradient-stat-blue">
+              <div class="stat-icon">💰</div>
+              <div class="stat-value" x-text="(assetStats.totalMaterialValue || 0).toLocaleString()" :title="String(assetStats.totalMaterialValue || 0)"></div>
+              <div class="stat-label">材料流通总量</div>
+            </div>
+            <div class="gradient-stat-card gradient-stat-purple">
+              <div class="stat-icon">💎</div>
+              <div class="stat-value" x-text="(assetStats.totalVirtualValue || 0).toLocaleString()" :title="String(assetStats.totalVirtualValue || 0)"></div>
+              <div class="stat-label">虚拟资产流通量</div>
+            </div>
+            <div class="gradient-stat-card gradient-stat-green">
+              <div class="stat-icon">📦</div>
+              <div class="stat-value" x-text="assetStats.totalAssetTypes || 0"></div>
+              <div class="stat-label">资产类型数</div>
+            </div>
+            <div class="gradient-stat-card gradient-stat-orange">
+              <div class="stat-icon">👥</div>
+              <div class="stat-value" x-text="assetStats.totalHolders || 0"></div>
+              <div class="stat-label">持有者数量</div>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div class="gradient-stat-card gradient-stat-indigo">
+              <div class="stat-icon">📈</div>
+              <div class="stat-value" x-text="(assetStats.totalCirculation || 0).toLocaleString()" :title="String(assetStats.totalCirculation || 0)"></div>
+              <div class="stat-label">总流通量</div>
+            </div>
+            <div class="gradient-stat-card gradient-stat-rose">
+              <div class="stat-icon">🔒</div>
+              <div class="stat-value" x-text="(assetStats.totalFrozen || 0).toLocaleString()" :title="String(assetStats.totalFrozen || 0)"></div>
+              <div class="stat-label">总冻结量</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== Modal 组件区域（必须在 x-data 作用域内） ==================== -->
+
+    <!-- 1. 添加材料资产类型 Modal -->
+    <div x-ref="addMaterialTypeModal"
+         x-show="isModalOpen('addMaterialTypeModal')"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('addMaterialTypeModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
+          <h5 class="font-semibold">➕ 添加资产类型</h5>
+          <button @click="hideModal('addMaterialTypeModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+        </div>
+        <form @submit.prevent="submitAddMaterialType()">
+          <div class="p-6 space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">资产代码 <span class="text-red-500">*</span></label>
+                <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.asset_code" required placeholder="如: red_core_shard">
+                <p class="text-xs themed-text-muted mt-1">唯一标识，建议使用小写字母和下划线</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">显示名称 <span class="text-red-500">*</span></label>
+                <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.display_name" required placeholder="如: 红源晶碎片">
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">材料组 <span class="text-red-500">*</span></label>
+                <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.group_code" required placeholder="如: red">
+                <p class="text-xs themed-text-muted mt-1">用于分组，如: red, orange, purple</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">形态 <span class="text-red-500">*</span></label>
+                <select class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.form" required>
+                  <option value="">请选择</option>
+                  <option value="shard">碎片（shard）</option>
+                  <option value="crystal">水晶（crystal）</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">层级 <span class="text-red-500">*</span></label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.tier" required min="1" placeholder="如: 1">
+                <p class="text-xs themed-text-muted mt-1">层级越高价值越大</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4" x-show="materialTypeAddForm.form !== 'quota'">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">可见价值（积分） <span class="text-red-500">*</span></label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.visible_value_points" :required="materialTypeAddForm.form !== 'quota'" min="0" placeholder="如: 10">
+                <p class="text-xs themed-text-muted mt-1">用于用户展示和说明</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">预算价值（积分） <span class="text-red-500">*</span></label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.budget_value_points" :required="materialTypeAddForm.form !== 'quota'" min="0" placeholder="如: 10">
+                <p class="text-xs themed-text-muted mt-1">用于系统成本控制</p>
+              </div>
+            </div>
+            <!-- 配额类（form=quota，如预算积分/星石配额）为系统内部记账单位，不作为奖品发放、不参与积分计价，故不需要价值积分 -->
+            <p x-show="materialTypeAddForm.form === 'quota'" class="text-xs themed-text-muted">配额类资产为系统内部记账单位，不参与积分计价，无需填写价值积分。</p>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">排序权重</label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.sort_order" value="0">
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">启用状态</label>
+                <select class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.is_enabled">
+                  <option value="1">启用</option>
+                  <option value="0">禁用</option>
+                </select>
+              </div>
+            </div>
+            <!-- 资产图标上传（议题二·单一图标真相源：抽奖/商城/背包/余额四端同步） -->
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">资产图标</label>
+              <div class="flex items-center space-x-3">
+                <div class="w-14 h-14 rounded-lg border themed-bg-subtle flex items-center justify-center overflow-hidden">
+                  <template x-if="materialTypeIconPreviewUrl">
+                    <img :src="materialTypeIconPreviewUrl" alt="图标预览" class="w-full h-full object-contain">
+                  </template>
+                  <template x-if="!materialTypeIconPreviewUrl">
+                    <span class="text-xs themed-text-muted">无图</span>
+                  </template>
+                </div>
+                <label class="px-3 py-2 themed-bg-muted themed-text-secondary rounded-lg cursor-pointer hover:bg-gray-300 text-sm">
+                  <span x-show="!image_uploading">选择图片上传</span>
+                  <span x-show="image_uploading">上传中...</span>
+                  <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" @change="uploadMaterialTypeIcon($event, 'add')" :disabled="image_uploading">
+                </label>
+              </div>
+              <p class="text-xs themed-text-muted mt-1">支持 JPG/PNG/GIF/WebP，≤5MB；上传后抽奖、兑换/道具商城、背包、资产余额四处同步使用</p>
+            </div>
+          </div>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
+            <button type="button" @click="hideModal('addMaterialTypeModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300">取消</button>
+            <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary disabled:opacity-50" :disabled="materialTypeSubmitting">
+              <span x-show="materialTypeSubmitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+              确认添加
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 2. 编辑材料资产类型 Modal -->
+    <div x-ref="editMaterialTypeModal"
+         x-show="isModalOpen('editMaterialTypeModal')"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('editMaterialTypeModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
+          <h5 class="font-semibold">✏️ 编辑资产类型</h5>
+          <button @click="hideModal('editMaterialTypeModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+        </div>
+        <form @submit.prevent="submitEditMaterialType()">
+          <div class="p-6 space-y-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">资产代码</label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg themed-bg-subtle" x-model="materialTypeEditForm.asset_code" disabled>
+              <p class="text-xs themed-text-muted mt-1">资产代码不可修改</p>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">显示名称 <span class="text-red-500">*</span></label>
+                <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.display_name" required>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">材料组</label>
+                <input type="text" class="w-full px-3 py-2 border rounded-lg themed-bg-subtle" x-model="materialTypeEditForm.group_code" disabled>
+                <p class="text-xs themed-text-muted mt-1">材料组不可修改</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">形态</label>
+                <input type="text" class="w-full px-3 py-2 border rounded-lg themed-bg-subtle" :value="getFormLabel(materialTypeEditForm.form)" disabled>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">层级</label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg themed-bg-subtle" x-model="materialTypeEditForm.tier" disabled>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">排序权重</label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.sort_order">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4" x-show="materialTypeEditForm.form !== 'quota'">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">可见价值（积分）</label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.visible_value_points" min="0" placeholder="留空则保持原值">
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">预算价值（积分）</label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.budget_value_points" min="0" placeholder="留空则保持原值">
+              </div>
+            </div>
+            <!-- 配额类（form=quota）为系统内部记账单位，不参与积分计价，无需价值积分 -->
+            <p x-show="materialTypeEditForm.form === 'quota'" class="text-xs themed-text-muted">配额类资产为系统内部记账单位，不参与积分计价，无需填写价值积分。</p>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">启用状态</label>
+              <select class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.is_enabled">
+                <option value="1">启用</option>
+                <option value="0">禁用</option>
+              </select>
+            </div>
+            <!-- 资产图标上传（议题二·单一图标真相源：抽奖/商城/背包/余额四端同步） -->
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">资产图标</label>
+              <div class="flex items-center space-x-3">
+                <div class="w-14 h-14 rounded-lg border themed-bg-subtle flex items-center justify-center overflow-hidden">
+                  <template x-if="materialTypeIconPreviewUrl">
+                    <img :src="materialTypeIconPreviewUrl" alt="图标预览" class="w-full h-full object-contain">
+                  </template>
+                  <template x-if="!materialTypeIconPreviewUrl">
+                    <span class="text-xs themed-text-muted">无图</span>
+                  </template>
+                </div>
+                <label class="px-3 py-2 themed-bg-muted themed-text-secondary rounded-lg cursor-pointer hover:bg-gray-300 text-sm">
+                  <span x-show="!image_uploading">更换图标</span>
+                  <span x-show="image_uploading">上传中...</span>
+                  <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" @change="uploadMaterialTypeIcon($event, 'edit')" :disabled="image_uploading">
+                </label>
+              </div>
+              <p class="text-xs themed-text-muted mt-1">上传新图后保存即生效；抽奖、兑换/道具商城、背包、资产余额四处自动同步（不传则保持原图）</p>
+            </div>
+          </div>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
+            <button type="button" @click="hideModal('editMaterialTypeModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300">取消</button>
+            <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary disabled:opacity-50" :disabled="materialTypeSubmitting">
+              <span x-show="materialTypeSubmitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+              保存更新
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 3. 物品实例详情 Modal -->
+    <div x-ref="instanceDetailModal"
+         x-show="isModalOpen('instanceDetailModal')"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('instanceDetailModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
+          <h5 class="font-semibold">📦 物品实例详情</h5>
+          <button @click="hideModal('instanceDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+        </div>
+        <div class="p-6" x-show="instanceDetail">
+          <!-- 基本信息 -->
+          <div class="mb-6">
+            <h6 class="font-medium themed-text-secondary border-b pb-2 mb-3">ℹ️ 基本信息</h6>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">实例ID</label>
+                <div class="font-mono text-sm themed-bg-subtle px-2 py-1 rounded" x-text="instanceDetail?.instance_id"></div>
+              </div>
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">物品名称</label>
+                <div class="font-medium" x-text="instanceDetail?.item_name || instanceDetail?.template_id || '-'"></div>
+              </div>
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">模板ID</label>
+                <div class="font-mono text-sm" x-text="instanceDetail?.template_id || '-'"></div>
+              </div>
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">状态</label>
+                <span class="px-2 py-1 text-xs rounded" :class="getInstanceStatusClass(instanceDetail?.status)" x-text="getInstanceStatusText(instanceDetail?.status)"></span>
+              </div>
+            </div>
+          </div>
+          <!-- 所有者信息 -->
+          <div class="mb-6">
+            <h6 class="font-medium themed-text-secondary border-b pb-2 mb-3">👤 所有者信息</h6>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">用户ID</label>
+                <div x-text="instanceDetail?.owner_user_id || '-'"></div>
+              </div>
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">用户昵称</label>
+                <div x-text="instanceDetail?.owner_nickname || '-'"></div>
+              </div>
+            </div>
+          </div>
+          <!-- 来源和时间 -->
+          <div class="mb-6">
+            <h6 class="font-medium themed-text-secondary border-b pb-2 mb-3">🕐 来源和时间</h6>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">来源</label>
+                <div x-text="instanceDetail?.source || '-'"></div>
+              </div>
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">来源说明</label>
+                <div x-text="instanceDetail?.source_detail || '-'"></div>
+              </div>
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">创建时间</label>
+                <div x-text="formatDate(instanceDetail?.created_at)"></div>
+              </div>
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">更新时间</label>
+                <div x-text="formatDate(instanceDetail?.updated_at)"></div>
+              </div>
+            </div>
+          </div>
+          <!-- 扩展信息 -->
+          <template x-if="instanceDetail?.metadata && Object.keys(instanceDetail.metadata).length > 0">
+            <div>
+              <h6 class="font-medium themed-text-secondary border-b pb-2 mb-3">📋 扩展信息</h6>
+              <pre class="themed-bg-subtle p-3 rounded text-xs overflow-x-auto" x-text="JSON.stringify(instanceDetail.metadata, null, 2)"></pre>
+            </div>
+          </template>
+        </div>
+        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
+          <button @click="hideModal('instanceDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300">关闭</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- 关闭 x-data="assetManagement()" 作用域 -->
+
+  <!-- 页面专属逻辑 -->
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+
+</body>
+</html>

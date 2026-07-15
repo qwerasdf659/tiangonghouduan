@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>提醒规则配置 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; } .rule-card { transition: all 0.2s ease; } .rule-card:hover { background-color: #f8fafc; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/reminder-rules-C8GH47K-.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-base min-h-screen">
+  <style>
+    /* 切换开关样式 */
+    .toggle-switch { position: relative; width: 44px; height: 24px; display: inline-block; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { 
+      position: absolute; cursor: pointer; 
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #cbd5e1; border-radius: 24px;
+      transition: 0.3s;
+    }
+    .toggle-slider:before {
+      position: absolute; content: "";
+      height: 18px; width: 18px;
+      left: 3px; bottom: 3px;
+      background-color: white; border-radius: 50%;
+      transition: 0.3s;
+    }
+    input:checked + .toggle-slider { background-color: #3b82f6; }
+    input:checked + .toggle-slider:before { transform: translateX(20px); }
+    input:disabled + .toggle-slider { opacity: 0.5; cursor: not-allowed; }
+  </style>
+  <div x-data="reminderRulesPage()" x-init="init()" x-cloak class="p-6" @table-action="handleTableAction($event.detail)">
+    <!-- 页面标题 -->
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-800">🔔 提醒规则配置</h1>
+        <p class="text-sm text-gray-500 mt-1">
+          管理系统自动提醒规则 · 共 <span x-text="pagination.total">0</span> 条规则
+        </p>
+      </div>
+      
+      <div class="flex items-center gap-3">
+        <!-- 新建规则按钮 -->
+        <button 
+          @click="openCreateModal()"
+          class="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition"
+        >
+          <span>➕</span>
+          新建规则
+        </button>
+        
+        <!-- 刷新按钮 -->
+        <button 
+          @click="loadRules()"
+          :disabled="loading"
+          class="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition"
+        >
+          <span :class="loading && 'animate-spin'">🔄</span>
+          刷新
+        </button>
+      </div>
+    </div>
+    
+    <!-- 筛选栏 -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+      <div class="flex flex-wrap items-center gap-4">
+        <!-- 类型筛选 -->
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-gray-500">类型:</span>
+          <!-- 类型取值以后端 ReminderRule.RULE_TYPES 枚举为权威（与 JS ruleTypes 同步，2026-07-11 修正旧假值） -->
+          <select 
+            x-model="filter.rule_type"
+            class="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">全部类型</option>
+            <template x-for="type in ruleTypes" :key="type.value">
+              <option :value="type.value" x-text="type.label"></option>
+            </template>
+          </select>
+        </div>
+        
+        <!-- 状态筛选 -->
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-gray-500">状态:</span>
+          <select 
+            x-model="filter.is_enabled"
+            class="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">全部状态</option>
+            <option value="true">已启用</option>
+            <option value="false">已禁用</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-5 text-white">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-blue-100 text-sm">规则总数</p>
+            <p class="text-3xl font-bold mt-1" x-text="stats.total">0</p>
+          </div>
+          <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl">📋</div>
+        </div>
+      </div>
+      <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg p-5 text-white">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-green-100 text-sm">已启用</p>
+            <p class="text-3xl font-bold mt-1" x-text="stats.enabled">0</p>
+          </div>
+          <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl">✅</div>
+        </div>
+      </div>
+      <div class="bg-gradient-to-br from-slate-400 to-slate-500 rounded-xl shadow-lg p-5 text-white">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-slate-200 text-sm">已禁用</p>
+            <p class="text-3xl font-bold mt-1" x-text="stats.disabled">0</p>
+          </div>
+          <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl">⏸️</div>
+        </div>
+      </div>
+      <div class="bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl shadow-lg p-5 text-white">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-orange-100 text-sm">今日触发</p>
+            <p class="text-3xl font-bold mt-1">0</p>
+          </div>
+          <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl">🔔</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- data-table 标准表格组件 -->
+    <div x-data="dataTable({
+      columns: tableColumns,
+      dataSource: fetchTableData,
+      primaryKey: 'reminder_rule_id',
+      sortable: true,
+      selectable: false,
+      exportable: false,
+      serverSort: true,
+      page_size: 20,
+      emptyText: '暂无提醒规则'
+    })" x-init="init()"
+       @dt-refresh.window="refresh()"
+       @dt-search.window="handleFilterSearch($event.detail.filters)">
+      <!-- 标准数据表格组件模板（data-table EJS partial）- 配合 Alpine.js dataTable 组件使用 -->
+<!-- ===== 工具栏 ===== -->
+<div class="flex justify-between items-center mb-3">
+  <div class="flex items-center gap-3">
+    <!-- 选择信息（#13） -->
+    <template x-if="selectable && selectedRows.length > 0">
+      <div class="flex items-center gap-2 text-sm themed-text-primary themed-bg-primary-light px-3 py-1.5 rounded-lg">
+        <span>已选 <strong x-text="selectedRows.length"></strong> 项</span>
+        <button @click="clearSelection()" class="themed-text-primary hover:underline text-xs underline">取消选择</button>
+      </div>
+    </template>
+    <!-- 上次更新时间（#2） -->
+    <template x-if="lastUpdateTime">
+      <span class="text-xs text-gray-400">最后更新: <span x-text="lastUpdateTime"></span></span>
+    </template>
+  </div>
+  <div class="flex items-center gap-2">
+    <!-- 导出按钮（#12） -->
+    <template x-if="exportable">
+      <button @click="openExport()" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1">
+        📥 <span>导出</span>
+      </button>
+    </template>
+    <!-- 刷新按钮 -->
+    <button @click="refresh()" :disabled="loading" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1 disabled:opacity-50">
+      🔄 <span>刷新</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== 表格 ===== -->
+<div class="overflow-x-auto themed-card rounded-lg shadow">
+  <table class="w-full">
+    <!-- 表头 -->
+    <thead class="themed-bg-muted">
+      <tr>
+        <!-- 选择列（#13） -->
+        <template x-if="selectable">
+          <th class="px-4 py-3 text-center w-12">
+            <input type="checkbox"
+              :checked="isAllSelected"
+              :indeterminate.prop="isPartialSelected"
+              @change="toggleSelectAll($event.target.checked)"
+              class="rounded border-gray-300">
+          </th>
+        </template>
+        <!-- 数据列（#10 排序） -->
+        <template x-for="(col, colIdx) in columns" :key="'th_' + colIdx">
+          <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary"
+            :class="{ 'cursor-pointer themed-th-sortable select-none': sortable && col.sortable }"
+            :style="col.width ? 'width:' + col.width : ''"
+            @click="sort(col)">
+            <div class="flex items-center gap-1">
+              <span x-text="col.label"></span>
+              <template x-if="sortable && col.sortable">
+                <span class="text-xs" :class="sortColumn === col.key ? 'themed-text-primary font-bold' : 'text-gray-400'" x-text="getSortIcon(col)"></span>
+              </template>
+            </div>
+          </th>
+        </template>
+      </tr>
+    </thead>
+    <!-- 状态行（加载/错误/空）独立 tbody，避免与 x-for 在同一 tbody 导致 Alpine.js DOM 引用丢失 -->
+    <tbody x-show="loading || hasError || isEmpty" class="divide-y themed-divide">
+      <!-- 加载状态 -->
+      <tr x-show="loading">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <div class="animate-spin w-8 h-8 border-4 themed-border-primary border-t-transparent rounded-full"></div>
+            <span class="text-sm themed-text-muted">加载中...</span>
+          </div>
+        </td>
+      </tr>
+      <!-- 错误状态（#5） -->
+      <tr x-show="hasError">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-3">
+            <span class="text-4xl">❌</span>
+            <div class="text-red-600 font-medium">加载失败</div>
+            <div class="text-sm text-gray-500" x-text="error"></div>
+            <button @click="loadData()" class="px-4 py-2 themed-bg-primary text-white rounded-lg text-sm">🔄 重试</button>
+          </div>
+        </td>
+      </tr>
+      <!-- 空状态 -->
+      <tr x-show="isEmpty">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <span class="text-4xl">📭</span>
+            <div class="themed-text-muted" x-text="emptyText"></div>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+    <!-- 数据行独立 tbody，x-for 是唯一模板，避免 Alpine.js x-for + x-if 嵌套 DOM 引用 bug -->
+    <tbody x-show="hasData" class="divide-y themed-divide">
+      <template x-for="(row, rowIndex) in data" :key="String(row[primaryKey] || '') + '_' + rowIndex">
+        <tr class="themed-hover-bg transition-colors" @click="handleRowClick(row, rowIndex)">
+          <!-- 选择列 -->
+          <template x-if="selectable">
+            <td class="px-4 py-3 text-center" @click.stop>
+              <input type="checkbox"
+                :checked="isSelected(row[primaryKey])"
+                @change="toggleSelect(row[primaryKey])"
+                class="rounded border-gray-300">
+            </td>
+          </template>
+          <!-- 数据列 -->
+          <template x-for="(col, colIdx) in columns" :key="'td_' + rowIndex + '_' + colIdx">
+            <td class="px-4 py-3 text-sm" :class="col.type === 'actions' ? '' : 'themed-text-primary'">
+              <!-- 普通列：使用 renderCell -->
+              <span x-show="col.type !== 'actions'" x-html="renderCell(row, col)"></span>
+              <!-- 操作列：使用 Alpine 指令（支持 @click） -->
+              <div x-show="col.type === 'actions'" class="flex items-center gap-1" @click.stop>
+                <template x-for="action in (col.actions || [])" :key="action.name">
+                  <button
+                    x-show="!action.condition || action.condition(row)"
+                    @click="$dispatch('table-action', { action: action.name, row: JSON.parse(JSON.stringify(row)) })"
+                    class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
+                    :class="action.class || 'themed-text-primary'"
+                    x-html="(action.icon ? action.icon + ' ' : '') + action.label">
+                  </button>
+                </template>
+              </div>
+            </td>
+          </template>
+        </tr>
+      </template>
+    </tbody>
+  </table>
+
+  <!-- ===== 分页栏（#4 统一分页） ===== -->
+  <template x-if="total_records > 0">
+    <div class="px-4 py-3 border-t themed-divide flex justify-between items-center">
+      <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+      <div class="flex items-center gap-1">
+        <!-- 首页 -->
+        <button @click="firstPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">«</button>
+        <!-- 上一页 -->
+        <button @click="prevPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+        <!-- 页码 -->
+        <template x-for="page in visiblePages" :key="'p_' + page">
+          <button @click="goToPage(page)"
+            :disabled="page === '...'"
+            :class="page === current_page ? 'themed-bg-primary text-white themed-border-primary' : 'hover:bg-gray-50'"
+            class="px-3 py-1 text-sm border rounded min-w-[32px]"
+            x-text="page"></button>
+        </template>
+        <!-- 下一页 -->
+        <button @click="nextPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+        <!-- 末页 -->
+        <button @click="lastPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">»</button>
+      </div>
+    </div>
+  </template>
+</div>
+
+
+    </div>
+    
+    <!-- 规则编辑弹窗 -->
+    <div 
+      x-show="showModal"
+      x-cloak
+      class="fixed inset-0 z-50 flex items-center justify-center"
+      style="display: none;"
+    >
+      <div class="fixed inset-0 bg-black/50" @click="closeModal()"></div>
+      <div class="relative bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
+        <!-- 弹窗头部 -->
+        <div class="sticky top-0 bg-white px-6 py-4 border-b flex items-center justify-between z-10">
+          <h3 class="text-lg font-semibold text-gray-800" x-text="editMode ? '编辑规则' : '新建规则'"></h3>
+          <button @click="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        
+        <!-- 弹窗内容 -->
+        <div class="p-6 space-y-4">
+          <!-- 规则名称 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">规则名称 <span class="text-red-500">*</span></label>
+            <input 
+              type="text"
+              x-model="form.rule_name"
+              placeholder="如：预算余额不足提醒"
+              class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          
+          <!-- 规则类型 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">规则类型 <span class="text-red-500">*</span></label>
+            <select 
+              x-model="form.rule_type"
+              class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">请选择类型</option>
+              <template x-for="type in ruleTypes" :key="type.value">
+                <option :value="type.value" x-text="type.label"></option>
+              </template>
+            </select>
+          </div>
+          
+          <!-- 规则描述 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">规则描述</label>
+            <textarea 
+              x-model="form.description"
+              rows="2"
+              placeholder="描述规则的用途和触发条件"
+              class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            ></textarea>
+          </div>
+          
+          <!-- 优先级和检查间隔 -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">优先级</label>
+              <select 
+                x-model="form.priority"
+                class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="80">高优先级</option>
+                <option value="50">中优先级</option>
+                <option value="20">低优先级</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">检查间隔（分钟）</label>
+              <input 
+                type="number"
+                x-model.number="form.check_interval"
+                min="1"
+                max="1440"
+                class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+          
+          <!-- 启用状态 -->
+          <div class="flex items-center gap-2">
+            <label class="toggle-switch">
+              <input type="checkbox" x-model="form.is_enabled">
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="text-sm text-gray-600">启用规则</span>
+          </div>
+        </div>
+        
+        <!-- 弹窗底部 -->
+        <div class="sticky bottom-0 bg-gray-50 px-6 py-4 border-t flex items-center justify-end gap-3">
+          <button 
+            @click="closeModal()"
+            class="px-4 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition"
+          >取消</button>
+          <button 
+            @click="saveRule()"
+            :disabled="saving"
+            class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition disabled:opacity-50"
+          >
+            <span x-show="!saving">保存</span>
+            <span x-show="saving">保存中...</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 页面模块引入 -->
+</body>
+</html>

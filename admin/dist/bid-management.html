@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>竞价管理 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/bid-management-DPvLsSkS.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-BYHTji0J.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+
+  <!-- 导航栏 -->
+  <nav class="bg-amber-600 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-amber-200">← 返回工作台</a>
+        <span class="text-lg font-semibold">🏷️ 竞价管理</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="bidManagementPage()" x-init="init()">
+
+    <!-- ============================================================ -->
+    <!-- ==================== B2C 竞价面板 ========================== -->
+    <!-- 注：C2C 用户间拍卖已随 C2C 下线删除（2026-06-05 阶段五），仅保留官方 B2C 竞价 -->
+    <!-- ============================================================ -->
+    <div x-cloak>
+
+      <!-- B2C 顶部统计卡片 -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="themed-card rounded-lg shadow p-4">
+          <div class="text-sm themed-text-muted">竞价总数</div>
+          <div class="text-2xl font-bold themed-text" x-text="bid_products.length"></div>
+        </div>
+        <div class="themed-card rounded-lg shadow p-4">
+          <div class="text-sm themed-text-muted">进行中</div>
+          <div class="text-2xl font-bold text-green-600" x-text="activeCount"></div>
+        </div>
+        <div class="themed-card rounded-lg shadow p-4">
+          <div class="text-sm themed-text-muted">已结算</div>
+          <div class="text-2xl font-bold text-purple-600" x-text="settledCount"></div>
+        </div>
+        <div class="themed-card rounded-lg shadow p-4">
+          <div class="text-sm themed-text-muted">流拍/取消</div>
+          <div class="text-2xl font-bold text-red-600" x-text="inactiveCount"></div>
+        </div>
+      </div>
+
+      <!-- B2C 操作栏 -->
+      <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+        <div class="flex flex-wrap gap-2">
+          <template x-for="opt in statusOptions" :key="opt.value">
+            <button @click="filterByStatus(opt.value)"
+                    :class="filter_status === opt.value ? 'bg-amber-500 text-white' : 'themed-card themed-text hover:bg-amber-100'"
+                    class="px-3 py-1 rounded-full text-xs transition" x-text="opt.label"></button>
+          </template>
+        </div>
+        <button @click="openCreateModal()" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm">+ 创建竞价</button>
+      </div>
+
+      <!-- B2C 列表 -->
+      <div class="themed-card rounded-lg shadow overflow-hidden">
+        <div x-show="list_loading" class="p-8 text-center themed-text-muted">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-600 mx-auto"></div>
+          <p class="mt-2 text-sm">加载中...</p>
+        </div>
+        <div x-show="list_error && !list_loading" class="p-8 text-center text-red-500">
+          <p x-text="list_error"></p>
+          <button @click="loadBidProducts()" class="mt-2 text-amber-600 hover:underline text-sm">重试</button>
+        </div>
+        <div x-show="!list_loading && !list_error && bid_products.length === 0" class="p-8 text-center themed-text-muted">暂无竞价商品</div>
+        <table x-show="!list_loading && bid_products.length > 0" class="w-full text-sm">
+          <thead class="themed-bg-muted">
+            <tr>
+              <th class="px-4 py-3 text-left">ID</th>
+              <th class="px-4 py-3 text-left">商品名称</th>
+              <th class="px-4 py-3 text-left">状态</th>
+              <th class="px-4 py-3 text-right">起拍价</th>
+              <th class="px-4 py-3 text-right">当前价</th>
+              <th class="px-4 py-3 text-right">出价数</th>
+              <th class="px-4 py-3 text-left">结束时间</th>
+              <th class="px-4 py-3 text-center">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="bid in bid_products" :key="bid.bid_product_id">
+              <tr class="border-t themed-border hover:themed-bg-muted transition">
+                <td class="px-4 py-3" x-text="bid.bid_product_id"></td>
+                <td class="px-4 py-3" x-text="bid.product_name || bid.exchange_item?.item_name || '-'"></td>
+                <td class="px-4 py-3">
+                  <span :class="getStatusInfo(bid.status).color" class="px-2 py-0.5 rounded-full text-xs" x-text="getStatusInfo(bid.status).label"></span>
+                </td>
+                <td class="px-4 py-3 text-right" x-text="formatAssetAmount(bid.start_price, bid.price_asset_code)"></td>
+                <td class="px-4 py-3 text-right font-semibold" x-text="formatAssetAmount(bid.current_price, bid.price_asset_code)"></td>
+                <td class="px-4 py-3 text-right" x-text="bid.bid_count || 0"></td>
+                <td class="px-4 py-3 text-xs themed-text-muted" x-text="formatDate(bid.end_time)"></td>
+                <td class="px-4 py-3 text-center">
+                  <div class="flex justify-center gap-1">
+                    <button @click="viewDetail(bid.bid_product_id)" class="text-blue-600 hover:underline text-xs">详情</button>
+                    <button x-show="canSettle(bid)" @click="manualSettle(bid.bid_product_id)" class="text-purple-600 hover:underline text-xs">结算</button>
+                    <button x-show="canCancel(bid)" @click="openCancelModal(bid)" class="text-red-600 hover:underline text-xs">取消</button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- B2C 分页 -->
+      <div x-show="pagination.total > pagination.page_size" class="flex justify-between items-center mt-4 text-sm">
+        <span class="themed-text-muted">共 <span x-text="pagination.total"></span> 条</span>
+        <div class="flex gap-2">
+          <button @click="goToPage(pagination.page - 1)" :disabled="!hasPrevPage" class="px-3 py-1 rounded themed-card disabled:opacity-50">上一页</button>
+          <span class="px-3 py-1" x-text="pagination.page + ' / ' + totalPages"></span>
+          <button @click="goToPage(pagination.page + 1)" :disabled="!hasNextPage" class="px-3 py-1 rounded themed-card disabled:opacity-50">下一页</button>
+        </div>
+      </div>
+    </div><!-- /B2C 面板 -->
+
+    <!-- ============================================================ -->
+    <!-- ==================== B2C 详情弹窗 ========================== -->
+    <!-- ============================================================ -->
+    <div x-show="show_detail_modal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="show_detail_modal = false">
+      <div class="themed-card rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold themed-text">B2C 竞价详情</h3>
+          <button @click="show_detail_modal = false" class="themed-text-muted hover:themed-text text-xl">&times;</button>
+        </div>
+        <div x-show="detail_loading" class="p-8 text-center themed-text-muted">加载中...</div>
+        <div x-show="!detail_loading && detail_data">
+          <div class="grid grid-cols-2 gap-4 text-sm mb-4">
+            <div><span class="themed-text-muted">ID：</span><span x-text="detail_data?.bid_product_id"></span></div>
+            <div><span class="themed-text-muted">状态：</span><span :class="getStatusInfo(detail_data?.status).color" class="px-2 py-0.5 rounded-full text-xs" x-text="getStatusInfo(detail_data?.status).label"></span></div>
+            <div><span class="themed-text-muted">起拍价：</span><span x-text="formatAssetAmount(detail_data?.start_price, detail_data?.price_asset_code)"></span></div>
+            <div><span class="themed-text-muted">当前价：</span><span class="font-semibold" x-text="formatAssetAmount(detail_data?.current_price, detail_data?.price_asset_code)"></span></div>
+            <div><span class="themed-text-muted">出价数：</span><span x-text="detail_data?.bid_count || 0"></span></div>
+            <div><span class="themed-text-muted">结束时间：</span><span x-text="formatDate(detail_data?.end_time)"></span></div>
+          </div>
+          <!-- 出价记录 -->
+          <div x-show="detail_bids.length > 0">
+            <h4 class="font-semibold text-sm mb-2 themed-text">出价记录</h4>
+            <table class="w-full text-xs">
+              <thead class="themed-bg-muted"><tr><th class="px-3 py-2 text-left">用户ID</th><th class="px-3 py-2 text-right">出价</th><th class="px-3 py-2 text-left">时间</th></tr></thead>
+              <tbody>
+                <template x-for="b in detail_bids" :key="b.bid_record_id || b.bid_id">
+                  <tr class="border-t themed-border">
+                    <td class="px-3 py-2" x-text="b.user_id || b.bidder_user_id"></td>
+                    <td class="px-3 py-2 text-right font-semibold" x-text="formatAssetAmount(b.bid_amount, detail_data?.price_asset_code)"></td>
+                    <td class="px-3 py-2 themed-text-muted" x-text="formatDate(b.created_at)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <!-- 操作按钮 -->
+          <div class="flex justify-end gap-2 mt-4">
+            <button x-show="canSettle(detail_data)" @click="manualSettle(detail_data?.bid_product_id)" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded text-sm">手动结算</button>
+            <button x-show="canCancel(detail_data)" @click="openCancelModal(detail_data); show_detail_modal = false" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm">取消竞价</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- ==================== B2C 创建弹窗 ========================== -->
+    <!-- ============================================================ -->
+    <div x-show="show_create_modal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="show_create_modal = false">
+      <div class="themed-card rounded-lg shadow-xl w-full max-w-lg p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold themed-text">创建 B2C 竞价</h3>
+          <button @click="show_create_modal = false" class="themed-text-muted hover:themed-text text-xl">&times;</button>
+        </div>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium themed-text mb-1">关联兑换商品</label>
+            <select x-model="create_form.exchange_item_id" class="w-full border rounded px-3 py-2 text-sm themed-border">
+              <option value="">请选择...</option>
+              <template x-for="item in exchange_items" :key="item.exchange_item_id">
+                <option :value="item.exchange_item_id" x-text="item.item_name || item.display_name || ('ID:' + item.exchange_item_id)"></option>
+              </template>
+            </select>
+            <p x-show="loading_exchange_items" class="text-xs themed-text-muted mt-1">加载商品中...</p>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text mb-1">起拍价</label>
+              <input type="number" x-model="create_form.start_price" min="1" class="w-full border rounded px-3 py-2 text-sm themed-border" placeholder="输入起拍价">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text mb-1">最小加价</label>
+              <input type="number" x-model="create_form.min_bid_increment" min="1" class="w-full border rounded px-3 py-2 text-sm themed-border">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text mb-1">开始时间</label>
+              <input type="datetime-local" x-model="create_form.start_time" class="w-full border rounded px-3 py-2 text-sm themed-border">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text mb-1">结束时间</label>
+              <input type="datetime-local" x-model="create_form.end_time" class="w-full border rounded px-3 py-2 text-sm themed-border">
+            </div>
+          </div>
+          <div class="flex justify-end gap-2 mt-4">
+            <button @click="show_create_modal = false" class="px-4 py-2 rounded themed-card text-sm">取消</button>
+            <button @click="submitCreate()" :disabled="creating" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded text-sm disabled:opacity-50">
+              <span x-show="!creating">确认创建</span>
+              <span x-show="creating">创建中...</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- ==================== B2C 取消弹窗 ========================== -->
+    <!-- ============================================================ -->
+    <div x-show="show_cancel_modal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="show_cancel_modal = false">
+      <div class="themed-card rounded-lg shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-semibold themed-text mb-4">取消 B2C 竞价</h3>
+        <p class="text-sm themed-text-muted mb-2">竞价ID：<span x-text="cancel_target?.bid_product_id"></span></p>
+        <div>
+          <label class="block text-sm font-medium themed-text mb-1">取消原因（必填）</label>
+          <textarea x-model="cancel_reason" rows="3" class="w-full border rounded px-3 py-2 text-sm themed-border" placeholder="请输入取消原因..."></textarea>
+        </div>
+        <div class="flex justify-end gap-2 mt-4">
+          <button @click="show_cancel_modal = false" class="px-4 py-2 rounded themed-card text-sm">返回</button>
+          <button @click="submitCancel()" :disabled="cancelling" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm disabled:opacity-50">
+            <span x-show="!cancelling">确认取消</span>
+            <span x-show="cancelling">处理中...</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 页面模块脚本 -->
+</body>
+</html>

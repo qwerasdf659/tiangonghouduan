@@ -1,0 +1,2256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>用户权限管理 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/user-management-DLHNICSG.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/asset-BmjTKnbE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/core-CTP2NuwM.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
+        <span class="text-lg font-semibold">👥 用户权限管理</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-data="{ user: JSON.parse(localStorage.getItem('admin_user') || '{}') }" x-text="'欢迎，' + (user.nickname || '管理员')"></span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="userNavigation()" x-init="init()">
+    
+    <!-- 子页面导航 -->
+    <div class="themed-card rounded-lg shadow mb-6">
+      <div class="flex border-b overflow-x-auto">
+        <template x-for="page in subPages" :key="page.id">
+          <button 
+            @click="switchPage(page.id)"
+            :class="current_page === page.id ? 'border-b-2 themed-border-primary themed-text-primary themed-bg-primary-light' : 'themed-text-muted themed-hover-bg'"
+            class="px-6 py-3 font-medium whitespace-nowrap transition-colors flex items-center gap-2"
+          >
+            <i :class="page.icon"></i>
+            <span x-text="page.title"></span>
+          </button>
+        </template>
+      </div>
+    </div>
+
+    <!-- 页面内容区域 -->
+    <div x-data="userPageContent()" x-init="init()"
+         @view-user="viewUserDetail($event.detail)"
+         @edit-user="editUser($event.detail)"
+         @toggle-user-status="toggleUserStatus($event.detail)"
+         @manage-user-role="manageUserRole($event.detail)"
+         @analyze-user="analyzeUser($event.detail)"
+         @edit-role="editRole($event.detail)"
+         @manage-role-permissions="manageRolePermissions($event.detail)"
+         @confirm-delete-role="confirmDeleteRole($event.detail)"
+         @open-change-role="openChangeRoleModal($event.detail)"
+         @revoke-user-role="revokeUserRole($event.detail)"
+         @view-premium-detail="viewPremiumDetail($event.detail)"
+         @open-risk-modal="openRiskModal($event.detail)"
+         @freeze-user="freezeUser($event.detail)"
+         @unfreeze-user="unfreezeUser($event.detail)">
+      
+      <!-- 用户列表页 -->
+      <div x-show="current_page === 'user-list'" x-cloak>
+        <div class="themed-card rounded-xl shadow-sm overflow-hidden">
+          <div class="p-5 border-b flex justify-between items-center themed-gradient-light">
+            <div>
+              <h5 class="font-semibold text-base">👥 用户列表</h5>
+              <p class="text-xs themed-text-muted mt-0.5">管理平台所有用户，查看角色和状态信息</p>
+            </div>
+            <button @click="openCreateModal('user')" class="px-4 py-2 themed-btn-primary rounded-lg shadow-sm hover:shadow transition-shadow text-sm">
+              ➕ 新增用户
+            </button>
+          </div>
+          
+          <!-- data-table: 用户列表 -->
+          <div x-data="usersDataTable()" x-init="init()">
+            <div class="p-4 border-b themed-bg-base">
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <input type="text" x-model="activeFilters.phone" placeholder="手机号" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <input type="text" x-model="activeFilters.nickname" placeholder="昵称" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <select x-model="activeFilters.status" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">全部状态</option>
+                  <option value="active">正常</option>
+                  <option value="inactive">禁用</option>
+                </select>
+                <div class="flex space-x-2">
+                  <button @click="search()" class="flex-1 px-4 py-2 themed-bg-primary text-white rounded-lg hover:opacity-90 transition-all shadow-sm">🔍 搜索</button>
+                  <button @click="handleFilterReset()" class="px-4 py-2 bg-white border themed-text-secondary rounded-lg hover:bg-gray-50 transition-colors">🔄</button>
+                </div>
+              </div>
+            </div>
+            <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+            <div x-show="hasError" class="p-8 text-center">
+              <p class="text-red-500 mb-2" x-text="error"></p>
+              <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+            </div>
+            <div x-show="hasData" class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                          :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                          @click="sort(col)">
+                        <span x-text="col.label"></span>
+                        <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                      </th>
+                    </template>
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(row, idx) in data" :key="row.user_id || idx">
+                    <tr class="themed-hover-bg">
+                      <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                        <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                      </template>
+                      <td class="px-4 py-3">
+                        <div class="flex space-x-2 flex-wrap gap-1">
+                          <button @click="$dispatch('view-user', row)" class="themed-text-primary hover:text-blue-700 text-sm">查看</button>
+                          <button @click="$dispatch('edit-user', row)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                          <button @click="$dispatch('toggle-user-status', row)" class="text-yellow-500 hover:text-yellow-700 text-sm" x-text="row.status === 'active' ? '禁用' : '启用'"></button>
+                          <button @click="$dispatch('manage-user-role', row)" class="text-purple-500 hover:text-purple-700 text-sm">角色</button>
+                          <button @click="$dispatch('analyze-user', row)" class="text-cyan-500 hover:text-cyan-700 text-sm">📊分析</button>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+              <div class="text-4xl mb-4">👥</div>
+              <p>暂无用户数据</p>
+            </div>
+            <template x-if="total_pages > 1">
+              <div class="p-4 border-t flex justify-between items-center">
+                <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+                <div class="flex space-x-1">
+                  <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                  <template x-for="p in visiblePages" :key="'pu'+p">
+                    <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                  </template>
+                  <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+                </div>
+              </div>
+            </template>
+            <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+              最后更新: <span x-text="lastUpdateTime"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 角色管理页 -->
+      <div x-show="current_page === 'role-list'" x-cloak>
+        <div class="themed-card rounded-xl shadow-sm overflow-hidden">
+          <div class="p-5 border-b flex justify-between items-center themed-gradient-light">
+            <div>
+              <h5 class="font-semibold text-base">🎭 角色管理</h5>
+              <p class="text-xs themed-text-muted mt-0.5">配置系统角色与权限级别，控制功能访问范围</p>
+            </div>
+            <button @click="openCreateModal('role')" class="px-4 py-2 themed-btn-primary rounded-lg shadow-sm hover:shadow transition-shadow text-sm">
+              ➕ 新增角色
+            </button>
+          </div>
+          <!-- data-table: 角色列表 -->
+          <div x-data="rolesDataTable()" x-init="init()">
+            <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+            <div x-show="hasError" class="p-8 text-center">
+              <p class="text-red-500 mb-2" x-text="error"></p>
+              <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+            </div>
+            <div x-show="hasData" class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                          :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                          @click="sort(col)">
+                        <span x-text="col.label"></span>
+                        <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                      </th>
+                    </template>
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(row, idx) in data" :key="row.role_id || idx">
+                    <tr class="themed-hover-bg">
+                      <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                        <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                      </template>
+                      <td class="px-4 py-3">
+                        <div class="flex space-x-2">
+                          <button @click="$dispatch('edit-role', row)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                          <button @click="$dispatch('manage-role-permissions', row)" class="text-purple-500 hover:text-purple-700 text-sm">权限</button>
+                          <button x-show="!['super_admin','admin','operator','user'].includes(row.role_name)" @click="$dispatch('confirm-delete-role', row)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
+                          <span x-show="['super_admin','admin','operator','user'].includes(row.role_name)" class="text-gray-400 text-sm cursor-not-allowed" title="系统内置角色不可删除">🔒</span>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+              <div class="text-4xl mb-4">🛡️</div>
+              <p>暂无角色数据</p>
+            </div>
+            <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+              最后更新: <span x-text="lastUpdateTime"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 权限管理页（只读展示 - 权限嵌入在角色中） -->
+      <div x-show="current_page === 'permission-list'" x-cloak>
+        <div class="themed-card rounded-xl shadow-sm">
+          <div class="p-5 border-b themed-gradient-light rounded-t-xl">
+            <div class="flex justify-between items-center">
+              <div>
+                <h5 class="font-semibold text-gray-800 flex items-center gap-2">
+                  <span class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600">🔑</span>
+                  权限配置概览
+                </h5>
+                <p class="text-sm text-gray-500 mt-1">系统权限嵌入在角色配置中，如需修改请编辑对应角色</p>
+              </div>
+              <span class="text-sm text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-lg font-medium">
+                📋 权限由角色定义
+              </span>
+            </div>
+            </p>
+          </div>
+          <!-- data-table: 权限列表 -->
+          <div x-data="permissionsDataTable()" x-init="init()">
+            <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+            <div x-show="hasError" class="p-8 text-center">
+              <p class="text-red-500 mb-2" x-text="error"></p>
+              <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+            </div>
+            <div x-show="hasData" class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                          :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                          @click="sort(col)">
+                        <span x-text="col.label"></span>
+                        <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                      </th>
+                    </template>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(row, idx) in data" :key="row.permission_key || idx">
+                    <tr class="themed-hover-bg">
+                      <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                        <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                      </template>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+              <div class="text-4xl mb-4">🔑</div>
+              <p>暂无权限数据</p>
+            </div>
+            <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+              最后更新: <span x-text="lastUpdateTime"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 用户角色分配页 -->
+      <div x-show="current_page === 'user-roles'" x-cloak>
+        <div class="themed-card rounded-xl shadow-sm">
+          <div class="p-5 border-b themed-gradient-light rounded-t-xl flex justify-between items-center">
+            <div>
+              <h5 class="font-semibold text-gray-800 flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600">👤</span>
+                用户角色分配
+              </h5>
+              <p class="text-sm text-gray-500 mt-1">管理用户的角色分配和权限配置</p>
+            </div>
+            <button @click="openAssignRoleModal()" class="px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary transition-all shadow-sm hover:shadow-md">
+              ➕ 分配角色
+            </button>
+          </div>
+          <!-- data-table: 用户角色列表 -->
+          <div x-data="userRolesDataTable()" x-init="init()">
+            <!-- 手机号搜索栏 -->
+            <div class="p-4 border-b flex items-center gap-3">
+              <div class="relative flex-1 max-w-sm">
+                <input type="tel" x-ref="roleSearchInput" placeholder="输入手机号搜索用户"
+                       maxlength="11" class="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none transition-all"
+                       @keydown.enter="if ($refs.roleSearchInput.value.trim()) handleFilterSearch({ search: $refs.roleSearchInput.value.trim() })">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">📱</span>
+              </div>
+              <button @click="if ($refs.roleSearchInput.value.trim()) handleFilterSearch({ search: $refs.roleSearchInput.value.trim() })"
+                      class="px-4 py-2 text-sm themed-bg-primary text-white rounded-lg themed-hover-primary transition-all">
+                🔍 搜索
+              </button>
+              <button @click="$refs.roleSearchInput.value = ''; handleFilterReset()"
+                      class="px-4 py-2 text-sm border rounded-lg themed-hover-bg transition-all text-gray-600">
+                🔄 重置
+              </button>
+            </div>
+            <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+            <div x-show="hasError" class="p-8 text-center">
+              <p class="text-red-500 mb-2" x-text="error"></p>
+              <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+            </div>
+            <div x-show="hasData" class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                          :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                          @click="sort(col)">
+                        <span x-text="col.label"></span>
+                        <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                      </th>
+                    </template>
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(row, idx) in data" :key="row.user_id + '_' + idx">
+                    <tr class="themed-hover-bg">
+                      <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                        <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                      </template>
+                      <td class="px-4 py-3">
+                        <button @click="$dispatch('open-change-role', row)" class="text-purple-500 hover:text-purple-700 text-sm">增加角色</button>
+                        <button @click="$dispatch('revoke-user-role', row)" class="ml-3 text-red-500 hover:text-red-700 text-sm">移除</button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+              <div class="text-4xl mb-4">👤</div>
+              <p>暂无用户角色数据</p>
+            </div>
+            <template x-if="total_pages > 1">
+              <div class="p-4 border-t flex justify-between items-center">
+                <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+                <div class="flex space-x-1">
+                  <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                  <template x-for="p in visiblePages" :key="'ur'+p">
+                    <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                  </template>
+                  <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+                </div>
+              </div>
+            </template>
+            <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+              最后更新: <span x-text="lastUpdateTime"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 高级状态页 -->
+      <div x-show="current_page === 'premium-status'" x-cloak>
+        <div class="themed-card rounded-xl shadow-sm">
+          <!-- 统计卡片 - 使用 stats-card 组件 -->
+          <div class="stats-grid stats-grid-4 p-5">
+            <div class="stats-card stats-primary stats-card-animate">
+              <div class="stats-card-icon">⭐</div>
+              <div class="stats-card-value" x-text="premiumStats.total || 0"></div>
+              <div class="stats-card-label">总高级用户</div>
+            </div>
+            <div class="stats-card stats-success stats-card-animate">
+              <div class="stats-card-icon">✅</div>
+              <div class="stats-card-value" x-text="premiumStats.active || 0"></div>
+              <div class="stats-card-label">有效用户</div>
+            </div>
+            <div class="stats-card stats-warning stats-card-animate">
+              <div class="stats-card-icon">⏰</div>
+              <div class="stats-card-value" x-text="premiumStats.expiring_soon || 0"></div>
+              <div class="stats-card-label">即将过期</div>
+            </div>
+            <div class="stats-card stats-danger stats-card-animate">
+              <div class="stats-card-icon">📛</div>
+              <div class="stats-card-value" x-text="premiumStats.expired || 0"></div>
+              <div class="stats-card-label">已过期</div>
+            </div>
+          </div>
+
+          <div class="p-5 border-b border-t bg-gradient-to-r from-amber-50 to-orange-50 flex justify-between items-center">
+            <div>
+              <h5 class="font-semibold text-gray-800 flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600">⭐</span>
+                高级用户状态
+              </h5>
+              <p class="text-sm text-gray-500 mt-1">查看和管理高级用户的解锁状态和有效期</p>
+            </div>
+            <button @click="loadPremiumUsers()" class="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-all shadow-sm hover:shadow-md">
+              🔄 刷新数据
+            </button>
+          </div>
+          
+          <!-- data-table: 高级用户列表 -->
+          <div x-data="premiumDataTable()" x-init="init()">
+            <div class="p-4 border-b themed-bg-base">
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <input type="text" x-model="activeFilters.mobile" maxlength="11" placeholder="手机号" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <select x-model="activeFilters.is_valid" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">全部状态</option>
+                  <option value="true">有效</option>
+                  <option value="false">无效/过期</option>
+                </select>
+                <select x-model="activeFilters.unlock_method" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">全部解锁方式</option>
+                  <option value="purchase">购买解锁</option>
+                  <option value="admin_grant">管理员授权</option>
+                  <option value="promotion">活动赠送</option>
+                  <option value="referral">推荐奖励</option>
+                </select>
+                <div class="flex space-x-2">
+                  <button @click="search()" class="flex-1 px-4 py-2 themed-bg-primary text-white rounded-lg hover:opacity-90 transition-all shadow-sm">🔍 搜索</button>
+                  <button @click="handleFilterReset()" class="px-4 py-2 bg-white border themed-text-secondary rounded-lg hover:bg-gray-50 transition-colors">🔄</button>
+                </div>
+              </div>
+            </div>
+            <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+            <div x-show="hasError" class="p-8 text-center">
+              <p class="text-red-500 mb-2" x-text="error"></p>
+              <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+            </div>
+            <div x-show="hasData" class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                          :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                          @click="sort(col)">
+                        <span x-text="col.label"></span>
+                        <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                      </th>
+                    </template>
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(row, idx) in data" :key="row.user_id || idx">
+                    <tr class="themed-hover-bg">
+                      <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                        <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                      </template>
+                      <td class="px-4 py-3">
+                        <button @click="$dispatch('view-premium-detail', row)" class="themed-text-primary hover:text-blue-700 text-sm">查看详情</button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+              <div class="text-4xl mb-4">⭐</div>
+              <p>暂无高级用户数据</p>
+            </div>
+            <template x-if="total_pages > 1">
+              <div class="p-4 border-t flex justify-between items-center">
+                <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+                <div class="flex space-x-1">
+                  <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                  <template x-for="p in visiblePages" :key="'pm'+p">
+                    <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                  </template>
+                  <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+                </div>
+              </div>
+            </template>
+            <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+              最后更新: <span x-text="lastUpdateTime"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 风控配置页 -->
+      <div x-show="current_page === 'risk-profiles'" x-cloak>
+        <div class="themed-card rounded-xl shadow-sm">
+          <div class="p-5 border-b bg-gradient-to-r from-red-50 to-orange-50 rounded-t-xl flex justify-between items-center">
+            <div>
+              <h5 class="font-semibold text-gray-800 flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center text-red-600">🛡️</span>
+                风控配置管理
+              </h5>
+              <p class="text-sm text-gray-500 mt-1">配置用户风控规则、积分限额和冻结策略</p>
+            </div>
+            <div class="flex space-x-2">
+              <button @click="loadRiskProfiles()" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all shadow-sm hover:shadow-md">
+                🔄 刷新数据
+              </button>
+            </div>
+          </div>
+          
+          <!-- data-table: 风控配置列表 -->
+          <div x-data="riskProfilesDataTable()" x-init="init()">
+            <div class="p-4 border-b themed-bg-base">
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <select x-model="activeFilters.config_type" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">全部配置类型</option>
+                  <option value="global">全局配置</option>
+                  <option value="user_level">等级配置</option>
+                  <option value="individual">个人配置</option>
+                </select>
+                <select x-model="activeFilters.user_level" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">全部用户等级</option>
+                  <option value="normal">普通用户</option>
+                  <option value="vip">VIP用户</option>
+                  <option value="premium">高级用户</option>
+                </select>
+                <select x-model="activeFilters.is_frozen" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">全部冻结状态</option>
+                  <option value="true">已冻结</option>
+                  <option value="false">未冻结</option>
+                </select>
+                <div class="flex space-x-2">
+                  <button @click="search()" class="flex-1 px-4 py-2 themed-bg-primary text-white rounded-lg hover:opacity-90 transition-all shadow-sm">🔍 搜索</button>
+                  <button @click="handleFilterReset()" class="px-4 py-2 bg-white border themed-text-secondary rounded-lg hover:bg-gray-50 transition-colors">🔄</button>
+                </div>
+              </div>
+            </div>
+            <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+            <div x-show="hasError" class="p-8 text-center">
+              <p class="text-red-500 mb-2" x-text="error"></p>
+              <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+            </div>
+            <div x-show="hasData" class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                          :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                          @click="sort(col)">
+                        <span x-text="col.label"></span>
+                        <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                      </th>
+                    </template>
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(row, idx) in data" :key="row.user_id || idx">
+                    <tr class="themed-hover-bg">
+                      <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                        <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                      </template>
+                      <td class="px-4 py-3">
+                        <div class="flex space-x-2">
+                          <button @click="$dispatch('open-risk-modal', row)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                          <button x-show="row.user_id" @click="$dispatch(row.is_frozen ? 'unfreeze-user' : 'freeze-user', row)"
+                            :class="row.is_frozen ? 'themed-text-primary hover:text-blue-700' : 'text-red-500 hover:text-red-700'"
+                            class="text-sm" x-text="row.is_frozen ? '解冻' : '冻结'"></button>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+              <div class="text-4xl mb-4">🛡️</div>
+              <p>暂无风控画像数据</p>
+            </div>
+            <template x-if="total_pages > 1">
+              <div class="p-4 border-t flex justify-between items-center">
+                <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+                <div class="flex space-x-1">
+                  <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                  <template x-for="p in visiblePages" :key="'rk'+p">
+                    <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                  </template>
+                  <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+                </div>
+              </div>
+            </template>
+            <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+              最后更新: <span x-text="lastUpdateTime"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 角色变更历史页 -->
+      <div x-show="current_page === 'role-history'" x-cloak>
+        <div class="themed-card rounded-xl shadow-sm">
+          <div class="p-5 border-b themed-gradient-light rounded-t-xl flex justify-between items-center">
+            <div>
+              <h5 class="font-semibold text-gray-800 flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">📜</span>
+                角色变更历史
+              </h5>
+              <p class="text-sm text-gray-500 mt-1">记录所有用户角色变更操作的审计日志</p>
+            </div>
+            <button @click="loadRoleChangeHistory(); showSuccess('数据已刷新')" 
+                    class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all shadow-sm hover:shadow-md"
+                    :disabled="loading">
+              <span x-show="loading" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+              🔄 刷新数据
+            </button>
+          </div>
+          
+          <!-- data-table: 角色变更历史 -->
+          <div x-data="roleHistoryDataTable()" x-init="init()">
+            <div class="p-4 border-b themed-bg-base">
+              <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <input type="text" x-model="activeFilters.mobile" maxlength="11" placeholder="手机号" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <input type="text" x-model="activeFilters.operator_id" placeholder="操作人ID" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <input type="date" x-model="activeFilters.start_date" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <input type="date" x-model="activeFilters.end_date" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <div class="flex space-x-2">
+                  <button @click="search()" class="flex-1 px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary transition-colors">🔍 搜索</button>
+                  <button @click="handleFilterReset()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">🔄</button>
+                </div>
+              </div>
+            </div>
+            <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+            <div x-show="hasError" class="p-8 text-center">
+              <p class="text-red-500 mb-2" x-text="error"></p>
+              <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+            </div>
+            <div x-show="hasData" class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                          :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                          @click="sort(col)">
+                        <span x-text="col.label"></span>
+                        <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                      </th>
+                    </template>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(row, idx) in data" :key="row.user_role_change_record_id || idx">
+                    <tr class="themed-hover-bg">
+                      <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                        <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                      </template>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+              <div class="text-4xl mb-4">📜</div>
+              <p>暂无角色变更记录</p>
+            </div>
+            <template x-if="total_pages > 1">
+              <div class="p-4 border-t flex justify-between items-center">
+                <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+                <div class="flex space-x-1">
+                  <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                  <template x-for="p in visiblePages" :key="'rh'+p">
+                    <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                  </template>
+                  <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+                </div>
+              </div>
+            </template>
+            <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+              最后更新: <span x-text="lastUpdateTime"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 状态变更历史页 -->
+      <div x-show="current_page === 'status-history'" x-cloak>
+        <div class="themed-card rounded-xl shadow-sm">
+          <div class="p-5 border-b themed-gradient-light rounded-t-xl flex justify-between items-center">
+            <div>
+              <h5 class="font-semibold text-gray-800 flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-cyan-100 flex items-center justify-center text-cyan-600">📋</span>
+                状态变更历史
+              </h5>
+              <p class="text-sm text-gray-500 mt-1">记录所有用户账号状态变更操作的审计日志</p>
+            </div>
+            <button @click="loadStatusChangeHistory(); showSuccess('数据已刷新')" 
+                    class="px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-all shadow-sm hover:shadow-md"
+                    :disabled="loading">
+              <span x-show="loading" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+              🔄 刷新数据
+            </button>
+          </div>
+          
+          <!-- data-table: 状态变更历史 -->
+          <div x-data="statusHistoryDataTable()" x-init="init()">
+            <div class="p-4 border-b themed-bg-base">
+              <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <input type="text" x-model="activeFilters.mobile" maxlength="11" placeholder="手机号" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <input type="text" x-model="activeFilters.operator_id" placeholder="操作人ID" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <input type="date" x-model="activeFilters.start_date" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <input type="date" x-model="activeFilters.end_date" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <div class="flex space-x-2">
+                  <button @click="search()" class="flex-1 px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary transition-colors">🔍 搜索</button>
+                  <button @click="handleFilterReset()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">🔄</button>
+                </div>
+              </div>
+            </div>
+            <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+            <div x-show="hasError" class="p-8 text-center">
+              <p class="text-red-500 mb-2" x-text="error"></p>
+              <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+            </div>
+            <div x-show="hasData" class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                          :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                          @click="sort(col)">
+                        <span x-text="col.label"></span>
+                        <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                      </th>
+                    </template>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(row, idx) in data" :key="row.user_status_change_record_id || idx">
+                    <tr class="themed-hover-bg">
+                      <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                        <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                      </template>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+              <div class="text-4xl mb-4">📋</div>
+              <p>暂无状态变更记录</p>
+            </div>
+            <template x-if="total_pages > 1">
+              <div class="p-4 border-t flex justify-between items-center">
+                <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+                <div class="flex space-x-1">
+                  <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                  <template x-for="p in visiblePages" :key="'sh'+p">
+                    <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                  </template>
+                  <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+                </div>
+              </div>
+            </template>
+            <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+              最后更新: <span x-text="lastUpdateTime"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 用户画像分析页 (P1-2) -->
+      <div x-show="current_page === 'user-segments'" x-cloak>
+        <!-- 分层概览卡片（后端4个分层: high_value / active / silent / churned） -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div class="themed-card rounded-lg shadow p-4 text-center">
+            <h6 class="themed-text-muted text-sm mb-2">💎 高价值用户</h6>
+            <h2 class="text-2xl font-bold text-green-600" x-text="userSegments.high_value?.count || 0"></h2>
+            <span class="text-xs themed-text-muted" x-text="(userSegments.high_value?.percentage || 0) + '%'"></span>
+          </div>
+          <div class="themed-card rounded-lg shadow p-4 text-center">
+            <h6 class="themed-text-muted text-sm mb-2">🔥 活跃用户</h6>
+            <h2 class="text-2xl font-bold themed-text-primary" x-text="userSegments.active?.count || 0"></h2>
+            <span class="text-xs themed-text-muted" x-text="(userSegments.active?.percentage || 0) + '%'"></span>
+          </div>
+          <div class="themed-card rounded-lg shadow p-4 text-center">
+            <h6 class="themed-text-muted text-sm mb-2">😴 沉默用户</h6>
+            <h2 class="text-2xl font-bold text-yellow-600" x-text="userSegments.silent?.count || 0"></h2>
+            <span class="text-xs themed-text-muted" x-text="(userSegments.silent?.percentage || 0) + '%'"></span>
+          </div>
+          <div class="themed-card rounded-lg shadow p-4 text-center">
+            <h6 class="themed-text-muted text-sm mb-2">❌ 流失用户</h6>
+            <h2 class="text-2xl font-bold text-red-600" x-text="userSegments.churned?.count || 0"></h2>
+            <span class="text-xs themed-text-muted" x-text="(userSegments.churned?.percentage || 0) + '%'"></span>
+          </div>
+        </div>
+
+        <!-- 图表区域 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <!-- 用户分层饼图 -->
+          <div class="themed-card rounded-lg shadow">
+            <div class="p-4 border-b">
+              <h5 class="font-semibold">🎯 用户分层分布</h5>
+            </div>
+            <div class="p-4">
+              <div id="userSegmentChart" style="width: 100%; height: 300px;"></div>
+            </div>
+          </div>
+
+          <!-- 行为漏斗 -->
+          <div class="themed-card rounded-lg shadow">
+            <div class="p-4 border-b">
+              <h5 class="font-semibold">📈 用户行为漏斗</h5>
+            </div>
+            <div class="p-4">
+              <div id="behaviorFunnelChart" style="width: 100%; height: 300px;"></div>
+              <template x-if="behaviorFunnel.length === 0">
+                <div class="text-center py-8 themed-text-muted">
+                  <p>暂无漏斗数据</p>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- 活跃时段热力图 (F-32) -->
+        <div class="themed-card rounded-lg shadow mb-6">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">🔥 活跃时段热力图</h5>
+            <span class="text-sm themed-text-muted">24小时 × 7天</span>
+          </div>
+          <div class="p-4">
+            <div id="activityHeatmapChart" style="width: 100%; height: 280px;"></div>
+            <template x-if="!activityHeatmap || activityHeatmap.length === 0">
+              <div class="text-center py-8 themed-text-muted">
+                <p>暂无活跃数据</p>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 兑换偏好（后端字段：preferences 数组，包含 item_name, exchange_count, unique_users, cost_asset_code, cost_amount） -->
+        <div class="themed-card rounded-lg shadow">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">🎁 兑换偏好分析</h5>
+            <template x-if="exchangePreferences.statistics">
+              <span class="text-sm themed-text-muted" x-text="exchangePreferences.statistics.analysis_period"></span>
+            </template>
+          </div>
+          <div class="p-4">
+            <!-- 统计汇总（后端字段：statistics.total_exchanges, statistics.total_unique_users, statistics.top_item） -->
+            <template x-if="exchangePreferences.statistics">
+              <div class="grid grid-cols-3 gap-4 mb-4 p-3 themed-bg-base rounded-lg">
+                <div class="text-center">
+                  <div class="text-lg font-bold text-blue-600" x-text="exchangePreferences.statistics.total_exchanges || 0"></div>
+                  <div class="text-xs themed-text-muted">总兑换次数</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-lg font-bold text-green-600" x-text="exchangePreferences.statistics.total_unique_users || 0"></div>
+                  <div class="text-xs themed-text-muted">参与用户数</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-lg font-bold text-purple-600 truncate" x-text="exchangePreferences.statistics.top_item || '-'"></div>
+                  <div class="text-xs themed-text-muted">最热门商品</div>
+                </div>
+              </div>
+            </template>
+
+            <!-- 热门兑换商品排行（后端字段：preferences[].item_name, exchange_count, unique_users, cost_asset_code, cost_amount） -->
+            <h6 class="font-medium mb-3">🏆 热门兑换商品 TOP10</h6>
+            <div class="space-y-2">
+              <template x-for="(item, index) in (exchangePreferences.preferences || []).slice(0, 10)" :key="item.exchange_item_id || index">
+                <div class="flex items-center justify-between p-3 themed-bg-base rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                  <span class="flex items-center flex-1 min-w-0">
+                    <!-- 排名徽章 -->
+                    <span class="w-7 h-7 rounded-full text-xs flex items-center justify-center mr-3 flex-shrink-0"
+                          :class="index === 0 ? 'bg-yellow-100 text-yellow-600' : index === 1 ? 'bg-gray-200 text-gray-600' : index === 2 ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'"
+                          x-text="item.rank || (index + 1)"></span>
+                    <!-- 商品名称 -->
+                    <span class="truncate font-medium" x-text="item.item_name"></span>
+                  </span>
+                  <!-- 统计数据（后端字段：exchange_count, unique_users, cost_asset_code, cost_amount） -->
+                  <span class="flex items-center gap-3 flex-shrink-0 ml-2">
+                    <span class="text-sm">
+                      <span class="text-blue-600 font-medium" x-text="item.exchange_count || 0"></span>
+                      <span class="themed-text-muted">次</span>
+                    </span>
+                    <span class="text-sm">
+                      <span class="text-green-600 font-medium" x-text="item.unique_users || 0"></span>
+                      <span class="themed-text-muted">人</span>
+                    </span>
+                    <template x-if="item.cost_amount">
+                      <span class="text-xs themed-text-muted px-2 py-1 themed-bg-base rounded" x-text="item.cost_amount + ' ' + (item.cost_asset_code || '')"></span>
+                    </template>
+                  </span>
+                </div>
+              </template>
+              <template x-if="!exchangePreferences.preferences?.length">
+                <p class="text-center themed-text-muted py-8">暂无兑换数据</p>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 用户统计页 -->
+      <div x-show="current_page === 'user-stats'" x-cloak>
+        <!-- 统计卡片 - 渐变风格 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div class="gradient-stat-card gradient-stat-blue stats-card-animate">
+            <div class="stat-icon">👥</div>
+            <div class="stat-value" x-text="userStats.total_users"></div>
+            <div class="stat-label">总用户数</div>
+            <div class="stat-trend" x-text="'今日新增 ' + (userStats.new_users_today || 0)"></div>
+          </div>
+          <div class="gradient-stat-card gradient-stat-green stats-card-animate">
+            <div class="stat-icon">🟢</div>
+            <div class="stat-value" x-text="userStats.active_users"></div>
+            <div class="stat-label">活跃用户</div>
+            <div class="stat-trend" x-text="userStats.total_users > 0 ? '活跃率 ' + Math.round(userStats.active_users / userStats.total_users * 100) + '%' : '—'"></div>
+          </div>
+          <div class="gradient-stat-card gradient-stat-purple stats-card-animate">
+            <div class="stat-icon">🎭</div>
+            <div class="stat-value" x-text="userStats.total_roles"></div>
+            <div class="stat-label">角色数量</div>
+            <div class="stat-trend">系统权限模型</div>
+          </div>
+          <div class="gradient-stat-card gradient-stat-orange stats-card-animate">
+            <div class="stat-icon">🔑</div>
+            <div class="stat-value" x-text="userStats.total_permissions"></div>
+            <div class="stat-label">权限数量</div>
+            <div class="stat-trend">细粒度控制</div>
+          </div>
+        </div>
+
+        <!-- 角色分布和权限概览 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- 角色分布 -->
+          <div class="themed-card rounded-lg shadow">
+            <div class="p-4 border-b">
+              <h5 class="font-semibold">🎭 角色分布</h5>
+              <p class="text-sm themed-text-muted mt-1">系统中各角色的配置情况</p>
+            </div>
+            <div class="p-4">
+              <template x-if="roles && roles.length > 0">
+                <div class="space-y-4">
+                  <template x-for="role in roles" :key="role.role_uuid || role.id">
+                    <div class="flex items-center justify-between p-3 themed-bg-base rounded-lg">
+                      <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center"
+                             :class="{
+                               'bg-red-100 text-red-600': role.role_level >= 100,
+                               'bg-orange-100 text-orange-600': role.role_level >= 60 && role.role_level < 100,
+                               'themed-bg-primary-light themed-text-primary': role.role_level >= 30 && role.role_level < 60,
+                               'themed-bg-subtle themed-text-muted': role.role_level < 30
+                             }">
+                          <i class="bi bi-person-badge"></i>
+                        </div>
+                        <div>
+                          <div class="font-medium" x-text="role.role_name"></div>
+                          <div class="text-xs themed-text-muted" x-text="role.description || '无描述'"></div>
+                        </div>
+                      </div>
+                      <div class="text-right">
+                        <div class="text-sm font-medium">级别: <span x-text="role.role_level"></span></div>
+                        <div class="text-xs themed-text-muted">
+                          权限: <span x-text="role.permissions ? (typeof role.permissions === 'object' ? Object.keys(role.permissions).length : 0) : 0"></span>项
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+              <template x-if="!roles || roles.length === 0">
+                <div class="text-center py-8 themed-text-muted">
+                  <i class="bi bi-inbox text-4xl mb-2"></i>
+                  <p>暂无角色数据</p>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- 权限概览 -->
+          <div class="themed-card rounded-lg shadow">
+            <div class="p-4 border-b">
+              <h5 class="font-semibold">🔐 权限概览</h5>
+              <p class="text-sm themed-text-muted mt-1">从角色中提取的权限分类</p>
+            </div>
+            <div class="p-4">
+              <template x-if="permissions && permissions.length > 0">
+                <div class="space-y-3 max-h-96 overflow-y-auto">
+                  <template x-for="perm in permissions" :key="perm.permission_code">
+                    <div class="flex items-center justify-between p-2 border-b themed-border-light">
+                      <div class="flex items-center space-x-2">
+                        <i class="bi bi-key text-purple-500"></i>
+                        <span class="font-medium" x-text="perm.permission_name || perm.permission_code"></span>
+                      </div>
+                      <div class="flex items-center space-x-2">
+                        <template x-for="role in (perm.roles || []).slice(0, 3)" :key="role">
+                          <span class="px-2 py-0.5 text-xs themed-bg-primary-light themed-text-primary rounded" x-text="role"></span>
+                        </template>
+                        <template x-if="(perm.roles || []).length > 3">
+                          <span class="text-xs themed-text-muted">+<span x-text="(perm.roles || []).length - 3"></span></span>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+              <template x-if="!permissions || permissions.length === 0">
+                <div class="text-center py-8 themed-text-muted">
+                  <i class="bi bi-lock text-4xl mb-2"></i>
+                  <p>暂无权限数据</p>
+                  <p class="text-xs mt-1">请先切换到"权限管理"页加载数据</p>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- 用户活跃度统计 -->
+        <div class="mt-6 themed-card rounded-lg shadow">
+          <div class="p-4 border-b">
+            <h5 class="font-semibold">📊 用户活跃度</h5>
+          </div>
+          <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+              <span class="themed-text-muted">活跃用户比例</span>
+              <span class="font-medium" x-text="userStats.total_users > 0 ? Math.round((userStats.active_users / userStats.total_users) * 100) + '%' : '0%'"></span>
+            </div>
+            <div class="w-full themed-bg-muted rounded-full h-4">
+              <div class="bg-green-500 h-4 rounded-full transition-all duration-500"
+                   :style="'width: ' + (userStats.total_users > 0 ? (userStats.active_users / userStats.total_users * 100) : 0) + '%'"></div>
+            </div>
+            <div class="flex justify-between text-sm themed-text-muted mt-2">
+              <span>活跃: <span x-text="userStats.active_users"></span></span>
+              <span>非活跃: <span x-text="userStats.total_users - userStats.active_users"></span></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- P2#9: 用户分层分析（以后端 /console/users/segments 数据为准） -->
+        <div class="mt-6 themed-card rounded-lg shadow">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">🎯 用户分层分析</h5>
+            <button @click="loadUserSegments()" class="text-sm themed-btn-secondary px-3 py-1 rounded"
+                    :disabled="loadingSegments">
+              <span x-show="!loadingSegments">🔄 刷新</span>
+              <span x-show="loadingSegments">加载中...</span>
+            </button>
+          </div>
+          <div class="p-6">
+            <!-- 加载状态 -->
+            <div x-show="loadingSegments" class="text-center py-8">
+              <div class="animate-spin inline-block w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full"></div>
+              <p class="themed-text-muted mt-2 text-sm">加载分层数据中...</p>
+            </div>
+            <!-- 后端返回: { segments: [{code, name, count, percentage, criteria, color}], total_users } -->
+            <template x-if="userSegments && userSegments.segments && userSegments.segments.length > 0 && !loadingSegments">
+              <div>
+                <!-- 分层卡片（直接使用后端字段: code, name, count, percentage, criteria） -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <template x-for="seg in userSegments.segments" :key="seg.code">
+                    <div class="rounded-lg p-4 border-l-4 themed-card shadow-sm"
+                         :class="getSegmentBorderColor(seg.code)">
+                      <div class="flex items-center gap-2 mb-2">
+                        <span class="text-xl" x-text="getSegmentIcon(seg.code)"></span>
+                        <h6 class="font-semibold text-sm" x-text="seg.name"></h6>
+                      </div>
+                      <p class="text-2xl font-bold" :class="getSegmentTextColor(seg.code)" x-text="seg.count"></p>
+                      <p class="text-xs themed-text-muted mt-1">
+                        占比 <span x-text="seg.percentage + '%'"></span>
+                      </p>
+                      <p class="text-xs themed-text-muted mt-1" x-text="seg.criteria"></p>
+                    </div>
+                  </template>
+                </div>
+                <!-- 分布条（使用后端 total_users 和各 segment.count 计算宽度） -->
+                <div class="mb-4">
+                  <p class="text-sm themed-text-muted mb-2">用户分层分布（总用户: <span x-text="userSegments.total_users"></span>）</p>
+                  <div class="w-full h-6 rounded-full overflow-hidden flex">
+                    <template x-for="seg in userSegments.segments" :key="'bar-' + seg.code">
+                      <div class="h-full transition-all duration-500 flex items-center justify-center text-white text-xs"
+                           :class="getSegmentBgColor(seg.code)"
+                           :style="'width: ' + (userSegments.total_users > 0 ? (seg.count / userSegments.total_users * 100) : 0) + '%'"
+                           :title="seg.name + ': ' + seg.count + '人'">
+                        <span x-show="seg.count / (userSegments.total_users || 1) > 0.08" 
+                              x-text="seg.count"></span>
+                      </div>
+                    </template>
+                  </div>
+                  <div class="flex flex-wrap gap-4 mt-2 text-xs">
+                    <template x-for="seg in userSegments.segments" :key="'legend-' + seg.code">
+                      <span class="flex items-center gap-1">
+                        <span class="w-3 h-3 rounded-full inline-block" :class="getSegmentBgColor(seg.code)"></span>
+                        <span x-text="seg.name"></span>
+                        <span class="themed-text-muted" x-text="'(' + seg.count + '人, ' + seg.percentage + '%)'"></span>
+                      </span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <!-- 无数据 -->
+            <div x-show="!loadingSegments && (!userSegments || !userSegments.segments || userSegments.segments.length === 0)" class="text-center py-8 themed-text-muted">
+              <i class="bi bi-bar-chart text-4xl mb-2"></i>
+              <p>暂无用户分层数据</p>
+              <p class="text-xs mt-1">后端 GET /api/v4/console/users/segments</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- P2#9: 用户生命周期标签 -->
+        <div class="mt-6 themed-card rounded-lg shadow">
+          <div class="p-4 border-b">
+            <h5 class="font-semibold">🔄 用户生命周期</h5>
+            <p class="text-xs themed-text-muted mt-1">基于 last_active_at 和 created_at 的用户生命周期分析</p>
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <!-- 新注册（7天内） -->
+              <div class="text-center p-4 rounded-lg themed-bg-base">
+                <div class="w-12 h-12 rounded-full bg-green-100 text-green-600 mx-auto mb-2 flex items-center justify-center text-xl">🌱</div>
+                <p class="text-sm font-medium">新注册</p>
+                <p class="text-xs themed-text-muted">7天内注册</p>
+                <p class="text-lg font-bold text-green-600 mt-1" x-text="userStats.new_users_last_7_days || 0"></p>
+              </div>
+              <!-- 活跃（7天内活跃） -->
+              <div class="text-center p-4 rounded-lg themed-bg-base">
+                <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 mx-auto mb-2 flex items-center justify-center text-xl">🏃</div>
+                <p class="text-sm font-medium">活跃</p>
+                <p class="text-xs themed-text-muted">7天内活跃</p>
+                <p class="text-lg font-bold text-blue-600 mt-1" x-text="userStats.active_users || 0"></p>
+              </div>
+              <!-- 今日活跃 -->
+              <div class="text-center p-4 rounded-lg themed-bg-base">
+                <div class="w-12 h-12 rounded-full bg-purple-100 text-purple-600 mx-auto mb-2 flex items-center justify-center text-xl">⚡</div>
+                <p class="text-sm font-medium">今日活跃</p>
+                <p class="text-xs themed-text-muted">今日有行为</p>
+                <p class="text-lg font-bold text-purple-600 mt-1" x-text="userStats.active_users_today || 0"></p>
+              </div>
+              <!-- 30天新增 -->
+              <div class="text-center p-4 rounded-lg themed-bg-base">
+                <div class="w-12 h-12 rounded-full bg-orange-100 text-orange-600 mx-auto mb-2 flex items-center justify-center text-xl">📈</div>
+                <p class="text-sm font-medium">月新增</p>
+                <p class="text-xs themed-text-muted">30天内注册</p>
+                <p class="text-lg font-bold text-orange-600 mt-1" x-text="userStats.new_users_last_30_days || 0"></p>
+              </div>
+              <!-- 沉默（非活跃） -->
+              <div class="text-center p-4 rounded-lg themed-bg-base">
+                <div class="w-12 h-12 rounded-full bg-gray-200 text-gray-500 mx-auto mb-2 flex items-center justify-center text-xl">😴</div>
+                <p class="text-sm font-medium">沉默</p>
+                <p class="text-xs themed-text-muted">7天+未活跃</p>
+                <p class="text-lg font-bold text-gray-500 mt-1" x-text="Math.max(0, (userStats.total_users || 0) - (userStats.active_users || 0))"></p>
+              </div>
+            </div>
+            <!-- 增长率指标 -->
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="rounded-lg p-4 border themed-border-light">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm themed-text-muted">日增长率</span>
+                  <span class="font-bold" 
+                        :class="(userStats.daily_growth_rate || 0) >= 0 ? 'text-green-600' : 'text-red-600'"
+                        x-text="((userStats.daily_growth_rate || 0) >= 0 ? '+' : '') + (userStats.daily_growth_rate || 0).toFixed(2) + '%'"></span>
+                </div>
+              </div>
+              <div class="rounded-lg p-4 border themed-border-light">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm themed-text-muted">周增长率</span>
+                  <span class="font-bold"
+                        :class="(userStats.weekly_growth_rate || 0) >= 0 ? 'text-green-600' : 'text-red-600'"
+                        x-text="((userStats.weekly_growth_rate || 0) >= 0 ? '+' : '') + (userStats.weekly_growth_rate || 0).toFixed(2) + '%'"></span>
+                </div>
+              </div>
+              <div class="rounded-lg p-4 border themed-border-light">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm themed-text-muted">活跃率</span>
+                  <span class="font-bold themed-text-primary"
+                        x-text="(userStats.active_rate || 0).toFixed(2) + '%'"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== Modal 区域 ==================== -->
+
+      <!-- 1. 用户详情 Modal -->
+      <div x-ref="userDetailModal" 
+           x-show="isModalOpen('userDetailModal')" 
+           x-cloak
+           class="fixed inset-0 z-50 flex items-center justify-center"
+           style="display: none;">
+        <!-- 遮罩层 -->
+        <div class="fixed inset-0 bg-black/50" @click="hideModal('userDetailModal')"></div>
+        <!-- 内容 -->
+        <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">👤 用户详情</h5>
+            <button @click="hideModal('userDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+          </div>
+          <div class="p-6">
+            <template x-if="selectedUser">
+              <div class="space-y-4">
+                <!-- 头像和基本信息 -->
+                <div class="flex items-center space-x-4 pb-4 border-b">
+                  <div class="w-20 h-20 rounded-full overflow-hidden border-2 themed-border img-blur-load">
+                    <img :data-src="selectedUser.avatar_url || '/admin/images/default-avatar.svg'" 
+                         class="w-full h-full object-cover img-lazy" 
+                         alt="头像"
+                         x-init="$nextTick(() => { $el.src = selectedUser.avatar_url || '/admin/images/default-avatar.svg'; $el.classList.add('loaded') })"
+                         @error="$el.src='/admin/images/default-avatar.svg'">
+                  </div>
+                  <div>
+                    <h3 class="text-lg font-semibold" x-text="selectedUser.nickname || '未设置昵称'"></h3>
+                    <p class="themed-text-muted">ID: <span x-text="selectedUser.user_id"></span></p>
+                  </div>
+                </div>
+                <!-- 详细信息 -->
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="text-sm themed-text-muted">手机号</label>
+                    <p class="font-medium" x-text="selectedUser.phone || selectedUser.mobile || '-'"></p>
+                  </div>
+                  <div>
+                    <label class="text-sm themed-text-muted">状态</label>
+                    <p>
+                      <span class="px-2 py-1 text-xs rounded text-white" 
+                            :class="getUserStatusClass(selectedUser.status)"
+                            x-text="selectedUser.status_display || selectedUser.status"></span>
+                    </p>
+                  </div>
+                  <div>
+                    <label class="text-sm themed-text-muted">注册时间</label>
+                    <p class="font-medium" x-text="formatDateTimeShort(selectedUser.created_at)"></p>
+                  </div>
+                  <div>
+                    <label class="text-sm themed-text-muted">最后登录</label>
+                    <p class="font-medium" x-text="selectedUser.last_login ? formatDateTimeShort(selectedUser.last_login) : '从未登录'"></p>
+                  </div>
+                </div>
+
+                <!-- 用户行为轨迹 (P2-4) -->
+                <div class="mt-4 pt-4 border-t">
+                  <div class="flex justify-between items-center mb-3">
+                    <h6 class="font-medium">📍 最近行为轨迹</h6>
+                    <button @click="loadUserActivities(selectedUser.user_id)" class="text-xs themed-text-primary hover:underline">刷新</button>
+                  </div>
+                  <div class="max-h-48 overflow-y-auto">
+
+                      <p x-show="!userActivities || userActivities.length === 0" class="text-center py-4 themed-text-muted text-sm">
+
+                    <div class="relative pl-6">
+                      <!-- 时间线竖线 -->
+                      <div class="absolute left-2 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+                      <template x-for="(activity, index) in userActivities" :key="index">
+                        <div class="relative mb-3 pb-3 border-b border-dashed last:border-0">
+                          <!-- 时间点 -->
+                          <div class="absolute -left-4 w-3 h-3 rounded-full" 
+                               :class="{
+                                 'bg-green-500': activity.type === 'draw',
+                                 'bg-blue-500': activity.type === 'transaction',
+                                 'bg-yellow-500': activity.type === 'exchange',
+                                 'bg-purple-500': activity.type === 'consumption',
+                                 'bg-gray-400': !activity.type
+                               }"></div>
+                          <div class="flex justify-between items-start">
+                            <div>
+                              <span class="text-sm font-medium" x-text="getActivityTypeName(activity.type)"></span>
+                              <p class="text-xs themed-text-muted" x-text="activity.description || activity.detail"></p>
+                            </div>
+                            <span class="text-xs themed-text-muted whitespace-nowrap" x-text="formatDateTimeShort(activity.created_at)"></span>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
+            <button @click="hideModal('userDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. 编辑用户 Modal -->
+      <div x-ref="editUserModal" 
+           x-show="isModalOpen('editUserModal')" 
+           x-cloak
+           class="fixed inset-0 z-50 flex items-center justify-center"
+           style="display: none;">
+        <!-- 遮罩层 -->
+        <div class="fixed inset-0 bg-black/50" @click="hideModal('editUserModal')"></div>
+        <!-- 内容 -->
+        <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">✏️ 编辑用户</h5>
+            <button @click="hideModal('editUserModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+          </div>
+          <form @submit.prevent="submitEditUser()">
+            <div class="p-6 space-y-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">用户ID</label>
+                <input type="text" class="w-full px-3 py-2 border rounded themed-bg-subtle cursor-not-allowed" 
+                       :value="editUserForm.user_id" disabled>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">昵称</label>
+                <input type="text" x-model="editUserForm.nickname" 
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
+                       placeholder="请输入昵称">
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
+                <select x-model="editUserForm.status" 
+                        class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="active">正常</option>
+                  <option value="inactive">禁用</option>
+                  <option value="banned">封禁</option>
+                </select>
+              </div>
+            </div>
+            <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+              <button type="button" @click="hideModal('editUserModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+              <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary" :disabled="saving">
+                <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+                保存
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- 3. 用户角色管理 Modal -->
+      <div x-ref="userRoleModal" 
+           x-show="isModalOpen('userRoleModal')" 
+           x-cloak
+           class="fixed inset-0 z-50 flex items-center justify-center"
+           style="display: none;">
+        <!-- 遮罩层 -->
+        <div class="fixed inset-0 bg-black/50" @click="hideModal('userRoleModal')"></div>
+        <!-- 内容 -->
+        <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">🛡️ 管理用户角色</h5>
+            <button @click="hideModal('userRoleModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+          </div>
+          <form @submit.prevent="submitUserRole()">
+            <div class="p-6 space-y-4">
+              <p class="themed-text-muted">
+                用户：<strong x-text="selectedUserForRole?.nickname || selectedUserForRole?.user_id"></strong>
+              </p>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-2">选择角色</label>
+                <div class="space-y-2 max-h-60 overflow-y-auto">
+                  <template x-for="role in (roles || [])" :key="role.role_id">
+                    <label class="flex items-center p-2 border rounded themed-hover-bg cursor-pointer">
+                      <input type="radio" name="userRole" 
+                             :value="role.role_uuid || role.id" 
+                             x-model="selectedRoleCode"
+                             class="mr-3">
+                      <span class="px-2 py-0.5 text-xs rounded text-white mr-2" 
+                            :class="role.role_level >= 80 ? 'bg-red-500' : (role.role_level >= 40 ? 'bg-yellow-500' : 'bg-gray-400')">
+                        Lv.<span x-text="role.role_level"></span>
+                      </span>
+                      <span x-text="role.role_name"></span>
+                      <small class="text-gray-400 ml-2" x-text="role.description || ''"></small>
+                    </label>
+                  </template>
+                </div>
+              </div>
+            </div>
+            <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+              <button type="button" @click="hideModal('userRoleModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+              <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary" :disabled="saving">
+                <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+                保存
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- 4. 分配角色 Modal -->
+      <div x-ref="assignRoleModal" 
+           x-show="isModalOpen('assignRoleModal')" 
+           x-cloak
+           class="fixed inset-0 z-50 flex items-center justify-center"
+           style="display: none;">
+        <!-- 遮罩层 -->
+        <div class="fixed inset-0 bg-black/50" @click="hideModal('assignRoleModal')"></div>
+        <!-- 内容 -->
+        <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold" x-text="userRoleForm.mobile ? ('🏷️ 增加角色（' + userRoleForm.mobile + '）') : '🏷️ 增加角色'"></h5>
+            <button @click="hideModal('assignRoleModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+          </div>
+          <form @submit.prevent="submitAssignRole()">
+            <div class="p-6 space-y-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">用户手机号 <span class="text-red-500">*</span></label>
+                <input type="text" x-model="userRoleForm.mobile" maxlength="11"
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
+                       placeholder="请输入手机号" required>
+                <template x-if="resolvedUser">
+                  <p class="text-xs text-green-600 mt-1">✅ <span x-text="resolvedUser.nickname"></span> (<span x-text="resolvedUser.mobile"></span>)</p>
+                </template>
+                <template x-if="resolveError">
+                  <p class="text-xs text-red-500 mt-1" x-text="resolveError"></p>
+                </template>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">要增加的角色 <span class="text-red-500">*</span></label>
+                <select x-model="userRoleForm.role_name" 
+                        class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" required>
+                  <option value="">请选择角色</option>
+                  <template x-for="role in roles" :key="role.role_id">
+                    <option :value="role.role_name" x-text="role.role_name + ' (level ' + role.role_level + ')'"></option>
+                  </template>
+                </select>
+                <p class="text-xs themed-text-muted mt-1">多角色并集：增加不会移除该用户已有的其它角色；权限取所有角色并集。</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">变更原因</label>
+                <input type="text" x-model="userRoleForm.reason" 
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
+                       placeholder="选填，如：晋升为管理员">
+              </div>
+            </div>
+            <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+              <button type="button" @click="hideModal('assignRoleModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+              <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary" :disabled="saving">
+                <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+                分配
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- 5. 高级状态详情 Modal -->
+      <div x-ref="premiumDetailModal" 
+           x-show="isModalOpen('premiumDetailModal')" 
+           x-cloak
+           class="fixed inset-0 z-50 flex items-center justify-center"
+           style="display: none;">
+        <div class="fixed inset-0 bg-black/50" @click="hideModal('premiumDetailModal')"></div>
+        <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 z-10">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">⭐ 高级状态详情</h5>
+            <button @click="hideModal('premiumDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+          </div>
+          <div class="p-6">
+            <template x-if="selectedPremiumUser">
+              <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="text-sm themed-text-muted">用户ID</label>
+                    <p class="font-medium" x-text="selectedPremiumUser.user_id"></p>
+                  </div>
+                  <div>
+                    <label class="text-sm themed-text-muted">昵称</label>
+                    <p class="font-medium" x-text="selectedPremiumUser.nickname || selectedPremiumUser.user?.nickname || '-'"></p>
+                  </div>
+                  <div>
+                    <label class="text-sm themed-text-muted">状态</label>
+                    <p>
+                      <span 
+                        :class="selectedPremiumUser.is_valid ? 'bg-green-100 themed-text-success' : 'bg-red-100 text-red-700'"
+                        class="px-2 py-1 text-xs rounded"
+                        x-text="selectedPremiumUser.is_valid ? '有效' : '无效/过期'"
+                      ></span>
+                    </p>
+                  </div>
+                  <div>
+                    <label class="text-sm themed-text-muted">解锁方式</label>
+                    <p class="font-medium" x-text="selectedPremiumUser.unlock_method_display || selectedPremiumUser.unlock_method"></p>
+                  </div>
+                  <div>
+                    <label class="text-sm themed-text-muted">解锁时间</label>
+                    <p class="font-medium" x-text="formatDateTimeShort(selectedPremiumUser.unlocked_at || selectedPremiumUser.created_at)"></p>
+                  </div>
+                  <div>
+                    <label class="text-sm themed-text-muted">过期时间</label>
+                    <p class="font-medium" x-text="selectedPremiumUser.expires_at ? formatDateTimeShort(selectedPremiumUser.expires_at) : '永久有效'"></p>
+                  </div>
+                </div>
+                <!-- 权益信息 -->
+                <div class="pt-4 border-t">
+                  <h6 class="font-medium themed-text-secondary mb-2">高级权益</h6>
+                  <div class="space-y-2 text-sm themed-text-muted">
+                    <p>✓ 无广告体验</p>
+                    <p>✓ 专属客服通道</p>
+                    <p>✓ 更高回馈概率</p>
+                    <p>✓ 专属活动参与资格</p>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
+            <button @click="hideModal('premiumDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. 风控配置编辑 Modal -->
+      <div x-ref="riskProfileModal" 
+           x-show="isModalOpen('riskProfileModal')" 
+           x-cloak
+           class="fixed inset-0 z-50 flex items-center justify-center"
+           style="display: none;">
+        <div class="fixed inset-0 bg-black/50" @click="hideModal('riskProfileModal')"></div>
+        <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">🛡️ 编辑风控配置</h5>
+            <button @click="hideModal('riskProfileModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+          </div>
+          <form @submit.prevent="submitRiskProfile()">
+            <div class="p-6 space-y-4">
+              <!-- 等级配置显示信息 -->
+              <template x-if="selectedRiskProfile && !selectedRiskProfile.user_id">
+                <div class="p-3 themed-bg-primary-light rounded-lg text-sm themed-text-primary">
+                  📋 编辑 <strong x-text="selectedRiskProfile?.user_level || '默认'"></strong> 等级的默认风控配置
+                </div>
+              </template>
+              <div x-show="!selectedRiskProfile || selectedRiskProfile.user_id">
+                <label class="block text-sm font-medium themed-text-secondary mb-1">用户手机号 <span class="text-red-500">*</span></label>
+                <input type="text" x-model="riskForm.mobile" maxlength="11"
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
+                       placeholder="请输入手机号" :required="!selectedRiskProfile || selectedRiskProfile.user_id">
+                <template x-if="resolvedUser">
+                  <p class="text-xs text-green-600 mt-1">✅ <span x-text="resolvedUser.nickname"></span></p>
+                </template>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">日积分限额</label>
+                <input type="number" x-model.number="riskForm.daily_points_limit" 
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
+                       placeholder="如 10000">
+                <p class="text-xs themed-text-muted mt-1">用户每日可获取积分上限</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">单笔交易限额</label>
+                <input type="number" x-model.number="riskForm.single_transaction_limit" 
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
+                       placeholder="如 1000">
+                <p class="text-xs themed-text-muted mt-1">单次交易积分/金额上限</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">日回馈次数限制</label>
+                <input type="number" x-model.number="riskForm.daily_lottery_limit" 
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
+                       placeholder="如 100">
+                <p class="text-xs themed-text-muted mt-1">用户每日可回馈次数上限</p>
+              </div>
+            </div>
+            <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+              <button type="button" @click="hideModal('riskProfileModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+              <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary" :disabled="saving">
+                <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+                保存
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- 7. 角色创建/编辑 Modal -->
+      <div x-ref="roleEditModal" 
+           x-show="isModalOpen('roleEditModal')" 
+           x-cloak
+           class="fixed inset-0 z-50 flex items-center justify-center"
+           style="display: none;">
+        <!-- 遮罩层 -->
+        <div class="fixed inset-0 bg-black/50" @click="hideModal('roleEditModal')"></div>
+        <!-- 内容 -->
+        <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
+          <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
+            <h5 class="font-semibold" x-text="roleForm.role_id ? '✏️ 编辑角色' : '➕ 创建角色'"></h5>
+            <button @click="hideModal('roleEditModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+          </div>
+          <form @submit.prevent="submitRoleForm()">
+            <div class="p-6 space-y-4">
+              <!-- 系统角色提示 -->
+              <template x-if="roleForm.role_id && isSystemRole(roleForm.role_name)">
+                <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p class="text-yellow-800 text-sm">⚠️ 系统内置角色，仅可修改描述信息，不可修改名称和权限</p>
+                </div>
+              </template>
+
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">角色名称 <span class="text-red-500">*</span></label>
+                <input type="text" x-model="roleForm.role_name" 
+                       :disabled="roleForm.role_id && isSystemRole(roleForm.role_name)"
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed" 
+                       placeholder="如 editor, reviewer" required>
+                <p class="text-xs themed-text-muted mt-1">角色唯一标识，只能包含字母、数字和下划线</p>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">角色描述</label>
+                <input type="text" x-model="roleForm.description" 
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
+                       placeholder="如 内容编辑员">
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">权限等级 <span class="text-red-500">*</span></label>
+                <input type="number" x-model.number="roleForm.role_level" 
+                       :disabled="roleForm.role_id && isSystemRole(roleForm.role_name)"
+                       min="1" max="999"
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed" 
+                       placeholder="1-999，数值越大权限越高" required>
+                <p class="text-xs themed-text-muted mt-1">数值越大权限越高，只能创建等级不超过自己的角色</p>
+              </div>
+
+              <!-- 权限配置区域 -->
+              <div x-show="!roleForm.role_id || !isSystemRole(roleForm.role_name)">
+                <label class="block text-sm font-medium themed-text-secondary mb-2">权限配置</label>
+                <div class="border rounded-lg p-4 max-h-80 overflow-y-auto themed-bg-base">
+
+                    <div x-show="permissionResources.length === 0" class="text-center py-4 themed-text-muted">
+                      <p>加载权限资源中...</p>
+                      <button type="button" @click="loadPermissionResources()" class="themed-text-primary text-sm mt-2">点击重新加载</button>
+                    </div>
+
+                  <template x-for="resource in permissionResources" :key="resource.code">
+                    <div class="mb-4 pb-4 border-b themed-border last:border-b-0 last:pb-0 last:mb-0">
+                      <div class="font-medium themed-text-secondary mb-2">
+                        <span x-text="resource.name"></span>
+                        <span class="text-xs text-gray-400 ml-2" x-text="'(' + resource.code + ')'"></span>
+                      </div>
+                      <div class="flex flex-wrap gap-2">
+                        <template x-for="action in resource.actions" :key="resource.code + '_' + action.code">
+                          <label class="inline-flex items-center px-2 py-1 border rounded hover:bg-white cursor-pointer">
+                            <input type="checkbox" 
+                                   :checked="isPermissionSelected(resource.code, action.code)"
+                                   @change="togglePermission(resource.code, action.code)"
+                                   class="mr-1">
+                            <span class="text-sm" x-text="action.name"></span>
+                          </label>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+            <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2 sticky bottom-0">
+              <button type="button" @click="hideModal('roleEditModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+              <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary" :disabled="saving">
+                <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+                <span x-text="roleForm.role_id ? '保存修改' : '创建角色'"></span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- 8. 角色删除确认 Modal -->
+      <div x-ref="roleDeleteModal" 
+           x-show="isModalOpen('roleDeleteModal')" 
+           x-cloak
+           class="fixed inset-0 z-50 flex items-center justify-center"
+           style="display: none;">
+        <div class="fixed inset-0 bg-black/50" @click="hideModal('roleDeleteModal')"></div>
+        <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold text-red-600">⚠️ 确认删除角色</h5>
+            <button @click="hideModal('roleDeleteModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+          </div>
+          <div class="p-6">
+            <p class="themed-text-secondary mb-4">
+              确定要删除角色 <strong class="text-red-600" x-text="roleToDelete?.role_name"></strong> 吗？
+            </p>
+            <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+              <p class="text-yellow-800">⚠️ 此操作将执行软删除：</p>
+              <ul class="list-disc list-inside mt-2 text-yellow-700">
+                <li>如果有用户正在使用此角色，将被自动分配到默认角色</li>
+                <li>角色数据不会被物理删除，仅标记为删除状态</li>
+              </ul>
+            </div>
+          </div>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+            <button type="button" @click="hideModal('roleDeleteModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+            <button type="button" @click="executeDeleteRole()" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600" :disabled="saving">
+              <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+              确认删除
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 9. 角色权限查看/编辑 Modal -->
+      <div x-ref="rolePermissionsModal" 
+           x-show="isModalOpen('rolePermissionsModal')" 
+           x-cloak
+           class="fixed inset-0 z-50 flex items-center justify-center"
+           style="display: none;">
+        <div class="fixed inset-0 bg-black/50" @click="hideModal('rolePermissionsModal')"></div>
+        <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
+          <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
+            <h5 class="font-semibold">🔐 角色权限配置</h5>
+            <button @click="hideModal('rolePermissionsModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+          </div>
+          <div class="p-6">
+            <template x-if="selectedRoleForPermissions">
+              <div>
+                <!-- 角色基本信息 -->
+                <div class="p-3 themed-bg-primary-light rounded-lg mb-4">
+                  <p class="themed-text-primary">
+                    角色：<strong x-text="selectedRoleForPermissions.role_name"></strong>
+                    <span class="ml-2 px-2 py-0.5 text-xs rounded text-white"
+                          :class="selectedRoleForPermissions.role_level >= 80 ? 'bg-red-500' : (selectedRoleForPermissions.role_level >= 40 ? 'bg-yellow-500' : 'bg-gray-400')">
+                      Lv.<span x-text="selectedRoleForPermissions.role_level"></span>
+                    </span>
+                  </p>
+                  <p class="themed-text-primary text-sm mt-1" x-text="selectedRoleForPermissions.description || '暂无描述'"></p>
+                </div>
+
+                <!-- 系统角色提示 -->
+                <template x-if="isSystemRole(selectedRoleForPermissions.role_name)">
+                  <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
+                    <p class="text-yellow-800 text-sm">🔒 系统内置角色，权限配置只读</p>
+                  </div>
+                </template>
+
+                <!-- 当前权限列表 -->
+                <div class="border rounded-lg">
+                  <div class="p-3 border-b themed-bg-base font-medium">当前权限配置</div>
+                  <div class="p-4 max-h-80 overflow-y-auto">
+                    <template x-if="selectedRoleForPermissions.permissions && Object.keys(selectedRoleForPermissions.permissions).length > 0">
+                      <div class="space-y-3">
+                        <template x-for="(actions, resource) in selectedRoleForPermissions.permissions" :key="resource">
+                          <div class="flex items-start gap-3 pb-3 border-b themed-border-light last:border-b-0">
+                            <span class="font-medium themed-text-secondary min-w-24" x-text="getResourceName(resource)"></span>
+                            <div class="flex flex-wrap gap-1">
+                              <template x-for="action in actions" :key="resource + '_' + action">
+                                <span class="px-2 py-0.5 text-xs bg-green-100 themed-text-success rounded" x-text="getActionName(action)"></span>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </template>
+                    <template x-if="!selectedRoleForPermissions.permissions || Object.keys(selectedRoleForPermissions.permissions).length === 0">
+                      <p class="text-center themed-text-muted py-4">该角色暂未配置任何权限</p>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2 sticky bottom-0">
+            <button type="button" @click="hideModal('rolePermissionsModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
+            <template x-if="selectedRoleForPermissions && !isSystemRole(selectedRoleForPermissions.role_name)">
+              <button type="button" @click="hideModal('rolePermissionsModal'); editRole(selectedRoleForPermissions)" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">
+                编辑权限
+              </button>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- P2-9: 用户分析报告 Modal -->
+      <div x-show="showAnalysisReportModal" 
+           x-cloak
+           class="fixed inset-0 z-50 flex items-center justify-center"
+           style="display: none;">
+        <!-- 遮罩层 -->
+        <div class="fixed inset-0 bg-black/50" @click="closeAnalysisReportModal()"></div>
+        <!-- 内容 -->
+        <div class="relative themed-card rounded-lg shadow-xl w-full max-w-3xl mx-4 z-10 max-h-[90vh] flex flex-col">
+          <div class="p-4 border-b flex justify-between items-center shrink-0">
+            <h5 class="font-semibold">📊 用户分析报告</h5>
+            <div class="flex items-center gap-2">
+              <button 
+                @click="exportAnalysisReportPDF()"
+                class="px-3 py-1.5 bg-green-500 text-white text-sm rounded hover:bg-green-600 transition"
+              >
+                📥 导出PDF
+              </button>
+              <button @click="closeAnalysisReportModal()" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+            </div>
+          </div>
+          
+          <!-- 报告内容 -->
+          <div class="p-6 overflow-y-auto flex-1">
+            <template x-if="userAnalysisReport">
+              <div class="space-y-6">
+                <!-- 用户基本信息 -->
+                <div class="themed-card rounded-lg p-4 border">
+                  <h6 class="font-semibold themed-text mb-3 flex items-center gap-2">
+                    <span>👤</span> 基本信息
+                  </h6>
+                  <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div>
+                      <span class="text-sm themed-text-muted">用户ID</span>
+                      <p class="font-medium" x-text="userAnalysisReport.user_info.user_id"></p>
+                    </div>
+                    <div>
+                      <span class="text-sm themed-text-muted">手机号</span>
+                      <p class="font-medium" x-text="userAnalysisReport.user_info.phone || '-'"></p>
+                    </div>
+                    <div>
+                      <span class="text-sm themed-text-muted">昵称</span>
+                      <p class="font-medium" x-text="userAnalysisReport.user_info.nickname"></p>
+                    </div>
+                    <div>
+                      <span class="text-sm themed-text-muted">状态</span>
+                      <p>
+                        <span 
+                          :class="userAnalysisReport.user_info.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'"
+                          class="px-2 py-0.5 text-xs rounded"
+                          x-text="userAnalysisReport.user_info.status === 'active' ? '正常' : '禁用'"
+                        ></span>
+                      </p>
+                    </div>
+                    <div>
+                      <span class="text-sm themed-text-muted">注册时间</span>
+                      <p class="font-medium text-sm" x-text="formatDateTimeShort(userAnalysisReport.user_info.created_at)"></p>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- 回馈数据 -->
+                <template x-if="userAnalysisReport.lottery_profile">
+                  <div class="themed-card rounded-lg p-4 border">
+                    <h6 class="font-semibold themed-text mb-3 flex items-center gap-2">
+                      <span>🎰</span> 回馈数据
+                    </h6>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div class="text-center p-3 bg-blue-50 rounded-lg">
+                        <p class="text-2xl font-bold text-blue-600" x-text="userAnalysisReport.lottery_profile.stats?.total_draws || 0"></p>
+                        <span class="text-xs themed-text-muted">总回馈次数</span>
+                      </div>
+                      <div class="text-center p-3 bg-green-50 rounded-lg">
+                        <p class="text-2xl font-bold text-green-600" x-text="userAnalysisReport.lottery_profile.stats?.total_wins || 0"></p>
+                        <span class="text-xs themed-text-muted">发放次数</span>
+                      </div>
+                      <div class="text-center p-3 bg-orange-50 rounded-lg">
+                        <p class="text-2xl font-bold text-orange-600" x-text="((userAnalysisReport.lottery_profile.stats?.win_rate || 0) * 100).toFixed(1) + '%'"></p>
+                        <span class="text-xs themed-text-muted">发放率</span>
+                      </div>
+                      <div class="text-center p-3 bg-purple-50 rounded-lg">
+                        <p class="text-2xl font-bold text-purple-600" x-text="userAnalysisReport.lottery_profile.stats?.campaign_count || 0"></p>
+                        <span class="text-xs themed-text-muted">参与活动</span>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+                
+                <!-- 资产概览 -->
+                <template x-if="userAnalysisReport.assets">
+                  <div class="themed-card rounded-lg p-4 border">
+                    <h6 class="font-semibold themed-text mb-3 flex items-center gap-2">
+                      <span>💰</span> 资产概览
+                    </h6>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div class="text-center p-3 bg-yellow-50 rounded-lg">
+                        <p class="text-2xl font-bold text-yellow-600" x-text="userAnalysisReport.assets.total_balance || 0"></p>
+                        <span class="text-xs themed-text-muted">总资产</span>
+                      </div>
+                      <div class="text-center p-3 bg-cyan-50 rounded-lg">
+                        <p class="text-2xl font-bold text-cyan-600" x-text="userAnalysisReport.assets.asset_count || 0"></p>
+                        <span class="text-xs themed-text-muted">资产种类</span>
+                      </div>
+                      <div class="text-center p-3 bg-pink-50 rounded-lg">
+                        <p class="text-2xl font-bold text-pink-600" x-text="userAnalysisReport.assets.transaction_count || 0"></p>
+                        <span class="text-xs themed-text-muted">交易次数</span>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+                
+                <!-- 近期行为 -->
+                <template x-if="userAnalysisReport.activities && userAnalysisReport.activities.length > 0">
+                  <div class="themed-card rounded-lg p-4 border">
+                    <h6 class="font-semibold themed-text mb-3 flex items-center gap-2">
+                      <span>📋</span> 近期行为（最近10条）
+                    </h6>
+                    <div class="space-y-2 max-h-48 overflow-y-auto">
+                      <template x-for="(activity, idx) in userAnalysisReport.activities.slice(0, 10)" :key="idx">
+                        <div class="flex items-center gap-3 p-2 bg-gray-50 rounded text-sm">
+                          <span class="themed-text-muted text-xs w-32 shrink-0" x-text="formatDateTimeShort(activity.created_at || activity.time)"></span>
+                          <span class="px-2 py-0.5 bg-blue-100 text-blue-600 text-xs rounded" x-text="activity.type || activity.activity_type || '-'"></span>
+                          <span class="truncate" x-text="activity.description || activity.detail || '-'"></span>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+                
+                <!-- 报告生成时间 -->
+                <div class="text-center text-sm themed-text-muted pt-4 border-t">
+                  报告生成时间：<span x-text="userAnalysisReport.generated_at"></span>
+                </div>
+              </div>
+            </template>
+            
+            <!-- 无数据状态 -->
+            <template x-if="!userAnalysisReport">
+              <div class="text-center py-12 themed-text-muted">
+                <div class="text-4xl mb-4">📊</div>
+                <p>暂无分析数据</p>
+              </div>
+            </template>
+          </div>
+          
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end shrink-0">
+            <button @click="closeAnalysisReportModal()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 页面专属逻辑 -->
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+
+  <!-- ==================== P1-1: 用户360°视图抽屉 ==================== -->
+  <div x-data="userDrawer()" x-init="init(); $store.userDrawer.setInstance($data)">
+    <!-- 背景遮罩 -->
+    <div 
+      x-show="isOpen" 
+      x-transition:enter="transition ease-out duration-300"
+      x-transition:enter-start="opacity-0"
+      x-transition:enter-end="opacity-100"
+      x-transition:leave="transition ease-in duration-200"
+      x-transition:leave-start="opacity-100"
+      x-transition:leave-end="opacity-0"
+      @click="close()"
+      class="fixed inset-0 bg-black/50 z-40"
+      x-cloak
+    ></div>
+
+    <!-- 抽屉面板 -->
+    <div 
+      x-show="isOpen" 
+      x-transition:enter="transition ease-out duration-300"
+      x-transition:enter-start="translate-x-full"
+      x-transition:enter-end="translate-x-0"
+      x-transition:leave="transition ease-in duration-200"
+      x-transition:leave-start="translate-x-0"
+      x-transition:leave-end="translate-x-full"
+      class="fixed top-0 right-0 w-[480px] h-full bg-white shadow-2xl z-50 flex flex-col"
+      @click.stop
+      x-cloak
+    >
+      <!-- 抽屉头部 -->
+      <div class="flex items-center justify-between px-6 py-4 border-b themed-gradient-light">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">👤</span>
+          <div>
+            <h3 class="text-lg font-semibold text-gray-800">用户详情</h3>
+            <p class="text-sm text-gray-500">
+              <span x-text="user?.nickname || '未知用户'"></span>
+              <span class="text-gray-400">(ID: <span x-text="user_id"></span>)</span>
+            </p>
+          </div>
+        </div>
+        <button @click="close()" class="p-2 hover:bg-gray-200 rounded-lg transition-colors">
+          <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Tab 导航 -->
+      <div class="flex border-b bg-gray-50 px-2">
+        <template x-for="tab in tabs" :key="tab.id">
+          <button 
+            @click="switchTab(tab.id)"
+            :class="activeTab === tab.id 
+              ? 'border-b-2 border-blue-500 text-blue-600 bg-white' 
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'"
+            class="px-4 py-3 text-sm font-medium transition-colors flex items-center gap-1.5"
+          >
+            <span x-text="tab.icon"></span>
+            <span x-text="tab.label"></span>
+          </button>
+        </template>
+      </div>
+
+      <!-- Tab 内容 -->
+      <div class="flex-1 overflow-y-auto p-6">
+        <!-- 加载状态 -->
+        <div x-show="loading" class="flex items-center justify-center py-12">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <span class="ml-3 text-gray-500">加载中...</span>
+        </div>
+
+        <!-- ===== 基本信息 Tab ===== -->
+        <div x-show="activeTab === 'basic' && !loading" x-cloak>
+          <div class="space-y-6">
+            <!-- 用户基本信息卡片 -->
+            <div class="bg-gray-50 rounded-lg p-4">
+              <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <span>📋</span> 基本信息
+              </h4>
+              <dl class="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <dt class="text-gray-500">用户ID</dt>
+                  <dd class="font-medium" x-text="basicInfo.user?.user_id || user_id"></dd>
+                </div>
+                <div>
+                  <dt class="text-gray-500">昵称</dt>
+                  <dd class="font-medium" x-text="basicInfo.user?.nickname || '-'"></dd>
+                </div>
+                <div>
+                  <dt class="text-gray-500">手机号</dt>
+                  <dd class="font-medium" x-text="basicInfo.user?.mobile || '-'"></dd>
+                </div>
+                <div>
+                  <dt class="text-gray-500">状态</dt>
+                  <dd>
+                    <span :class="getStatusColor(basicInfo.user?.status)" class="px-2 py-0.5 rounded text-xs font-medium" x-text="basicInfo.user?.status_display || basicInfo.user?.status || '-'"></span>
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-gray-500">角色</dt>
+                  <dd class="font-medium" x-text="basicInfo.user?.role_name || 'user'"></dd>
+                </div>
+                <div>
+                  <dt class="text-gray-500">注册时间</dt>
+                  <dd class="font-medium" x-text="formatDate(basicInfo.user?.created_at)"></dd>
+                </div>
+              </dl>
+            </div>
+
+            <!-- 风控信息卡片 -->
+            <div class="bg-gray-50 rounded-lg p-4">
+              <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <span>🛡️</span> 风控信息
+              </h4>
+              <dl class="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <dt class="text-gray-500">风控等级</dt>
+                  <dd>
+                    <span :class="getRiskLevelColor(basicInfo.risk_profile?.risk_level)" class="px-2 py-0.5 rounded text-xs font-medium" x-text="getRiskLevelLabel(basicInfo.risk_profile?.risk_level)"></span>
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-gray-500">最后登录</dt>
+                  <dd class="font-medium" x-text="formatDateTime(basicInfo.user?.last_login_at) || '-'"></dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== 回馈记录 Tab ===== -->
+        <div x-show="activeTab === 'lottery' && !loading" x-cloak>
+          <div class="space-y-4">
+            <h4 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <span>🎰</span> 回馈记录
+              <span class="text-gray-400 font-normal">(<span x-text="lotteryPagination.total"></span> 条)</span>
+            </h4>
+            
+            <!-- 回馈记录列表 -->
+            <div class="space-y-2">
+              <template x-for="record in lotteryRecords" :key="record.draw_id">
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div class="flex items-center gap-3">
+                    <span :class="record.is_winner ? 'text-yellow-500' : 'text-gray-400'" class="text-lg" x-text="record.is_winner ? '🏆' : '🎲'"></span>
+                    <div>
+                      <p class="font-medium text-sm" x-text="record.prize_name || '谢谢参与'"></p>
+                      <p class="text-xs text-gray-500" x-text="record.campaign_name || '-'"></p>
+                    </div>
+                  </div>
+                  <span class="text-xs text-gray-400" x-text="formatDateTime(record.created_at)"></span>
+                </div>
+              </template>
+            </div>
+
+            <!-- 分页 -->
+            <div x-show="lotteryPagination.total > lotteryPagination.page_size" class="flex justify-center gap-2 pt-4">
+              <button @click="changeLotteryPage(lotteryPagination.page - 1)" :disabled="lotteryPagination.page <= 1" class="px-3 py-1 text-sm border rounded disabled:opacity-50">上一页</button>
+              <span class="px-3 py-1 text-sm" x-text="`${lotteryPagination.page} / ${lotteryTotalPages}`"></span>
+              <button @click="changeLotteryPage(lotteryPagination.page + 1)" :disabled="lotteryPagination.page >= lotteryTotalPages" class="px-3 py-1 text-sm border rounded disabled:opacity-50">下一页</button>
+            </div>
+
+            <!-- 空状态 -->
+            <div x-show="lotteryRecords.length === 0" class="text-center py-8 text-gray-400">
+              <span class="text-4xl block mb-2">🎲</span>
+              <p>暂无回馈记录</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== 消费记录 Tab ===== -->
+        <div x-show="activeTab === 'consumption' && !loading" x-cloak>
+          <div class="space-y-4">
+            <h4 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <span>💳</span> 消费记录
+              <span class="text-gray-400 font-normal">(<span x-text="consumptionPagination.total"></span> 条)</span>
+            </h4>
+            
+            <!-- 消费记录列表 -->
+            <div class="space-y-2">
+              <template x-for="record in consumptionRecords" :key="record.order_id">
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div class="flex items-center gap-3">
+                    <span class="text-lg">🛒</span>
+                    <div>
+                      <p class="font-medium text-sm" x-text="record.item_name || '-'"></p>
+                      <p class="text-xs text-gray-500" x-text="formatDateTime(record.created_at)"></p>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <p class="font-semibold text-red-500" x-text="formatAmount(record.amount)"></p>
+                    <span :class="record.status === 'completed' ? 'text-green-600 bg-green-100' : 'text-yellow-600 bg-yellow-100'" class="text-xs px-1.5 py-0.5 rounded" x-text="record.status === 'completed' ? '已完成' : '处理中'"></span>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- 分页 -->
+            <div x-show="consumptionPagination.total > consumptionPagination.page_size" class="flex justify-center gap-2 pt-4">
+              <button @click="changeConsumptionPage(consumptionPagination.page - 1)" :disabled="consumptionPagination.page <= 1" class="px-3 py-1 text-sm border rounded disabled:opacity-50">上一页</button>
+              <span class="px-3 py-1 text-sm" x-text="`${consumptionPagination.page} / ${consumptionTotalPages}`"></span>
+              <button @click="changeConsumptionPage(consumptionPagination.page + 1)" :disabled="consumptionPagination.page >= consumptionTotalPages" class="px-3 py-1 text-sm border rounded disabled:opacity-50">下一页</button>
+            </div>
+
+            <!-- 空状态 -->
+            <div x-show="consumptionRecords.length === 0" class="text-center py-8 text-gray-400">
+              <span class="text-4xl block mb-2">💳</span>
+              <p>暂无消费记录</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== 资产明细 Tab ===== -->
+        <div x-show="activeTab === 'assets' && !loading" x-cloak>
+          <div class="space-y-4">
+            <h4 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <span>💰</span> 资产流水
+              <span class="text-gray-400 font-normal">(<span x-text="assetPagination.total"></span> 条)</span>
+            </h4>
+            
+            <!-- 资产流水列表 -->
+            <div class="space-y-2">
+              <template x-for="tx in assetDetails.transactions" :key="tx.transaction_id">
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div class="flex items-center gap-3">
+                    <span :class="tx.amount > 0 ? 'text-green-500' : 'text-red-500'" class="text-lg" x-text="tx.amount > 0 ? '📈' : '📉'"></span>
+                    <div>
+                      <p class="font-medium text-sm" x-text="tx.asset_name || '-'"></p>
+                      <p class="text-xs text-gray-500" x-text="tx.business_type || '-'"></p>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <p :class="tx.amount > 0 ? 'text-green-600' : 'text-red-600'" class="font-semibold" x-text="(tx.amount > 0 ? '+' : '') + tx.amount"></p>
+                    <p class="text-xs text-gray-400" x-text="'余额: ' + tx.balance_after"></p>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- 分页 -->
+            <div x-show="assetPagination.total > assetPagination.page_size" class="flex justify-center gap-2 pt-4">
+              <button @click="changeAssetPage(assetPagination.page - 1)" :disabled="assetPagination.page <= 1" class="px-3 py-1 text-sm border rounded disabled:opacity-50">上一页</button>
+              <span class="px-3 py-1 text-sm" x-text="`${assetPagination.page} / ${assetTotalPages}`"></span>
+              <button @click="changeAssetPage(assetPagination.page + 1)" :disabled="assetPagination.page >= assetTotalPages" class="px-3 py-1 text-sm border rounded disabled:opacity-50">下一页</button>
+            </div>
+
+            <!-- 空状态 -->
+            <div x-show="assetDetails.transactions.length === 0" class="text-center py-8 text-gray-400">
+              <span class="text-4xl block mb-2">💰</span>
+              <p>暂无资产流水</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== 行为轨迹 Tab ===== -->
+        <div x-show="activeTab === 'behavior' && !loading" x-cloak>
+          <div class="space-y-4">
+            <h4 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <span>👣</span> 行为轨迹
+              <span class="text-gray-400 font-normal">(<span x-text="behaviorPagination.total"></span> 条)</span>
+            </h4>
+            
+            <!-- 时间线列表 -->
+            <div class="relative pl-6 border-l-2 border-gray-200 space-y-4">
+              <template x-for="track in behaviorTracks" :key="track.track_id">
+                <div class="relative">
+                  <div class="absolute -left-8 w-4 h-4 rounded-full bg-blue-500 border-2 border-white"></div>
+                  <div class="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div class="flex items-center gap-2 mb-1">
+                      <span x-text="track.action_icon"></span>
+                      <span class="font-medium text-sm" x-text="track.action_label"></span>
+                    </div>
+                    <p class="text-xs text-gray-500" x-text="track.detail"></p>
+                    <p class="text-xs text-gray-400 mt-1" x-text="formatDateTime(track.created_at)"></p>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- 分页 -->
+            <div x-show="behaviorPagination.total > behaviorPagination.page_size" class="flex justify-center gap-2 pt-4">
+              <button @click="changeBehaviorPage(behaviorPagination.page - 1)" :disabled="behaviorPagination.page <= 1" class="px-3 py-1 text-sm border rounded disabled:opacity-50">上一页</button>
+              <span class="px-3 py-1 text-sm" x-text="`${behaviorPagination.page} / ${behaviorTotalPages}`"></span>
+              <button @click="changeBehaviorPage(behaviorPagination.page + 1)" :disabled="behaviorPagination.page >= behaviorTotalPages" class="px-3 py-1 text-sm border rounded disabled:opacity-50">下一页</button>
+            </div>
+
+            <!-- 空状态 -->
+            <div x-show="behaviorTracks.length === 0" class="text-center py-8 text-gray-400">
+              <span class="text-4xl block mb-2">👣</span>
+              <p>暂无行为轨迹</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 抽屉底部操作栏 -->
+      <div class="border-t bg-gray-50 px-6 py-4 flex justify-between items-center">
+        <div class="flex gap-2">
+          <button @click="exportReport()" class="px-4 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+            📄 导出报告
+          </button>
+          <button @click="addRiskMark()" class="px-4 py-2 text-sm bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors">
+            🚨 风控标记
+          </button>
+        </div>
+        <button @click="viewFullDetail()" class="px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+          查看完整详情 →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 导入用户抽屉组件 -->
+
+</body>
+</html>

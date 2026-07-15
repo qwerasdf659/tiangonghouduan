@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>装饰商城管理 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/decoration-management-Cph3s7eC.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+
+  <!-- 页面顶部渐变横幅 -->
+  <div class="page-banner">
+    <div class="container mx-auto px-4 flex justify-between items-center">
+      <div>
+        <div class="flex items-center gap-3 mb-1">
+          <a href="/admin/workspace.html" class="text-blue-200 hover:text-white text-sm transition">← 返回工作台</a>
+        </div>
+        <h1>🎨 星石装饰商城管理</h1>
+        <p>配置纯展示装饰（头像框/气泡/主题/称号），星石明码标价购买。装饰纯展示零数值，严禁抽取/开箱。</p>
+      </div>
+      <div class="text-6xl opacity-20">⭐</div>
+    </div>
+  </div>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="decorationManagement()" x-init="init()" @table-action="handleTableAction($event.detail)">
+
+    <!-- Tab 切换：一站式（装饰SKU / 赛季） -->
+    <div class="flex gap-2 mb-4 border-b">
+      <button @click="switchTab('decorations')"
+              :class="activeTab==='decorations' ? 'border-amber-500 text-amber-600' : 'border-transparent text-gray-500'"
+              class="px-4 py-2 border-b-2 font-medium transition">🎨 装饰 SKU</button>
+      <button @click="switchTab('seasons')"
+              :class="activeTab==='seasons' ? 'border-amber-500 text-amber-600' : 'border-transparent text-gray-500'"
+              class="px-4 py-2 border-b-2 font-medium transition">📅 赛季管理</button>
+    </div>
+
+    <!-- ============ 装饰 SKU Tab ============ -->
+    <div x-show="activeTab==='decorations'">
+    <!-- 操作栏 -->
+    <div class="flex justify-end items-center mb-4">
+      <button @click="openCreateModal()" class="btn-primary px-5 py-2.5 rounded-lg shadow-md transition flex items-center gap-2">
+        <span>➕</span> 新增装饰
+      </button>
+    </div>
+
+    <!-- data-table 标准表格组件 -->
+    <div x-data="dataTable({
+      columns: tableColumns,
+      dataSource: fetchTableData,
+      primaryKey: 'decoration_sku_id',
+      sortable: true,
+      selectable: false,
+      exportable: false,
+      page_size: 100,
+      emptyText: '暂无装饰，点击右上角新增'
+    })" x-init="init()" @dt-refresh.window="refresh()">
+      <!-- 标准数据表格组件模板（data-table EJS partial）- 配合 Alpine.js dataTable 组件使用 -->
+<!-- ===== 工具栏 ===== -->
+<div class="flex justify-between items-center mb-3">
+  <div class="flex items-center gap-3">
+    <!-- 选择信息（#13） -->
+    <template x-if="selectable && selectedRows.length > 0">
+      <div class="flex items-center gap-2 text-sm themed-text-primary themed-bg-primary-light px-3 py-1.5 rounded-lg">
+        <span>已选 <strong x-text="selectedRows.length"></strong> 项</span>
+        <button @click="clearSelection()" class="themed-text-primary hover:underline text-xs underline">取消选择</button>
+      </div>
+    </template>
+    <!-- 上次更新时间（#2） -->
+    <template x-if="lastUpdateTime">
+      <span class="text-xs text-gray-400">最后更新: <span x-text="lastUpdateTime"></span></span>
+    </template>
+  </div>
+  <div class="flex items-center gap-2">
+    <!-- 导出按钮（#12） -->
+    <template x-if="exportable">
+      <button @click="openExport()" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1">
+        📥 <span>导出</span>
+      </button>
+    </template>
+    <!-- 刷新按钮 -->
+    <button @click="refresh()" :disabled="loading" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1 disabled:opacity-50">
+      🔄 <span>刷新</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== 表格 ===== -->
+<div class="overflow-x-auto themed-card rounded-lg shadow">
+  <table class="w-full">
+    <!-- 表头 -->
+    <thead class="themed-bg-muted">
+      <tr>
+        <!-- 选择列（#13） -->
+        <template x-if="selectable">
+          <th class="px-4 py-3 text-center w-12">
+            <input type="checkbox"
+              :checked="isAllSelected"
+              :indeterminate.prop="isPartialSelected"
+              @change="toggleSelectAll($event.target.checked)"
+              class="rounded border-gray-300">
+          </th>
+        </template>
+        <!-- 数据列（#10 排序） -->
+        <template x-for="(col, colIdx) in columns" :key="'th_' + colIdx">
+          <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary"
+            :class="{ 'cursor-pointer themed-th-sortable select-none': sortable && col.sortable }"
+            :style="col.width ? 'width:' + col.width : ''"
+            @click="sort(col)">
+            <div class="flex items-center gap-1">
+              <span x-text="col.label"></span>
+              <template x-if="sortable && col.sortable">
+                <span class="text-xs" :class="sortColumn === col.key ? 'themed-text-primary font-bold' : 'text-gray-400'" x-text="getSortIcon(col)"></span>
+              </template>
+            </div>
+          </th>
+        </template>
+      </tr>
+    </thead>
+    <!-- 状态行（加载/错误/空）独立 tbody，避免与 x-for 在同一 tbody 导致 Alpine.js DOM 引用丢失 -->
+    <tbody x-show="loading || hasError || isEmpty" class="divide-y themed-divide">
+      <!-- 加载状态 -->
+      <tr x-show="loading">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <div class="animate-spin w-8 h-8 border-4 themed-border-primary border-t-transparent rounded-full"></div>
+            <span class="text-sm themed-text-muted">加载中...</span>
+          </div>
+        </td>
+      </tr>
+      <!-- 错误状态（#5） -->
+      <tr x-show="hasError">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-3">
+            <span class="text-4xl">❌</span>
+            <div class="text-red-600 font-medium">加载失败</div>
+            <div class="text-sm text-gray-500" x-text="error"></div>
+            <button @click="loadData()" class="px-4 py-2 themed-bg-primary text-white rounded-lg text-sm">🔄 重试</button>
+          </div>
+        </td>
+      </tr>
+      <!-- 空状态 -->
+      <tr x-show="isEmpty">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <span class="text-4xl">📭</span>
+            <div class="themed-text-muted" x-text="emptyText"></div>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+    <!-- 数据行独立 tbody，x-for 是唯一模板，避免 Alpine.js x-for + x-if 嵌套 DOM 引用 bug -->
+    <tbody x-show="hasData" class="divide-y themed-divide">
+      <template x-for="(row, rowIndex) in data" :key="String(row[primaryKey] || '') + '_' + rowIndex">
+        <tr class="themed-hover-bg transition-colors" @click="handleRowClick(row, rowIndex)">
+          <!-- 选择列 -->
+          <template x-if="selectable">
+            <td class="px-4 py-3 text-center" @click.stop>
+              <input type="checkbox"
+                :checked="isSelected(row[primaryKey])"
+                @change="toggleSelect(row[primaryKey])"
+                class="rounded border-gray-300">
+            </td>
+          </template>
+          <!-- 数据列 -->
+          <template x-for="(col, colIdx) in columns" :key="'td_' + rowIndex + '_' + colIdx">
+            <td class="px-4 py-3 text-sm" :class="col.type === 'actions' ? '' : 'themed-text-primary'">
+              <!-- 普通列：使用 renderCell -->
+              <span x-show="col.type !== 'actions'" x-html="renderCell(row, col)"></span>
+              <!-- 操作列：使用 Alpine 指令（支持 @click） -->
+              <div x-show="col.type === 'actions'" class="flex items-center gap-1" @click.stop>
+                <template x-for="action in (col.actions || [])" :key="action.name">
+                  <button
+                    x-show="!action.condition || action.condition(row)"
+                    @click="$dispatch('table-action', { action: action.name, row: JSON.parse(JSON.stringify(row)) })"
+                    class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
+                    :class="action.class || 'themed-text-primary'"
+                    x-html="(action.icon ? action.icon + ' ' : '') + action.label">
+                  </button>
+                </template>
+              </div>
+            </td>
+          </template>
+        </tr>
+      </template>
+    </tbody>
+  </table>
+
+  <!-- ===== 分页栏（#4 统一分页） ===== -->
+  <template x-if="total_records > 0">
+    <div class="px-4 py-3 border-t themed-divide flex justify-between items-center">
+      <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+      <div class="flex items-center gap-1">
+        <!-- 首页 -->
+        <button @click="firstPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">«</button>
+        <!-- 上一页 -->
+        <button @click="prevPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+        <!-- 页码 -->
+        <template x-for="page in visiblePages" :key="'p_' + page">
+          <button @click="goToPage(page)"
+            :disabled="page === '...'"
+            :class="page === current_page ? 'themed-bg-primary text-white themed-border-primary' : 'hover:bg-gray-50'"
+            class="px-3 py-1 text-sm border rounded min-w-[32px]"
+            x-text="page"></button>
+        </template>
+        <!-- 下一页 -->
+        <button @click="nextPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+        <!-- 末页 -->
+        <button @click="lastPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">»</button>
+      </div>
+    </div>
+  </template>
+</div>
+
+
+    </div>
+
+    <!-- 合规说明卡片 -->
+    <div class="themed-card rounded-xl shadow-sm mt-6 border border-gray-100 overflow-hidden">
+      <div class="card-header-accent">
+        <span class="header-icon">🛡️</span>
+        <span>合规红线说明</span>
+      </div>
+      <div class="p-5 text-sm themed-text-secondary space-y-2">
+        <p>• 装饰必须<strong>明码标价星石购买</strong>，严禁抽装饰/开箱等任何随机获取方式。</p>
+        <p>• 装饰<strong>纯展示、零数值</strong>，佩戴只影响 UI（头像框/气泡/主题/称号），不进入任何业务计算（尤其不碰回馈逻辑）。</p>
+        <p>• 限时装饰到期由定时任务自动清理，促星石持续消耗。</p>
+      </div>
+    </div>
+    </div><!-- 关闭 装饰SKU Tab -->
+
+    <!-- ============ 赛季管理 Tab ============ -->
+    <div x-show="activeTab==='seasons'" x-cloak>
+      <div class="flex justify-end items-center mb-4">
+        <button @click="openCreateSeasonModal()" class="btn-primary px-5 py-2.5 rounded-lg shadow-md transition flex items-center gap-2">
+          <span>➕</span> 新增赛季
+        </button>
+      </div>
+      <div class="themed-card rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="themed-bg-muted">
+            <tr>
+              <th class="px-4 py-3 text-left">ID</th>
+              <th class="px-4 py-3 text-left">赛季码</th>
+              <th class="px-4 py-3 text-left">名称</th>
+              <th class="px-4 py-3 text-left">开始</th>
+              <th class="px-4 py-3 text-left">结束</th>
+              <th class="px-4 py-3 text-left">状态</th>
+              <th class="px-4 py-3 text-left">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="s in seasons" :key="s.decoration_season_id">
+              <tr class="border-t hover:bg-gray-50">
+                <td class="px-4 py-3" x-text="s.decoration_season_id"></td>
+                <td class="px-4 py-3 font-mono text-xs" x-text="s.season_code"></td>
+                <td class="px-4 py-3" x-text="s.season_name"></td>
+                <td class="px-4 py-3 text-gray-500" x-text="s.start_at || '-'"></td>
+                <td class="px-4 py-3 text-gray-500" x-text="s.end_at || '-'"></td>
+                <td class="px-4 py-3">
+                  <span x-text="{draft:'草稿',active:'进行中',ended:'已结束'}[s.status] || s.status"></span>
+                </td>
+                <td class="px-4 py-3">
+                  <button @click="openEditSeasonModal(s)" class="text-blue-600 hover:text-blue-800">✏️ 编辑</button>
+                </td>
+              </tr>
+            </template>
+            <tr x-show="seasons.length===0">
+              <td colspan="7" class="px-4 py-8 text-center text-gray-400">暂无赛季，点击右上角新增</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div><!-- 关闭 赛季 Tab -->
+
+    <!-- 赛季表单 Modal -->
+    <div x-ref="seasonModal"
+         x-show="isModalOpen('seasonModal')"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('seasonModal')"></div>
+      <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-md mx-4 z-10 animate-slide-in-up">
+        <div class="p-5 border-b flex justify-between items-center themed-gradient-light rounded-t-xl">
+          <h5 class="font-semibold text-blue-900 flex items-center gap-2">
+            <span class="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-sm">📅</span>
+            <span x-text="seasonEditingId ? '编辑赛季' : '新增赛季'"></span>
+          </h5>
+          <button @click="hideModal('seasonModal')" class="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">✕</button>
+        </div>
+        <form @submit.prevent="saveSeason()">
+          <div class="p-6 space-y-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">赛季码 <span class="text-red-500">*</span></label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500"
+                     x-model="seasonForm.season_code" :disabled="!!seasonEditingId" required placeholder="如: s2026_summer">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">赛季名称 <span class="text-red-500">*</span></label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500"
+                     x-model="seasonForm.season_name" required placeholder="如: 2026夏季限定">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">开始时间</label>
+                <input type="datetime-local" class="w-full px-3 py-2 border rounded-lg" x-model="seasonForm.start_at">
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">结束时间</label>
+                <input type="datetime-local" class="w-full px-3 py-2 border rounded-lg" x-model="seasonForm.end_at">
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
+              <select class="w-full px-3 py-2 border rounded-lg" x-model="seasonForm.status">
+                <option value="draft">草稿</option>
+                <option value="active">进行中</option>
+                <option value="ended">已结束</option>
+              </select>
+            </div>
+          </div>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
+            <button type="button" @click="hideModal('seasonModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300">取消</button>
+            <button type="submit" class="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50" :disabled="seasonSaving">
+              <span x-show="seasonSaving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+              <span x-text="seasonEditingId ? '保存修改' : '创建赛季'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 装饰表单 Modal -->
+    <div x-ref="decorationModal"
+         x-show="isModalOpen('decorationModal')"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('decorationModal')"></div>
+      <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-lg mx-4 z-10 animate-slide-in-up max-h-[90vh] overflow-y-auto">
+        <div class="p-5 border-b flex justify-between items-center themed-gradient-light rounded-t-xl">
+          <h5 class="font-semibold text-blue-900 flex items-center gap-2">
+            <span class="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-sm">🎨</span>
+            <span x-text="editingId ? '编辑装饰' : '新增装饰'"></span>
+          </h5>
+          <button @click="hideModal('decorationModal')" class="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">✕</button>
+        </div>
+        <form @submit.prevent="saveDecoration()">
+          <div class="p-6 space-y-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">装饰码 <span class="text-red-500">*</span></label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                     x-model="decorationForm.decoration_code"
+                     :disabled="!!editingId"
+                     required
+                     placeholder="如: frame_gold_2026">
+              <p class="text-xs themed-text-muted mt-1" x-show="!editingId">snake_case 唯一标识，创建后不可修改</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">装饰名称 <span class="text-red-500">*</span></label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                     x-model="decorationForm.decoration_name" required placeholder="如: 黄金头像框">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">装饰类型 <span class="text-red-500">*</span></label>
+              <select class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500" x-model="decorationForm.decoration_type">
+                <option value="avatar_frame">头像框</option>
+                <option value="bubble">气泡</option>
+                <option value="theme">主题</option>
+                <option value="title">称号</option>
+                <option value="badge_visual">视觉徽章</option>
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">星石价 <span class="text-red-500">*</span></label>
+                <input type="number" min="0" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                       x-model.number="decorationForm.price_star_stone" required placeholder="明码标价">
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">有效期(天)</label>
+                <input type="number" min="1" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                       x-model="decorationForm.validity_days" placeholder="留空=永久">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">稀有度码</label>
+                <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                       x-model="decorationForm.rarity_code" placeholder="仅视觉，如 epic">
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">排序</label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                       x-model.number="decorationForm.sort_order">
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">预览图 URL</label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                     x-model="decorationForm.image_url" placeholder="装饰预览图">
+            </div>
+            <div class="flex items-center gap-6">
+              <label class="flex items-center text-sm font-medium themed-text-secondary">
+                <input type="checkbox" x-model="decorationForm.is_limited" class="mr-2 rounded"> 限定款
+              </label>
+              <div class="flex items-center gap-2">
+                <label class="text-sm font-medium themed-text-secondary">上架状态</label>
+                <select class="px-3 py-1.5 border rounded-lg" x-model="decorationForm.status">
+                  <option value="draft">草稿</option>
+                  <option value="on_sale">在售</option>
+                  <option value="off_sale">下架</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
+            <button type="button" @click="hideModal('decorationModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300">取消</button>
+            <button type="submit" class="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50" :disabled="saving">
+              <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+              <span x-text="editingId ? '保存修改' : '创建装饰'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div><!-- 关闭 decorationManagement -->
+
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+</body>
+</html>

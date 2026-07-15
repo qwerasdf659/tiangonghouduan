@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>资产调账 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/asset-adjustment-Csv4BolD.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen" x-data="assetAdjustmentPage()" x-init="init()" x-cloak>
+  
+  <!-- 导航栏（深色渐变风格） -->
+  <nav class="page-navbar">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="text-blue-200 hover:text-white transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">⚖️ 资产调账</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-text="'欢迎，' + (admin_user?.nickname || '管理员')"></span>
+        <button @click="logout()" class="px-3 py-1 border border-white/30 rounded hover:bg-white/10 transition-colors">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6">
+    <!-- 页面横幅 -->
+    <div class="page-banner mb-6">
+      <h1>⚖️ 资产调账</h1>
+      <p>查询用户资产 → 选择调整类型 → 填写原因 → 提交调账（所有操作可追溯）</p>
+    </div>
+
+    <!-- 操作提示（未选择用户时显示操作引导） -->
+    <div x-show="!current_user" class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6 animate-fade-in">
+      <div class="flex items-start gap-3">
+        <span class="text-2xl">💡</span>
+        <div>
+          <strong class="text-blue-800 text-base">如何使用资产调账？</strong>
+          <ol class="text-sm text-blue-700 mt-2 space-y-1 list-decimal list-inside">
+            <li>在左侧表单中<strong>输入用户手机号</strong>并点击"查找"</li>
+            <li>系统会展示该用户的所有资产余额</li>
+            <li>选择需要调整的资产类型，填写金额和原因</li>
+            <li>统计数据和调账记录将在操作后自动更新</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <!-- 安全警告（选择用户后显示） -->
+    <div x-show="current_user" x-cloak class="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+      <div class="flex items-start">
+        <span class="text-red-500 mr-2">⚠️</span>
+        <div>
+          <strong class="text-red-700">重要提醒：</strong>
+          <p class="text-sm text-red-600 mt-1">资产调账操作将直接影响用户资产，请务必核实信息后再操作。所有调账记录将被永久保存并可追溯。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 统计卡片（渐变样式） -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div class="gradient-stat-card gradient-stat-blue">
+        <div class="stat-icon">📋</div>
+        <div class="stat-value" x-text="stats.totalAdjustments">0</div>
+        <div class="stat-label">当前用户流水数</div>
+        <div class="stat-trend" x-show="!current_user">请先搜索用户</div>
+      </div>
+      <div class="gradient-stat-card gradient-stat-green">
+        <div class="stat-icon">➕</div>
+        <div class="stat-value" x-text="formatNumber(stats.totalIncrease)">0</div>
+        <div class="stat-label">本页累计增加</div>
+      </div>
+      <div class="gradient-stat-card gradient-stat-rose">
+        <div class="stat-icon">➖</div>
+        <div class="stat-value" x-text="formatNumber(stats.totalDecrease)">0</div>
+        <div class="stat-label">本页累计减少</div>
+      </div>
+      <div class="gradient-stat-card gradient-stat-orange">
+        <div class="stat-icon">👤</div>
+        <div class="stat-value" x-text="balances.length || 0">0</div>
+        <div class="stat-label">资产种类数</div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- 调账表单 -->
+      <div class="lg:col-span-1">
+        <div class="themed-card rounded-lg shadow">
+          <div class="p-4 border-b">
+            <h5 class="font-semibold">新建调账</h5>
+          </div>
+          <div class="p-4 space-y-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">手机号</label>
+              <div class="flex space-x-2">
+                <input type="text" x-model="searchMobile" maxlength="11" class="flex-1 px-3 py-2 border rounded-lg" placeholder="请输入手机号" @keyup.enter="handleMobileSearch()">
+                <button type="button" @click="handleMobileSearch()" :disabled="searching" class="px-3 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                  <span x-show="!searching">🔍 查找</span>
+                  <span x-show="searching" class="flex items-center">
+                    <svg class="animate-spin -ml-1 mr-1 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    搜索中...
+                  </span>
+                </button>
+              </div>
+              <div x-show="resolvedUser" class="mt-2 p-2 bg-blue-50 rounded text-sm">
+                ✅ <span x-text="resolvedUser?.nickname"></span> (<span x-text="resolvedUser?.mobile"></span>) · <span x-text="resolvedUser?.status === 'active' ? '活跃' : '异常'" :class="resolvedUser?.status === 'active' ? 'text-green-600' : 'text-red-500'"></span>
+              </div>
+              <div x-show="resolveError" class="mt-1 text-sm text-red-500" x-text="resolveError"></div>
+              <p x-show="current_user && !resolvedUser" class="mt-1 text-sm themed-text-primary">
+                ✅ 已加载用户: <span x-text="current_user?.nickname || current_user?.user_id"></span>
+              </p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">资产类型</label>
+              <select x-model="form.asset_type" class="w-full px-3 py-2 border rounded-lg">
+                <option value="">请选择</option>
+                <option value="points">积分</option>
+                <option value="star_stone">星石</option>
+                <option value="star_stone_quota">星石配额</option>
+                <option value="budget_points">预算积分</option>
+                <option value="material">材料</option>
+              </select>
+            </div>
+            <!-- 活动选择 (仅预算积分时显示) -->
+            <div x-show="form.asset_type === 'budget_points'" x-cloak>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">关联活动 <span class="text-red-500">*</span></label>
+              <select x-model="form.campaign_id" class="w-full px-3 py-2 border rounded-lg">
+                <option value="">请选择活动</option>
+                <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
+                  <option :value="campaign.lottery_campaign_id" x-text="campaign.name || campaign.campaign_name || ('活动#' + campaign.lottery_campaign_id)"></option>
+                </template>
+              </select>
+              <p class="mt-1 text-xs text-gray-500">预算将充入该活动配置的预算桶（allowed_campaign_ids）</p>
+              <p x-show="campaigns.length === 0" class="mt-1 text-sm text-yellow-600">⚠️ 暂无可用活动，请先创建活动</p>
+            </div>
+            <div x-show="form.asset_type === 'material'" x-cloak>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">材料类型</label>
+              <select x-model="form.material_code" class="w-full px-3 py-2 border rounded-lg">
+                <option value="">请选择</option>
+                <template x-for="mat in materialTypes" :key="mat.code">
+                  <option :value="mat.code" x-text="mat.name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">调账方式</label>
+              <div class="flex space-x-4">
+                <label class="flex items-center">
+                  <input type="radio" x-model="form.direction" value="increase" class="mr-2"> 增加
+                </label>
+                <label class="flex items-center">
+                  <input type="radio" x-model="form.direction" value="decrease" class="mr-2"> 减少
+                </label>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">调账数量</label>
+              <input type="number" x-model.number="form.amount" min="1" class="w-full px-3 py-2 border rounded-lg" placeholder="输入调账数量">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">调账原因</label>
+              <select x-model="form.reason_type" class="w-full px-3 py-2 border rounded-lg mb-2">
+                <option value="error_correction">错误修正</option>
+                <option value="customer_service">客服补偿</option>
+                <option value="promotion">活动奖励</option>
+                <option value="refund">退款处理</option>
+                <option value="other">其他</option>
+              </select>
+              <textarea x-model="form.reason" rows="3" class="w-full px-3 py-2 border rounded-lg" placeholder="详细说明调账原因..."></textarea>
+            </div>
+            <button @click="submitAdjustment()" :disabled="submitting" class="w-full px-4 py-2 themed-btn-primary rounded-lg disabled:opacity-50">
+              <span x-show="!submitting">提交调账</span>
+              <span x-show="submitting">提交中...</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 调账记录（data-table） -->
+      <div class="lg:col-span-2" @table-action="handleRecordsTableAction($event.detail)">
+        <div class="themed-card rounded-lg shadow">
+          <div class="p-4 border-b">
+            <h5 class="font-semibold">调账记录</h5>
+          </div>
+          <div x-data="dataTable({
+            columns: recordsTableColumns,
+            dataSource: fetchRecordsTableData,
+            primaryKey: 'transaction_id',
+            sortable: true,
+            selectable: false,
+            exportable: false,
+            page_size: 20,
+            emptyText: '暂无调整记录，请先搜索用户'
+          })" x-init="init()" @dt-records-refresh.window="search()">
+            <!-- 标准数据表格组件模板（data-table EJS partial）- 配合 Alpine.js dataTable 组件使用 -->
+<!-- ===== 工具栏 ===== -->
+<div class="flex justify-between items-center mb-3">
+  <div class="flex items-center gap-3">
+    <!-- 选择信息（#13） -->
+    <template x-if="selectable && selectedRows.length > 0">
+      <div class="flex items-center gap-2 text-sm themed-text-primary themed-bg-primary-light px-3 py-1.5 rounded-lg">
+        <span>已选 <strong x-text="selectedRows.length"></strong> 项</span>
+        <button @click="clearSelection()" class="themed-text-primary hover:underline text-xs underline">取消选择</button>
+      </div>
+    </template>
+    <!-- 上次更新时间（#2） -->
+    <template x-if="lastUpdateTime">
+      <span class="text-xs text-gray-400">最后更新: <span x-text="lastUpdateTime"></span></span>
+    </template>
+  </div>
+  <div class="flex items-center gap-2">
+    <!-- 导出按钮（#12） -->
+    <template x-if="exportable">
+      <button @click="openExport()" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1">
+        📥 <span>导出</span>
+      </button>
+    </template>
+    <!-- 刷新按钮 -->
+    <button @click="refresh()" :disabled="loading" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1 disabled:opacity-50">
+      🔄 <span>刷新</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== 表格 ===== -->
+<div class="overflow-x-auto themed-card rounded-lg shadow">
+  <table class="w-full">
+    <!-- 表头 -->
+    <thead class="themed-bg-muted">
+      <tr>
+        <!-- 选择列（#13） -->
+        <template x-if="selectable">
+          <th class="px-4 py-3 text-center w-12">
+            <input type="checkbox"
+              :checked="isAllSelected"
+              :indeterminate.prop="isPartialSelected"
+              @change="toggleSelectAll($event.target.checked)"
+              class="rounded border-gray-300">
+          </th>
+        </template>
+        <!-- 数据列（#10 排序） -->
+        <template x-for="(col, colIdx) in columns" :key="'th_' + colIdx">
+          <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary"
+            :class="{ 'cursor-pointer themed-th-sortable select-none': sortable && col.sortable }"
+            :style="col.width ? 'width:' + col.width : ''"
+            @click="sort(col)">
+            <div class="flex items-center gap-1">
+              <span x-text="col.label"></span>
+              <template x-if="sortable && col.sortable">
+                <span class="text-xs" :class="sortColumn === col.key ? 'themed-text-primary font-bold' : 'text-gray-400'" x-text="getSortIcon(col)"></span>
+              </template>
+            </div>
+          </th>
+        </template>
+      </tr>
+    </thead>
+    <!-- 状态行（加载/错误/空）独立 tbody，避免与 x-for 在同一 tbody 导致 Alpine.js DOM 引用丢失 -->
+    <tbody x-show="loading || hasError || isEmpty" class="divide-y themed-divide">
+      <!-- 加载状态 -->
+      <tr x-show="loading">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <div class="animate-spin w-8 h-8 border-4 themed-border-primary border-t-transparent rounded-full"></div>
+            <span class="text-sm themed-text-muted">加载中...</span>
+          </div>
+        </td>
+      </tr>
+      <!-- 错误状态（#5） -->
+      <tr x-show="hasError">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-3">
+            <span class="text-4xl">❌</span>
+            <div class="text-red-600 font-medium">加载失败</div>
+            <div class="text-sm text-gray-500" x-text="error"></div>
+            <button @click="loadData()" class="px-4 py-2 themed-bg-primary text-white rounded-lg text-sm">🔄 重试</button>
+          </div>
+        </td>
+      </tr>
+      <!-- 空状态 -->
+      <tr x-show="isEmpty">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <span class="text-4xl">📭</span>
+            <div class="themed-text-muted" x-text="emptyText"></div>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+    <!-- 数据行独立 tbody，x-for 是唯一模板，避免 Alpine.js x-for + x-if 嵌套 DOM 引用 bug -->
+    <tbody x-show="hasData" class="divide-y themed-divide">
+      <template x-for="(row, rowIndex) in data" :key="String(row[primaryKey] || '') + '_' + rowIndex">
+        <tr class="themed-hover-bg transition-colors" @click="handleRowClick(row, rowIndex)">
+          <!-- 选择列 -->
+          <template x-if="selectable">
+            <td class="px-4 py-3 text-center" @click.stop>
+              <input type="checkbox"
+                :checked="isSelected(row[primaryKey])"
+                @change="toggleSelect(row[primaryKey])"
+                class="rounded border-gray-300">
+            </td>
+          </template>
+          <!-- 数据列 -->
+          <template x-for="(col, colIdx) in columns" :key="'td_' + rowIndex + '_' + colIdx">
+            <td class="px-4 py-3 text-sm" :class="col.type === 'actions' ? '' : 'themed-text-primary'">
+              <!-- 普通列：使用 renderCell -->
+              <span x-show="col.type !== 'actions'" x-html="renderCell(row, col)"></span>
+              <!-- 操作列：使用 Alpine 指令（支持 @click） -->
+              <div x-show="col.type === 'actions'" class="flex items-center gap-1" @click.stop>
+                <template x-for="action in (col.actions || [])" :key="action.name">
+                  <button
+                    x-show="!action.condition || action.condition(row)"
+                    @click="$dispatch('table-action', { action: action.name, row: JSON.parse(JSON.stringify(row)) })"
+                    class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
+                    :class="action.class || 'themed-text-primary'"
+                    x-html="(action.icon ? action.icon + ' ' : '') + action.label">
+                  </button>
+                </template>
+              </div>
+            </td>
+          </template>
+        </tr>
+      </template>
+    </tbody>
+  </table>
+
+  <!-- ===== 分页栏（#4 统一分页） ===== -->
+  <template x-if="total_records > 0">
+    <div class="px-4 py-3 border-t themed-divide flex justify-between items-center">
+      <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+      <div class="flex items-center gap-1">
+        <!-- 首页 -->
+        <button @click="firstPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">«</button>
+        <!-- 上一页 -->
+        <button @click="prevPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+        <!-- 页码 -->
+        <template x-for="page in visiblePages" :key="'p_' + page">
+          <button @click="goToPage(page)"
+            :disabled="page === '...'"
+            :class="page === current_page ? 'themed-bg-primary text-white themed-border-primary' : 'hover:bg-gray-50'"
+            class="px-3 py-1 text-sm border rounded min-w-[32px]"
+            x-text="page"></button>
+        </template>
+        <!-- 下一页 -->
+        <button @click="nextPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+        <!-- 末页 -->
+        <button @click="lastPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">»</button>
+      </div>
+    </div>
+  </template>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 资产调整 Modal (新架构) -->
+  <div x-ref="adjustModal" 
+       x-show="isModalOpen('adjustModal')" 
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('adjustModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">⚖️ 资产调整</h5>
+        <button @click="hideModal('adjustModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      <form @submit.prevent="submitAdjust()">
+        <div class="p-6 space-y-4">
+          <!-- 当前用户信息 -->
+          <div x-show="current_user" class="themed-bg-primary-light rounded-lg p-3 text-sm">
+            <p><strong>用户:</strong> <span x-text="current_user?.nickname || current_user?.user_id"></span></p>
+            <p><strong>ID:</strong> <span class="font-mono" x-text="current_user?.user_id"></span></p>
+          </div>
+          
+          <!-- 资产类型 -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">资产类型 <span class="text-red-500">*</span></label>
+            <select x-model="adjustForm.asset_code" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500" required>
+              <option value="">请选择资产类型</option>
+              <template x-for="(asset, idx) in assetTypes" :key="asset.asset_code + '_' + idx">
+                <option :value="asset.asset_code" x-text="asset.display_name || asset.name"></option>
+              </template>
+            </select>
+          </div>
+          
+          <!-- 活动选择 (仅预算积分时显示) -->
+          <div x-show="adjustForm.asset_code === 'budget_points'">
+            <label class="block text-sm font-medium themed-text-secondary mb-1">关联活动 <span class="text-red-500">*</span></label>
+            <select x-model="adjustForm.campaign_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500">
+              <option value="">请选择活动</option>
+              <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
+                <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
+              </template>
+            </select>
+          </div>
+          
+          <!-- 调整方式 -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">调整方式</label>
+            <div class="flex space-x-4">
+              <label class="flex items-center cursor-pointer">
+                <input type="radio" x-model="adjustForm.adjust_type" value="increase" class="mr-2 text-green-600">
+                <span class="text-green-600 font-medium">➕ 增加</span>
+              </label>
+              <label class="flex items-center cursor-pointer">
+                <input type="radio" x-model="adjustForm.adjust_type" value="decrease" class="mr-2 text-red-600">
+                <span class="text-red-600 font-medium">➖ 减少</span>
+              </label>
+            </div>
+          </div>
+          
+          <!-- 调整数量 -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">调整数量 <span class="text-red-500">*</span></label>
+            <input type="number" x-model.number="adjustForm.amount" min="1" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500" placeholder="请输入调整数量" required>
+          </div>
+          
+          <!-- 调整原因 -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">调整原因 <span class="text-red-500">*</span></label>
+            <textarea x-model="adjustForm.reason" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500" placeholder="请详细说明调整原因..." required></textarea>
+          </div>
+        </div>
+        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+          <button type="button" @click="hideModal('adjustModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+          <button type="submit" class="px-4 py-2 themed-btn-primary rounded disabled:opacity-50" :disabled="submitting">
+            <span x-show="submitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+            确认调整
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 详情模态框 -->
+  <div x-show="selectedRecord" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="selectedRecord = null">
+    <div class="themed-card rounded-lg shadow-xl w-full max-w-lg mx-4">
+      <div class="p-4 border-b">
+        <h5 class="font-semibold">交易详情</h5>
+      </div>
+      <div class="p-4 space-y-3">
+        <div class="flex justify-between"><span class="themed-text-muted">交易ID:</span><span class="font-mono" x-text="selectedRecord?.transaction_id"></span></div>
+        <div class="flex justify-between"><span class="themed-text-muted">用户:</span><span x-text="current_user?.nickname || current_user?.user_id || '-'"></span></div>
+        <div class="flex justify-between"><span class="themed-text-muted">资产类型:</span><span x-text="selectedRecord?.asset_name || selectedRecord?.asset_type_display || selectedRecord?.asset_name || selectedRecord?.asset_code"></span></div>
+        <div class="flex justify-between"><span class="themed-text-muted">变动数量:</span><span class="font-mono" :class="Number(selectedRecord?.amount) >= 0 ? 'text-green-600' : 'text-red-600'" x-text="(Number(selectedRecord?.amount) >= 0 ? '+' : '') + formatNumber(selectedRecord?.amount)"></span></div>
+        <div class="flex justify-between"><span class="themed-text-muted">变动前余额:</span><span class="font-mono" x-text="formatNumber(selectedRecord?.balance_before)"></span></div>
+        <div class="flex justify-between"><span class="themed-text-muted">变动后余额:</span><span class="font-mono" x-text="formatNumber(selectedRecord?.balance_after)"></span></div>
+        <div class="flex justify-between"><span class="themed-text-muted">业务类型:</span><span x-text="selectedRecord?.business_type || '-'"></span></div>
+        <div class="flex justify-between"><span class="themed-text-muted">操作人:</span><span x-text="selectedRecord?.operator_name || '-'"></span></div>
+        <div class="flex justify-between"><span class="themed-text-muted">创建时间:</span><span x-text="formatDateTimeShort(selectedRecord?.created_at)"></span></div>
+        <div>
+          <span class="themed-text-muted">说明:</span>
+          <p class="mt-1 p-2 themed-bg-base rounded text-sm" x-text="selectedRecord?.reason || selectedRecord?.description || '无'"></p>
+        </div>
+      </div>
+      <div class="p-4 border-t flex justify-end">
+        <button @click="selectedRecord = null" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+
+</body>
+</html>

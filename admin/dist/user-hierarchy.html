@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>用户层级管理 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; } .role-badge-80 { background-color: #7c3aed; color: white; } .role-badge-60 { background-color: #f97316; color: white; } .role-badge-40 { background-color: #10b981; color: white; } .inactive-row { opacity: 0.6; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/user-hierarchy-oS7b7Z1T.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
+        <span class="text-lg font-semibold">👥 用户层级管理</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-data x-text="Alpine.store('auth')?.user_info?.nickname ? `欢迎，${Alpine.store('auth').user_info.nickname}` : '欢迎，管理员'"></span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6" x-data="userHierarchyPage()" x-init="init()">
+    
+    <!-- 层级说明 -->
+    <div class="themed-bg-primary-light border border-blue-200 rounded-lg p-4 mb-6">
+      <div class="flex items-start">
+        <span class="themed-text-primary mr-2">ℹ️</span>
+        <div>
+          <strong>层级结构：</strong>
+          <span class="ml-2 px-2 py-1 rounded text-xs role-badge-80">区域负责人 (80)</span> →
+          <span class="ml-1 px-2 py-1 rounded text-xs role-badge-60">业务经理 (60)</span> →
+          <span class="ml-1 px-2 py-1 rounded text-xs role-badge-40">业务员 (40)</span> → 门店
+          <p class="text-sm themed-text-muted mt-2">用户层级管理用于管理业务人员的上下级关系。此功能整合了门店分配、业务员管理等能力。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+      <div class="themed-card rounded-lg shadow p-6 text-center border-l-4 themed-border-primary">
+        <span class="text-4xl">👥</span>
+        <h4 class="mt-2 text-2xl font-bold themed-text-primary" x-text="stats.total">0</h4>
+        <small class="themed-text-muted">总层级关系</small>
+      </div>
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <span class="text-4xl">✅</span>
+        <h4 class="mt-2 text-2xl font-bold text-green-600" x-text="stats.active">0</h4>
+        <small class="themed-text-muted">激活中</small>
+      </div>
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <span class="text-4xl">⏸️</span>
+        <h4 class="mt-2 text-2xl font-bold themed-text-muted" x-text="stats.inactive">0</h4>
+        <small class="themed-text-muted">已停用</small>
+      </div>
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <span class="text-4xl">🏪</span>
+        <h4 class="mt-2 text-2xl font-bold text-cyan-600" x-text="stats.storeAssigned">0</h4>
+        <small class="themed-text-muted">已分配门店</small>
+      </div>
+    </div>
+
+    <!-- 操作区域 -->
+    <div class="themed-card rounded-lg shadow mb-6 p-4">
+      <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">角色级别</label>
+          <select class="w-full border rounded-lg px-3 py-2" x-model="filters.role_level" @change="loadData()">
+            <option value="">全部级别</option>
+            <option value="80">区域负责人 (80)</option>
+            <option value="60">业务经理 (60)</option>
+            <option value="40">业务员 (40)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
+          <select class="w-full border rounded-lg px-3 py-2" x-model="filters.status" @change="loadData()">
+            <option value="">全部状态</option>
+            <option value="true">激活中</option>
+            <option value="false">已停用</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">上级手机号</label>
+          <input type="text" class="w-full border rounded-lg px-3 py-2" maxlength="11" x-model="filters.superior_mobile" placeholder="输入上级手机号" @keypress.enter="loadData()">
+        </div>
+        <div>
+          <button class="w-full px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary disabled:opacity-50" 
+                  @click="refreshData()" 
+                  :disabled="loading">
+            <span x-show="!loading">🔄 刷新</span>
+            <span x-show="loading">⏳ 加载中...</span>
+          </button>
+        </div>
+        <div>
+          <button class="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600" @click="openCreateModal()">
+            ➕ 新建层级
+          </button>
+        </div>
+        <div>
+          <button class="w-full px-4 py-2 border themed-border themed-text-muted rounded-lg themed-hover-bg" @click="exportData()">
+            📥 导出
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 层级列表（data-table） -->
+    <div class="themed-card rounded-lg shadow" @table-action="handleHierarchyTableAction($event.detail)">
+      <div class="p-4 border-b">
+        <h5 class="font-semibold">📊 用户层级列表</h5>
+      </div>
+      <div x-data="dataTable({
+        columns: hierarchyTableColumns,
+        dataSource: fetchHierarchyTableData,
+        primaryKey: 'hierarchy_id',
+        sortable: true,
+        selectable: false,
+        exportable: true,
+        page_size: 20,
+        emptyText: '暂无层级数据'
+      })" x-init="init()" @dt-hierarchy-refresh.window="refresh()">
+        <!-- 标准数据表格组件模板（data-table EJS partial）- 配合 Alpine.js dataTable 组件使用 -->
+<!-- ===== 工具栏 ===== -->
+<div class="flex justify-between items-center mb-3">
+  <div class="flex items-center gap-3">
+    <!-- 选择信息（#13） -->
+    <template x-if="selectable && selectedRows.length > 0">
+      <div class="flex items-center gap-2 text-sm themed-text-primary themed-bg-primary-light px-3 py-1.5 rounded-lg">
+        <span>已选 <strong x-text="selectedRows.length"></strong> 项</span>
+        <button @click="clearSelection()" class="themed-text-primary hover:underline text-xs underline">取消选择</button>
+      </div>
+    </template>
+    <!-- 上次更新时间（#2） -->
+    <template x-if="lastUpdateTime">
+      <span class="text-xs text-gray-400">最后更新: <span x-text="lastUpdateTime"></span></span>
+    </template>
+  </div>
+  <div class="flex items-center gap-2">
+    <!-- 导出按钮（#12） -->
+    <template x-if="exportable">
+      <button @click="openExport()" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1">
+        📥 <span>导出</span>
+      </button>
+    </template>
+    <!-- 刷新按钮 -->
+    <button @click="refresh()" :disabled="loading" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1 disabled:opacity-50">
+      🔄 <span>刷新</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== 表格 ===== -->
+<div class="overflow-x-auto themed-card rounded-lg shadow">
+  <table class="w-full">
+    <!-- 表头 -->
+    <thead class="themed-bg-muted">
+      <tr>
+        <!-- 选择列（#13） -->
+        <template x-if="selectable">
+          <th class="px-4 py-3 text-center w-12">
+            <input type="checkbox"
+              :checked="isAllSelected"
+              :indeterminate.prop="isPartialSelected"
+              @change="toggleSelectAll($event.target.checked)"
+              class="rounded border-gray-300">
+          </th>
+        </template>
+        <!-- 数据列（#10 排序） -->
+        <template x-for="(col, colIdx) in columns" :key="'th_' + colIdx">
+          <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary"
+            :class="{ 'cursor-pointer themed-th-sortable select-none': sortable && col.sortable }"
+            :style="col.width ? 'width:' + col.width : ''"
+            @click="sort(col)">
+            <div class="flex items-center gap-1">
+              <span x-text="col.label"></span>
+              <template x-if="sortable && col.sortable">
+                <span class="text-xs" :class="sortColumn === col.key ? 'themed-text-primary font-bold' : 'text-gray-400'" x-text="getSortIcon(col)"></span>
+              </template>
+            </div>
+          </th>
+        </template>
+      </tr>
+    </thead>
+    <!-- 状态行（加载/错误/空）独立 tbody，避免与 x-for 在同一 tbody 导致 Alpine.js DOM 引用丢失 -->
+    <tbody x-show="loading || hasError || isEmpty" class="divide-y themed-divide">
+      <!-- 加载状态 -->
+      <tr x-show="loading">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <div class="animate-spin w-8 h-8 border-4 themed-border-primary border-t-transparent rounded-full"></div>
+            <span class="text-sm themed-text-muted">加载中...</span>
+          </div>
+        </td>
+      </tr>
+      <!-- 错误状态（#5） -->
+      <tr x-show="hasError">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-3">
+            <span class="text-4xl">❌</span>
+            <div class="text-red-600 font-medium">加载失败</div>
+            <div class="text-sm text-gray-500" x-text="error"></div>
+            <button @click="loadData()" class="px-4 py-2 themed-bg-primary text-white rounded-lg text-sm">🔄 重试</button>
+          </div>
+        </td>
+      </tr>
+      <!-- 空状态 -->
+      <tr x-show="isEmpty">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <span class="text-4xl">📭</span>
+            <div class="themed-text-muted" x-text="emptyText"></div>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+    <!-- 数据行独立 tbody，x-for 是唯一模板，避免 Alpine.js x-for + x-if 嵌套 DOM 引用 bug -->
+    <tbody x-show="hasData" class="divide-y themed-divide">
+      <template x-for="(row, rowIndex) in data" :key="String(row[primaryKey] || '') + '_' + rowIndex">
+        <tr class="themed-hover-bg transition-colors" @click="handleRowClick(row, rowIndex)">
+          <!-- 选择列 -->
+          <template x-if="selectable">
+            <td class="px-4 py-3 text-center" @click.stop>
+              <input type="checkbox"
+                :checked="isSelected(row[primaryKey])"
+                @change="toggleSelect(row[primaryKey])"
+                class="rounded border-gray-300">
+            </td>
+          </template>
+          <!-- 数据列 -->
+          <template x-for="(col, colIdx) in columns" :key="'td_' + rowIndex + '_' + colIdx">
+            <td class="px-4 py-3 text-sm" :class="col.type === 'actions' ? '' : 'themed-text-primary'">
+              <!-- 普通列：使用 renderCell -->
+              <span x-show="col.type !== 'actions'" x-html="renderCell(row, col)"></span>
+              <!-- 操作列：使用 Alpine 指令（支持 @click） -->
+              <div x-show="col.type === 'actions'" class="flex items-center gap-1" @click.stop>
+                <template x-for="action in (col.actions || [])" :key="action.name">
+                  <button
+                    x-show="!action.condition || action.condition(row)"
+                    @click="$dispatch('table-action', { action: action.name, row: JSON.parse(JSON.stringify(row)) })"
+                    class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
+                    :class="action.class || 'themed-text-primary'"
+                    x-html="(action.icon ? action.icon + ' ' : '') + action.label">
+                  </button>
+                </template>
+              </div>
+            </td>
+          </template>
+        </tr>
+      </template>
+    </tbody>
+  </table>
+
+  <!-- ===== 分页栏（#4 统一分页） ===== -->
+  <template x-if="total_records > 0">
+    <div class="px-4 py-3 border-t themed-divide flex justify-between items-center">
+      <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+      <div class="flex items-center gap-1">
+        <!-- 首页 -->
+        <button @click="firstPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">«</button>
+        <!-- 上一页 -->
+        <button @click="prevPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+        <!-- 页码 -->
+        <template x-for="page in visiblePages" :key="'p_' + page">
+          <button @click="goToPage(page)"
+            :disabled="page === '...'"
+            :class="page === current_page ? 'themed-bg-primary text-white themed-border-primary' : 'hover:bg-gray-50'"
+            class="px-3 py-1 text-sm border rounded min-w-[32px]"
+            x-text="page"></button>
+        </template>
+        <!-- 下一页 -->
+        <button @click="nextPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+        <!-- 末页 -->
+        <button @click="lastPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">»</button>
+      </div>
+    </div>
+  </template>
+</div>
+
+
+      </div>
+    </div>
+
+    <!-- 新建层级模态框 -->
+    <div x-ref="hierarchyModal" x-show="isModalOpen('hierarchyModal')" @keydown.escape.window="hideModal('hierarchyModal')" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+      <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black opacity-50" @click="hideModal('hierarchyModal')"></div>
+        <div class="themed-card rounded-lg shadow-xl z-10 w-full max-w-md">
+          <div class="px-6 py-4 border-b flex justify-between items-center">
+            <h5 class="text-lg font-semibold">➕ 新建层级关系</h5>
+            <button @click="hideModal('hierarchyModal')" class="themed-text-muted hover:themed-text-secondary text-2xl">&times;</button>
+          </div>
+          <form @submit.prevent="saveHierarchy">
+            <div class="p-6 space-y-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">用户手机号 <span class="text-red-500">*</span></label>
+                <input type="text" class="w-full border rounded-lg px-3 py-2" maxlength="11" x-model="form.mobile" required>
+                <small class="themed-text-muted">输入要建立层级关系的用户手机号</small>
+                <template x-if="resolvedUser">
+                  <p class="text-xs text-green-600 mt-1">✅ <span x-text="resolvedUser.nickname"></span> (<span x-text="resolvedUser.mobile"></span>)</p>
+                </template>
+                <template x-if="resolveError">
+                  <p class="text-xs text-red-500 mt-1" x-text="resolveError"></p>
+                </template>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">角色 <span class="text-red-500">*</span></label>
+                <select class="w-full border rounded-lg px-3 py-2" x-model="form.role_id" required>
+                  <option value="">请选择角色</option>
+                  <template x-for="role in rolesList" :key="role.role_id">
+                    <option :value="role.role_id" x-text="`${role.role_name} (${role.level_name})`"></option>
+                  </template>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">上级手机号</label>
+                <input type="text" class="w-full border rounded-lg px-3 py-2" maxlength="11" x-model="form.superior_mobile">
+                <small class="themed-text-muted">区域负责人可不填；业务经理需填写区域负责人手机号；业务员需填写业务经理手机号</small>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">关联门店ID</label>
+                <input type="number" class="w-full border rounded-lg px-3 py-2" x-model.number="form.store_id">
+                <small class="themed-text-muted">仅业务员需要关联门店</small>
+              </div>
+            </div>
+            <div class="px-6 py-4 border-t flex justify-end space-x-2">
+              <button type="button" class="px-4 py-2 border rounded-lg themed-hover-bg" @click="hideModal('hierarchyModal')">取消</button>
+              <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary">保存</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- 停用原因模态框 -->
+    <div x-ref="deactivateModal" x-show="isModalOpen('deactivateModal')" @keydown.escape.window="hideModal('deactivateModal')" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+      <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black opacity-50" @click="hideModal('deactivateModal')"></div>
+        <div class="themed-card rounded-lg shadow-xl z-10 w-full max-w-md">
+          <div class="px-6 py-4 border-b bg-yellow-50 flex justify-between items-center">
+            <h5 class="text-lg font-semibold text-yellow-800">⚠️ 停用用户权限</h5>
+            <button @click="hideModal('deactivateModal')" class="themed-text-muted hover:themed-text-secondary text-2xl">&times;</button>
+          </div>
+          <form @submit.prevent="confirmDeactivate">
+            <div class="p-6 space-y-4">
+              <p>您正在停用用户 <strong x-text="deactivateForm.user_info"></strong> 的层级权限。</p>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">停用原因 <span class="text-red-500">*</span></label>
+                <textarea class="w-full border rounded-lg px-3 py-2" x-model="deactivateForm.reason" rows="3" placeholder="请输入停用原因" required></textarea>
+              </div>
+              <div class="flex items-start">
+                <input type="checkbox" class="mt-1 mr-2" x-model="deactivateForm.include_subordinates" id="include_subordinates">
+                <label class="text-red-600 text-sm" for="include_subordinates">
+                  <strong>同时停用所有下级用户</strong>（谨慎选择，将级联停用该用户管理的所有下级）
+                </label>
+              </div>
+            </div>
+            <div class="px-6 py-4 border-t flex justify-end space-x-2">
+              <button type="button" class="px-4 py-2 border rounded-lg themed-hover-bg" @click="hideModal('deactivateModal')">取消</button>
+              <button type="submit" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">确认停用</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- 下级用户查看模态框 -->
+    <div x-ref="subordinatesModal" x-show="isModalOpen('subordinatesModal')" @keydown.escape.window="hideModal('subordinatesModal')" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+      <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black opacity-50" @click="hideModal('subordinatesModal')"></div>
+        <div class="themed-card rounded-lg shadow-xl z-10 w-full max-w-2xl">
+          <div class="px-6 py-4 border-b flex justify-between items-center">
+            <h5 class="text-lg font-semibold">📊 下级用户列表</h5>
+            <button @click="hideModal('subordinatesModal')" class="themed-text-muted hover:themed-text-secondary text-2xl">&times;</button>
+          </div>
+          <div class="p-6">
+            <template x-if="subordinatesLoading">
+              <div class="text-center themed-text-muted py-8">
+                ⏳ 加载中...
+              </div>
+            </template>
+            <template x-if="!subordinatesLoading && subordinates.length === 0">
+              <div class="text-center themed-text-muted py-8">
+                📭 该用户暂无下级
+              </div>
+            </template>
+            <template x-if="!subordinatesLoading && subordinates.length > 0">
+              <table class="w-full text-sm">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <th class="px-4 py-2 text-left">用户</th>
+                    <th class="px-4 py-2 text-left">角色</th>
+                    <th class="px-4 py-2 text-left">状态</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="sub in subordinates" :key="sub.user_id">
+                    <tr>
+                      <td class="px-4 py-2">
+                        <span x-text="sub.user_nickname || '-'"></span>
+                        <small class="themed-text-muted" x-text="`(${sub.user_mobile || '-'})`"></small>
+                      </td>
+                      <td class="px-4 py-2">
+                        <span class="px-2 py-1 rounded text-xs" :class="`role-badge-${sub.role_level || 40}`" x-text="sub.role_name || '-'"></span>
+                      </td>
+                      <td class="px-4 py-2">
+                        <template x-if="sub.is_active">
+                          <span class="px-2 py-1 bg-green-100 themed-text-success rounded text-xs">激活</span>
+                        </template>
+                        <template x-if="!sub.is_active">
+                          <span class="px-2 py-1 themed-bg-subtle themed-text-muted rounded text-xs">停用</span>
+                        </template>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 页面底部 - 可用于全局脚本或版权信息 -->
+
+
+
+</body>
+</html>

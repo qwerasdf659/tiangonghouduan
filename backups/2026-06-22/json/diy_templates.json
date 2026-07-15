@@ -1,0 +1,229 @@
+[
+  {
+    "diy_template_id": "1",
+    "category_id": 191,
+    "layout": {
+      "shape": "circle",
+      "radius_x": 120,
+      "radius_y": 120,
+      "bead_count": 18
+    },
+    "sort_order": 1,
+    "created_at": "2026-03-31 19:40:59",
+    "updated_at": "2026-04-08 23:07:38",
+    "template_code": "DT26033100000154",
+    "display_name": "经典串珠手链",
+    "status": "draft",
+    "is_enabled": 1,
+    "bead_rules": {
+      "margin": 10,
+      "default_diameter": 8,
+      "allowed_diameters": [
+        6,
+        8,
+        10,
+        12
+      ]
+    },
+    "sizing_rules": {
+      "default_size": "M",
+      "size_options": [
+        {
+          "label": "S",
+          "display": "小号 (约15cm)",
+          "radius_x": 95,
+          "radius_y": 95,
+          "bead_count": 14
+        },
+        {
+          "label": "M",
+          "display": "中号 (约17cm)",
+          "radius_x": 120,
+          "radius_y": 120,
+          "bead_count": 18
+        },
+        {
+          "label": "L",
+          "display": "大号 (约19cm)",
+          "radius_x": 140,
+          "radius_y": 140,
+          "bead_count": 22
+        }
+      ]
+    },
+    "capacity_rules": {
+      "max_beads": 24,
+      "min_beads": 12
+    },
+    "material_group_codes": [],
+    "preview_media_id": null,
+    "base_image_media_id": null,
+    "meta": null
+  },
+  {
+    "diy_template_id": "2",
+    "category_id": 192,
+    "layout": {
+      "shape": "ellipse",
+      "radius_x": 160,
+      "radius_y": 100,
+      "bead_count": 24
+    },
+    "sort_order": 2,
+    "created_at": "2026-03-31 19:41:11",
+    "updated_at": "2026-04-08 23:07:38",
+    "template_code": "DT26033100000279",
+    "display_name": "锁骨项链",
+    "status": "draft",
+    "is_enabled": 1,
+    "bead_rules": {
+      "margin": 8,
+      "default_diameter": 6,
+      "allowed_diameters": [
+        6,
+        8
+      ]
+    },
+    "sizing_rules": {
+      "default_size": "M",
+      "size_options": [
+        {
+          "label": "S",
+          "display": "短款 (约38cm)",
+          "radius_x": 130,
+          "radius_y": 80,
+          "bead_count": 20
+        },
+        {
+          "label": "M",
+          "display": "中款 (约45cm)",
+          "radius_x": 160,
+          "radius_y": 100,
+          "bead_count": 24
+        },
+        {
+          "label": "L",
+          "display": "长款 (约55cm)",
+          "radius_x": 190,
+          "radius_y": 120,
+          "bead_count": 30
+        }
+      ]
+    },
+    "capacity_rules": {
+      "max_beads": 36,
+      "min_beads": 18
+    },
+    "material_group_codes": [],
+    "preview_media_id": null,
+    "base_image_media_id": null,
+    "meta": null
+  },
+  {
+    "diy_template_id": "40",
+    "category_id": 194,
+    "layout": {
+      "shape": "slots",
+      "background_width": 800,
+      "slot_definitions": [
+        {
+          "x": 0.5,
+          "y": 0.638,
+          "label": "槽位1",
+          "width": 0.623,
+          "height": 0.498,
+          "slot_id": "slot_1",
+          "required": false,
+          "rotation": 0,
+          "allowed_shapes": [
+            "circle",
+            "ellipse"
+          ],
+          "allowed_group_codes": []
+        }
+      ],
+      "background_height": 1000
+    },
+    "sort_order": 0,
+    "created_at": "2026-04-09 00:12:40",
+    "updated_at": "2026-04-22 16:41:37",
+    "template_code": "DT26040900004093",
+    "display_name": "吊坠01",
+    "status": "draft",
+    "is_enabled": 1,
+    "bead_rules": {
+      "margin": 10,
+      "default_diameter": 10,
+      "allowed_diameters": [
+        8
+      ]
+    },
+    "sizing_rules": null,
+    "capacity_rules": {
+      "max_beads": 24,
+      "min_beads": 12
+    },
+    "material_group_codes": [],
+    "preview_media_id": null,
+    "base_image_media_id": null,
+    "meta": null
+  },
+  {
+    "diy_template_id": "65",
+    "category_id": 194,
+    "layout": {
+      "shape": "slots",
+      "background_width": 800,
+      "slot_definitions": [
+        {
+          "x": 0.533,
+          "y": 0.641,
+          "label": "槽位1",
+          "width": 0.632,
+          "height": 0.505,
+          "slot_id": "slot_1",
+          "required": false,
+          "rotation": 0,
+          "allowed_shapes": [
+            "circle",
+            "ellipse"
+          ],
+          "render_diameter": null,
+          "_previewMaterial": {
+            "price": 30,
+            "diameter": 8,
+            "image_url": "https://omqktqrtntnn.sealosbja.site/api/v4/images/uploads/1777333491106_cacac243d5c5c9f4.png",
+            "display_name": "海蓝宝",
+            "diy_material_id": "17"
+          },
+          "allowed_diameters": [],
+          "allowed_group_codes": []
+        }
+      ],
+      "background_height": 1000
+    },
+    "sort_order": 0,
+    "created_at": "2026-04-28 07:49:52",
+    "updated_at": "2026-04-28 07:50:47",
+    "template_code": "DT260428000065D5",
+    "display_name": "项链12",
+    "status": "published",
+    "is_enabled": 1,
+    "bead_rules": {
+      "margin": 10,
+      "default_diameter": 10,
+      "allowed_diameters": [
+        8
+      ]
+    },
+    "sizing_rules": null,
+    "capacity_rules": {
+      "max_beads": 24,
+      "min_beads": 12
+    },
+    "material_group_codes": [],
+    "preview_media_id": null,
+    "base_image_media_id": null,
+    "meta": null
+  }
+]

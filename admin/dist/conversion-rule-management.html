@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+<title>资产转换规则管理 - 管理后台</title>
+<style>[x-cloak] { display: none !important; }</style>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+
+
+  <script type="module" crossorigin src="/admin/assets/conversion-rule-management-CO1nA8Xx.js"></script>
+  <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+</head>
+<body class="themed-bg-subtle min-h-screen">
+
+  <!-- 页面主体 -->
+  <div x-data="conversionRuleManagementPage()" x-init="init()">
+
+    <!-- 导航栏 -->
+    <nav class="bg-emerald-600 text-white shadow-lg">
+      <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+        <div class="flex items-center space-x-4">
+          <a href="/admin/workspace.html" class="hover:text-emerald-200">← 返回工作台</a>
+          <span class="text-lg font-semibold">🔄 资产转换规则管理</span>
+        </div>
+        <button @click="openCreateForm()" class="bg-white text-emerald-600 px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-50">
+          + 新增转换规则
+        </button>
+      </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-6">
+
+    <!-- ==================== 页面横幅 ==================== -->
+    <div class="themed-card rounded-lg shadow p-4 mb-6 border-l-4 border-emerald-500">
+      <h1 class="text-xl font-bold themed-text mb-1">🔄 资产转换规则管理</h1>
+      <p class="themed-text-muted text-sm">统一管理所有资产间的转换规则（碎片→星石、碎片→碎片等）。支持比率设置、手续费、限额、时间窗、优先级。</p>
+    </div>
+
+    <!-- ==================== 筛选区域 ==================== -->
+    <div class="themed-card rounded-lg shadow p-4 mb-6">
+      <div class="flex flex-wrap gap-4 items-center">
+        <div>
+          <label class="text-sm themed-text-muted block mb-1">状态筛选</label>
+          <select x-model="filter_status" @change="onFilterChange()" class="themed-input rounded px-3 py-1.5 text-sm">
+            <template x-for="opt in status_options" :key="opt.value">
+              <option :value="opt.value" x-text="opt.label"></option>
+            </template>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm themed-text-muted block mb-1">源资产</label>
+          <input type="text" x-model="filter_from_asset" @input.debounce.500ms="onFilterChange()" 
+                 placeholder="输入资产代码" class="themed-input rounded px-3 py-1.5 text-sm w-40">
+        </div>
+        <div>
+          <label class="text-sm themed-text-muted block mb-1">目标资产</label>
+          <input type="text" x-model="filter_to_asset" @input.debounce.500ms="onFilterChange()" 
+                 placeholder="输入资产代码" class="themed-input rounded px-3 py-1.5 text-sm w-40">
+        </div>
+        <div class="flex-1"></div>
+        <div class="text-sm themed-text-muted">
+          共 <span class="font-bold" x-text="pagination.total"></span> 条规则
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 数据表格 ==================== -->
+    <div class="themed-card rounded-lg shadow overflow-hidden mb-6">
+      <!-- 加载状态 -->
+      <template x-if="list_loading">
+        <div class="p-8 text-center themed-text-muted">加载中...</div>
+      </template>
+
+      <!-- 错误状态 -->
+      <template x-if="list_error && !list_loading">
+        <div class="p-8 text-center text-red-500" x-text="list_error"></div>
+      </template>
+
+      <!-- 数据表格 -->
+      <template x-if="!list_loading && !list_error">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="themed-bg-muted">
+              <tr>
+                <th class="px-4 py-3 text-left themed-text font-medium">ID</th>
+                <th class="px-4 py-3 text-left themed-text font-medium">转换规则</th>
+                <th class="px-4 py-3 text-left themed-text font-medium">比率</th>
+                <th class="px-4 py-3 text-left themed-text font-medium">数量限制</th>
+                <th class="px-4 py-3 text-left themed-text font-medium">每日限额</th>
+                <th class="px-4 py-3 text-left themed-text font-medium">手续费</th>
+                <th class="px-4 py-3 text-left themed-text font-medium">舍入</th>
+                <th class="px-4 py-3 text-left themed-text font-medium">状态</th>
+                <th class="px-4 py-3 text-left themed-text font-medium">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="rule in rules" :key="rule.conversion_rule_id">
+                <tr class="border-t themed-border hover:themed-bg-muted transition-colors">
+                  <td class="px-4 py-3 themed-text-muted" x-text="rule.conversion_rule_id"></td>
+                  <td class="px-4 py-3">
+                    <div class="font-medium themed-text" x-text="rule.from_asset_code + ' → ' + rule.to_asset_code"></div>
+                    <div class="text-xs themed-text-muted" x-text="rule.title || rule.description || ''"></div>
+                  </td>
+                  <td class="px-4 py-3 font-mono text-emerald-600" x-text="formatRate(rule)"></td>
+                  <td class="px-4 py-3 themed-text">
+                    <span x-text="rule.min_from_amount"></span> / <span x-text="formatLimit(rule.max_from_amount)"></span>
+                  </td>
+                  <td class="px-4 py-3 themed-text" x-text="formatLimit(rule.daily_user_limit)"></td>
+                  <td class="px-4 py-3 themed-text" x-text="formatFeeRate(rule.fee_rate)"></td>
+                  <td class="px-4 py-3 themed-text text-xs" x-text="rule.rounding_mode || 'floor'"></td>
+                  <td class="px-4 py-3">
+                    <span class="px-2 py-0.5 rounded-full text-xs font-medium"
+                          :class="getStatusInfo(rule.status).color"
+                          x-text="getStatusInfo(rule.status).label"></span>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="flex gap-2">
+                      <button @click="openEditForm(rule)" class="text-blue-600 hover:text-blue-800 text-xs">编辑</button>
+                      <button @click="toggleStatus(rule)"
+                              :class="rule.status === 'active' ? 'text-yellow-600 hover:text-yellow-800' : 'text-green-600 hover:text-green-800'"
+                              class="text-xs"
+                              x-text="rule.status === 'active' ? '暂停' : '启用'"></button>
+                      <button x-show="rule.status !== 'disabled'" @click="disableRule(rule)"
+                              class="text-red-600 hover:text-red-800 text-xs">禁用</button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+              <template x-if="rules.length === 0 && !list_loading">
+                <tr><td colspan="9" class="px-4 py-8 text-center themed-text-muted">暂无转换规则</td></tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </template>
+
+      <!-- 分页 -->
+      <template x-if="pagination.total > pagination.page_size">
+        <div class="px-4 py-3 themed-bg-muted flex justify-between items-center text-sm">
+          <span class="themed-text-muted">第 <span x-text="pagination.page"></span> / <span x-text="total_pages"></span> 页</span>
+          <div class="flex gap-2">
+            <button @click="goToPage(pagination.page - 1)" :disabled="!has_prev_page"
+                    class="px-3 py-1 rounded themed-border border disabled:opacity-50">上一页</button>
+            <button @click="goToPage(pagination.page + 1)" :disabled="!has_next_page"
+                    class="px-3 py-1 rounded themed-border border disabled:opacity-50">下一页</button>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- ==================== 新增/编辑弹窗 ==================== -->
+    <template x-if="show_form">
+      <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="closeForm()">
+        <div class="themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+          <div class="p-6">
+            <h3 class="text-lg font-bold themed-text mb-4" x-text="is_editing ? '编辑转换规则' : '新增转换规则'"></h3>
+            
+            <div class="space-y-4">
+              <!-- 源资产 / 目标资产 -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">源资产代码 *</label>
+                  <input type="text" x-model="form.from_asset_code" placeholder="如 red_core_shard"
+                         :disabled="is_editing" class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">目标资产代码 *</label>
+                  <input type="text" x-model="form.to_asset_code" placeholder="如 star_stone"
+                         :disabled="is_editing" class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+              </div>
+
+              <!-- 比率 -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">比率分子（产出量） *</label>
+                  <input type="number" x-model.number="form.rate_numerator" min="1"
+                         class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">比率分母（输入量） *</label>
+                  <input type="number" x-model.number="form.rate_denominator" min="1"
+                         class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+              </div>
+              <p class="text-xs themed-text-muted -mt-2">
+                预览：<span class="font-mono text-emerald-600" x-text="`${form.rate_denominator} ${form.from_asset_code || '?'} = ${form.rate_numerator} ${form.to_asset_code || '?'}`"></span>
+              </p>
+
+              <!-- 舍入模式 -->
+              <div>
+                <label class="block text-sm themed-text-muted mb-1">舍入模式</label>
+                <select x-model="form.rounding_mode" class="w-full themed-input rounded px-3 py-2 text-sm">
+                  <template x-for="opt in rounding_mode_options" :key="opt.value">
+                    <option :value="opt.value" x-text="opt.label"></option>
+                  </template>
+                </select>
+              </div>
+
+              <!-- 数量限制 -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">最小转换量</label>
+                  <input type="number" x-model.number="form.min_from_amount" min="1"
+                         class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">最大转换量（空=无限制）</label>
+                  <input type="number" x-model.number="form.max_from_amount"
+                         class="w-full themed-input rounded px-3 py-2 text-sm" placeholder="无限制">
+                </div>
+              </div>
+
+              <!-- 每日限额 -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">每用户日限额（空=无限制）</label>
+                  <input type="number" x-model.number="form.daily_user_limit"
+                         class="w-full themed-input rounded px-3 py-2 text-sm" placeholder="无限制">
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">全局日限额（空=无限制）</label>
+                  <input type="number" x-model.number="form.daily_global_limit"
+                         class="w-full themed-input rounded px-3 py-2 text-sm" placeholder="无限制">
+                </div>
+              </div>
+
+              <!-- 手续费 + 优先级 -->
+              <div class="grid grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">手续费率（0=免费）</label>
+                  <input type="number" x-model.number="form.fee_rate" step="0.0001" min="0" max="1"
+                         class="w-full themed-input rounded px-3 py-2 text-sm" placeholder="0">
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">手续费资产代码</label>
+                  <select x-model="form.fee_asset_code"
+                          class="w-full themed-input rounded px-3 py-2 text-sm">
+                    <option value="">同扣减资产</option>
+                    <template x-for="t in asset_types" :key="t.asset_code">
+                      <option :value="t.asset_code" x-text="t.display_name + ' (' + t.asset_code + ')'"></option>
+                    </template>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm themed-text-muted mb-1">优先级</label>
+                  <input type="number" x-model.number="form.priority" min="0"
+                         class="w-full themed-input rounded px-3 py-2 text-sm">
+                </div>
+              </div>
+
+              <!-- 标题 + 描述 -->
+              <div>
+                <label class="block text-sm themed-text-muted mb-1">标题（可选）</label>
+                <input type="text" x-model="form.title" maxlength="100"
+                       class="w-full themed-input rounded px-3 py-2 text-sm" placeholder="规则标题">
+              </div>
+              <div>
+                <label class="block text-sm themed-text-muted mb-1">描述（运营备注）</label>
+                <input type="text" x-model="form.description" maxlength="500"
+                       class="w-full themed-input rounded px-3 py-2 text-sm" placeholder="可选">
+              </div>
+
+              <!-- 可见性 -->
+              <div class="flex items-center gap-2">
+                <input type="checkbox" x-model="form.is_visible" id="is_visible" class="rounded">
+                <label for="is_visible" class="text-sm themed-text">对用户可见</label>
+              </div>
+
+              <!-- 生效时间 -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium themed-text mb-1">生效开始时间</label>
+                  <input type="datetime-local" x-model="form.effective_from"
+                         class="w-full themed-input rounded px-3 py-2 text-sm">
+                  <p class="text-xs themed-text-secondary mt-1">留空表示立即生效</p>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium themed-text mb-1">生效结束时间</label>
+                  <input type="datetime-local" x-model="form.effective_until"
+                         class="w-full themed-input rounded px-3 py-2 text-sm">
+                  <p class="text-xs themed-text-secondary mt-1">留空表示永久有效</p>
+                </div>
+              </div>
+
+              <!-- 展示图标 + 风险等级 + 展示分类 -->
+              <div class="grid grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-sm font-medium themed-text mb-1">展示图标</label>
+                  <input type="text" x-model="form.display_icon"
+                         class="w-full themed-input rounded px-3 py-2 text-sm"
+                         placeholder="如 🔄 或图标URL">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium themed-text mb-1">风险等级</label>
+                  <select x-model="form.risk_level"
+                          class="w-full themed-input rounded px-3 py-2 text-sm">
+                    <template x-for="opt in risk_level_options" :key="opt.value">
+                      <option :value="opt.value" x-text="opt.label"></option>
+                    </template>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium themed-text mb-1">展示分类</label>
+                  <select x-model="form.display_category"
+                          class="w-full themed-input rounded px-3 py-2 text-sm">
+                    <template x-for="opt in display_category_options" :key="opt.value">
+                      <option :value="opt.value" x-text="opt.label"></option>
+                    </template>
+                  </select>
+                  <p class="text-xs themed-text-secondary mt-1">留空则根据资产 tier 自动推导</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 按钮 -->
+            <div class="flex justify-end gap-3 mt-6">
+              <button @click="closeForm()" class="px-4 py-2 rounded themed-border border text-sm">取消</button>
+              <button @click="submitForm()" class="px-4 py-2 rounded bg-emerald-600 text-white text-sm hover:bg-emerald-700">
+                <span x-text="is_editing ? '保存修改' : '创建规则'"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    </div><!-- /.container -->
+  </div><!-- /x-data -->
+
+  <!-- JS 模块 -->
+
+</body>
+</html>
