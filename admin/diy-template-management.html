@@ -262,6 +262,26 @@
               </div>
             </div>
 
+            <!-- 允许素材分组（material_group_codes，拍板 13：镶嵌模板限定只填宝石） -->
+            <div class="border-t pt-4">
+              <h4 class="text-sm font-semibold mb-2">允许素材分组</h4>
+              <p class="text-xs text-gray-400 mb-2">
+                勾选本模板可用的素材分组；全不勾=不限制（全部分组可用）。
+                镶嵌模板建议只勾宝石分组（蓝/红/绿），避免用户把水晶串珠填进宝石镶口。
+              </p>
+              <div class="flex flex-wrap gap-3">
+                <template x-for="opt in groupOptions" :key="opt.value">
+                  <label class="inline-flex items-center gap-1 text-sm cursor-pointer">
+                    <input type="checkbox"
+                           :checked="isMaterialGroupChecked(opt.value)"
+                           @change="toggleMaterialGroup(opt.value)"
+                           class="rounded border-gray-300">
+                    <span x-text="opt.label"></span>
+                  </label>
+                </template>
+              </div>
+            </div>
+
             <!-- 珠子规则（串珠模式，仅 bead_rules 非 null 时渲染） -->
             <template x-if="!isSlotMode && form.bead_rules">
               <div class="border-t pt-4">

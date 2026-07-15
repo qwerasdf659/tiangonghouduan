@@ -81,6 +81,8 @@ export function imageUploadMixin(config = {}) {
      * @param {File} file - 要上传的文件对象
      * @param {Object} [options={}] - 上传选项
      * @param {boolean} [options.trim_transparent=false] - 是否裁剪透明边距（DIY 素材图场景）
+     * @param {boolean} [options.pad_to_square=false] - 是否垫成正方形（透明底、主体居中，
+     *   DIY 珠子/宝石图场景，后端 sharp 处理，拍板决议 D.7.1）
      * @param {string} [options.folder] - 存储文件夹（默认 uploads）
      * @returns {Promise<MediaUploadResult|null>} 上传成功返回媒体数据，失败返回 null
      * @returns {number} return.media_id - 媒体 ID
@@ -118,6 +120,7 @@ export function imageUploadMixin(config = {}) {
         const formData = new FormData()
         formData.append('image', file)
         if (options.trim_transparent) formData.append('trim_transparent', 'true')
+        if (options.pad_to_square) formData.append('pad_to_square', 'true')
         if (options.folder) formData.append('folder', options.folder)
 
         const result = await request({

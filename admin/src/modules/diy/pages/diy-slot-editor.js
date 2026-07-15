@@ -13,6 +13,7 @@
 
 import { logger } from '@/utils/logger.js'
 import { Alpine } from '@/alpine/index.js'
+import { DIY_GROUP_LABELS } from '../constants.js'
 import { getTemplateDetail, updateTemplate, getAdminMaterialList } from '@/api/diy.js'
 import Konva from 'konva'
 
@@ -33,8 +34,8 @@ const state = {
   bgNaturalWidth: 800,
   bgNaturalHeight: 1000,
   saving: false,
-  materials: [],       // 珠子素材列表
-  previewImages: {}    // { slotIndex: Konva.Image } 已镶嵌的预览图
+  materials: [], // 珠子素材列表
+  previewImages: {} // { slotIndex: Konva.Image } 已镶嵌的预览图
 }
 
 // 暴露给 Alpine 的全局引用
@@ -72,7 +73,11 @@ async function initEditor() {
       state.bgImageUrl = bgUrl
     }
 
-    logger.info('[SlotEditor] 模板加载成功', { id: state.templateId, name: state.templateName, slots: state.slots.length })
+    logger.info('[SlotEditor] 模板加载成功', {
+      id: state.templateId,
+      name: state.templateName,
+      slots: state.slots.length
+    })
   } catch (e) {
     logger.error('[SlotEditor] 加载模板失败', e)
     alert('加载模板失败: ' + e.message)
@@ -125,7 +130,7 @@ function initKonva() {
   state.slots.forEach((slot, idx) => renderSlot(slot, idx))
 
   // 点击空白区域取消选中
-  state.stage.on('click tap', (e) => {
+  state.stage.on('click tap', e => {
     if (e.target === state.stage || e.target.name() === 'background') {
       state.transformer.nodes([])
       state.selectedIndex = -1
@@ -169,6 +174,25 @@ function drawBackground() {
     const img = new Image()
     img.crossOrigin = 'anonymous'
     img.onload = () => {
+      /*
+       * 底图真实像素尺寸回填（拍板决议 D.6：堵住 800×1000 缺省值错位隐患）：
+       * layout 未存底图尺寸时，用 naturalWidth/Height 覆盖并按真实比例重建画布，
+       * 保证标注即所见、归一化坐标基于真实宽高比；保存时随 layout 一并写库
+       */
+      if (
+        img.naturalWidth > 0 &&
+        img.naturalHeight > 0 &&
+        (state.bgNaturalWidth !== img.naturalWidth || state.bgNaturalHeight !== img.naturalHeight)
+      ) {
+        logger.info('[SlotEditor] 底图真实尺寸回填', {
+          layout_size: `${state.bgNaturalWidth}x${state.bgNaturalHeight}`,
+          natural_size: `${img.naturalWidth}x${img.naturalHeight}`
+        })
+        state.bgNaturalWidth = img.naturalWidth
+        state.bgNaturalHeight = img.naturalHeight
+        rebuildCanvas()
+        return
+      }
       const konvaImg = new Konva.Image({
         x: offsetX,
         y: offsetY,
@@ -206,7 +230,16 @@ function renderSlot(slot, index) {
   const rx = (slot.width * dr.width) / 2
   const ry = (slot.height * dr.height) / 2
 
-  const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316']
+  const colors = [
+    '#3b82f6',
+    '#ef4444',
+    '#10b981',
+    '#f59e0b',
+    '#8b5cf6',
+    '#ec4899',
+    '#06b6d4',
+    '#f97316'
+  ]
   const color = colors[index % colors.length]
 
   const group = new Konva.Group({
@@ -315,7 +348,7 @@ function addSlot() {
     label: `槽位${idx}`,
     x: 0.5,
     y: 0.5,
-    width: 0.10,
+    width: 0.1,
     height: 0.08,
     rotation: 0,
     allowed_shapes: ['circle', 'ellipse'],
@@ -345,10 +378,14 @@ async function saveSlots() {
     /*
      * 保存前剥离 _previewMaterial（编辑器内部预览态，含素材价格/图片 URL）
      * 修复：预览脏数据曾随保存入库并经公开模板接口下发（拍板决议 11.6-2）
+     * background_width/height 随 layout 写库（底图真实像素，拍板决议 D.6：
+     * 发布护栏 DIY_SLOT_BG_SIZE_MISSING 要求必填，缺失会导致小程序渲染槽位错位）
      */
     const newLayout = {
       ...state.layout,
       shape: 'slots',
+      background_width: state.bgNaturalWidth,
+      background_height: state.bgNaturalHeight,
       slot_definitions: state.slots.map(({ _previewMaterial, ...slot }) => slot)
     }
 
@@ -379,9 +416,7 @@ Alpine.data('slotPropertyPanel', () => ({
 
   init() {
     window.addEventListener('slot-editor-update', () => {
-      this.selectedSlot = state.selectedIndex >= 0
-        ? { ...state.slots[state.selectedIndex] }
-        : null
+      this.selectedSlot = state.selectedIndex >= 0 ? { ...state.slots[state.selectedIndex] } : null
     })
   },
 
@@ -474,10 +509,11 @@ Alpine.data('slotListPanel', () => ({
 
 // ========== 珠子素材面板 ==========
 
-const GROUP_LABELS = {
-  yellow: '黄水晶', red: '红/粉水晶', orange: '橙/茶水晶',
-  green: '绿水晶', blue: '蓝水晶', purple: '紫水晶'
-}
+/**
+ * 分组标签（DIY 自有分组维度，与资产字典 asset_group_defs 解耦，拍板 1）
+ * 复用 DIY 模块共享常量，权威字典源为后端 system_dictionaries（dict_type='diy_material_group'）
+ */
+const GROUP_LABELS = DIY_GROUP_LABELS
 
 async function loadMaterials() {
   try {
@@ -654,11 +690,13 @@ Alpine.data('materialPickerPanel', () => ({
       if (!groupMap[m.group_code]) groupMap[m.group_code] = 0
       groupMap[m.group_code]++
     })
-    this.groups = Object.entries(groupMap).map(([code, count]) => ({
-      code,
-      label: GROUP_LABELS[code] || code,
-      count
-    })).sort((a, b) => a.label.localeCompare(b.label))
+    this.groups = Object.entries(groupMap)
+      .map(([code, count]) => ({
+        code,
+        label: GROUP_LABELS[code] || code,
+        count
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label))
   },
 
   get filteredMaterials() {
@@ -668,14 +706,21 @@ Alpine.data('materialPickerPanel', () => ({
     }
     if (state.selectedIndex >= 0) {
       const slot = state.slots[state.selectedIndex]
-      if (slot?.allowed_diameters?.length > 0) {
-        list = list.map(m => ({
-          ...m,
-          _diameterAllowed: slot.allowed_diameters.includes(Number(m.diameter))
-        }))
-      } else {
-        list = list.map(m => ({ ...m, _diameterAllowed: true }))
-      }
+      /*
+       * 槽位级三种约束的所见即所得预览（与后端 getUserMaterials 的
+       * allowed_diameters / allowed_group_codes / allowed_shapes 过滤同口径，拍板 15）：
+       * 任一约束不满足即标记 _slotAllowed=false（灰显禁选），空数组=不限制
+       */
+      list = list.map(m => {
+        const diameterOk =
+          !(slot?.allowed_diameters?.length > 0) ||
+          slot.allowed_diameters.includes(Number(m.diameter))
+        const groupOk =
+          !(slot?.allowed_group_codes?.length > 0) ||
+          slot.allowed_group_codes.includes(m.group_code)
+        const shapeOk = !(slot?.allowed_shapes?.length > 0) || slot.allowed_shapes.includes(m.shape)
+        return { ...m, _slotAllowed: diameterOk && groupOk && shapeOk }
+      })
     }
     return list
   },

@@ -156,14 +156,17 @@ module.exports = sequelize => {
       },
 
       /**
-       * 允许的材料分组码数组
-       * 关联 asset_group_defs.group_code，如 ["red","blue","green"]
-       * 空数组 [] 表示全部允许
+       * 允许的材料分组码数组（DIY 自有分组维度，拍板 1）
+       *
+       * 取值为 diy_materials.group_code（自由字符串，展示名/色值由
+       * system_dictionaries dict_type='diy_material_group' 提供），
+       * 与资产字典 asset_group_defs 解耦、不做 join。
+       * 如 ["blue","red","green"]（镶嵌模板限定只填宝石，拍板 13）；空数组 [] 表示全部允许。
        */
       material_group_codes: {
         type: DataTypes.JSON,
         allowNull: true,
-        comment: '允许的材料分组码数组（空=全部允许）'
+        comment: '允许的材料分组码数组（DIY 自有分组，空=全部允许）'
       },
 
       /** 预览图媒体文件ID（FK → media_files.media_id） */

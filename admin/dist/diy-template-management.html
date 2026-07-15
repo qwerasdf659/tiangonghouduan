@@ -11,14 +11,15 @@
 
 
 
-  <script type="module" crossorigin src="/admin/assets/diy-template-management-Dmkkgkgc.js"></script>
+  <script type="module" crossorigin src="/admin/assets/diy-template-management-ZklvU7Ce.js"></script>
   <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
   <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
   <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
   <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
-  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
-  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
-  <link rel="modulepreload" crossorigin href="/admin/assets/diy-S3YEyTQI.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-BzZd00Na.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-CD4ziYoF.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/constants-CHwEsQNJ.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/diy-DtFnCrNS.js">
   <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
 </head>
 <body class="themed-bg-subtle min-h-screen">
@@ -273,6 +274,26 @@
                     <label class="block text-xs text-gray-500 mb-1">珠子数量</label>
                     <input type="number" x-model.number="form.layout.bead_count" class="input-field w-full" min="1" max="50">
                   </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- 允许素材分组（material_group_codes，拍板 13：镶嵌模板限定只填宝石） -->
+            <div class="border-t pt-4">
+              <h4 class="text-sm font-semibold mb-2">允许素材分组</h4>
+              <p class="text-xs text-gray-400 mb-2">
+                勾选本模板可用的素材分组；全不勾=不限制（全部分组可用）。
+                镶嵌模板建议只勾宝石分组（蓝/红/绿），避免用户把水晶串珠填进宝石镶口。
+              </p>
+              <div class="flex flex-wrap gap-3">
+                <template x-for="opt in groupOptions" :key="opt.value">
+                  <label class="inline-flex items-center gap-1 text-sm cursor-pointer">
+                    <input type="checkbox"
+                           :checked="isMaterialGroupChecked(opt.value)"
+                           @change="toggleMaterialGroup(opt.value)"
+                           class="rounded border-gray-300">
+                    <span x-text="opt.label"></span>
+                  </label>
                 </template>
               </div>
             </div>

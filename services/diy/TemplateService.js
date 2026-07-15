@@ -15,6 +15,12 @@ const { DiyMaterial, DiyTemplate, DiyWork, Category, MediaFile } = require('../.
 const { deriveCordOccupyMm } = require('./MaterialService')
 
 /**
+ * 镶嵌模式布局形状（slots 模板按 layout.background_width/height + slot_definitions 渲染）
+ * 与 BEADING_SHAPES 互斥，用于发布护栏 / 底图尺寸回填的分支判断。
+ */
+const SLOTS_SHAPE = 'slots'
+
+/**
  * 全局默认弹力/工艺余量（毫米），模板 sizing_rules.elastic_margin_mm 可覆盖（拍板 Q7：15mm）
  *
  * 唯一定义处：estimate 换算 / confirm 长度校验（WorkService）/ 长度偏差统计（AdminQueryService）
@@ -160,6 +166,13 @@ class DiyTemplateService {
       throw error
     }
 
+    /* 镶嵌模板底图真实尺寸回填（拍板决议 D.7.1：从源头堵住 800×1000 缺省值错位隐患） */
+    const layout = await DiyTemplateService._backfillBackgroundSize(
+      data.layout,
+      data.base_image_media_id,
+      { transaction }
+    )
+
     /*
      * 生成 template_code（bizCode=DT）
      * 先创建记录获取自增ID，再回填 code
@@ -167,6 +180,7 @@ class DiyTemplateService {
     const template = await DiyTemplate.create(
       {
         ...data,
+        layout,
         template_code: 'DT_TEMP' // 临时占位，下面回填
       },
       { transaction }
@@ -205,14 +219,35 @@ class DiyTemplateService {
       throw error
     }
 
-    // 禁止修改 template_code
-    delete data.template_code
-    delete data.diy_template_id
+    /* 收敛为本地 updates 对象（禁止修改 template_code / 主键；规避跨 await 写共享入参） */
+    const updates = { ...data }
+    delete updates.template_code
+    delete updates.diy_template_id
+
+    /*
+     * 镶嵌模板底图真实尺寸回填（拍板决议 D.7.1）：
+     * 本次更新涉及 layout 或换底图时，按"落库后的最终状态"补 background_width/height
+     */
+    if (updates.layout !== undefined || updates.base_image_media_id !== undefined) {
+      const finalLayout = updates.layout !== undefined ? updates.layout : template.layout
+      const finalBaseImageId =
+        updates.base_image_media_id !== undefined
+          ? updates.base_image_media_id
+          : template.base_image_media_id
+      const backfilled = await DiyTemplateService._backfillBackgroundSize(
+        finalLayout,
+        finalBaseImageId,
+        { transaction }
+      )
+      if (backfilled !== finalLayout) {
+        updates.layout = backfilled
+      }
+    }
 
     /* 如果通过 update 直接设置 status=published，也要校验图片 */
-    if (data.status === 'published') {
-      const baseImageId = data.base_image_media_id || template.base_image_media_id
-      const previewId = data.preview_media_id || template.preview_media_id
+    if (updates.status === 'published') {
+      const baseImageId = updates.base_image_media_id || template.base_image_media_id
+      const previewId = updates.preview_media_id || template.preview_media_id
       if (!baseImageId) {
         const error = new Error('发布失败：请先上传款式底图（base_image_media_id）')
         error.statusCode = 400
@@ -229,20 +264,21 @@ class DiyTemplateService {
        * 尺寸规则/布局/素材分组可能就在本次 update 中修改，合并后再判
        */
       await DiyTemplateService._assertPublishable({
-        layout: data.layout !== undefined ? data.layout : template.layout,
-        sizing_rules: data.sizing_rules !== undefined ? data.sizing_rules : template.sizing_rules,
+        layout: updates.layout !== undefined ? updates.layout : template.layout,
+        sizing_rules:
+          updates.sizing_rules !== undefined ? updates.sizing_rules : template.sizing_rules,
         material_group_codes:
-          data.material_group_codes !== undefined
-            ? data.material_group_codes
+          updates.material_group_codes !== undefined
+            ? updates.material_group_codes
             : template.material_group_codes
       })
     }
 
-    await template.update(data, { transaction })
+    await template.update(updates, { transaction })
 
     logger.info('[DIYService] 更新款式模板', {
       diy_template_id: templateId,
-      updated_fields: Object.keys(data)
+      updated_fields: Object.keys(updates)
     })
 
     return template
@@ -472,19 +508,83 @@ class DiyTemplateService {
   }
 
   /**
+   * 镶嵌模板底图真实像素尺寸回填（拍板决议 D.6/D.7.1，堵住 800×1000 缺省值错位隐患）
+   *
+   * 仅对 layout.shape='slots' 且 background_width/height 缺失的模板生效：
+   * 从底图 media_files 记录读取上传时 sharp.metadata 落库的真实 width/height 回填。
+   * 底图媒体缺尺寸数据时不回填（由发布护栏 DIY_SLOT_BG_SIZE_MISSING 兜底拦截）。
+   *
+   * @param {Object|null} layout - 模板布局配置（可能缺 background_width/height）
+   * @param {number|null} baseImageMediaId - 底图媒体 ID（media_files.media_id）
+   * @param {Object} options - { transaction }
+   * @returns {Promise<Object|null>} 回填后的 layout（无需回填时原样返回同一引用）
+   * @private
+   */
+  static async _backfillBackgroundSize(layout, baseImageMediaId, options = {}) {
+    const { transaction } = options
+    if (!layout || layout.shape !== SLOTS_SHAPE || !baseImageMediaId) return layout
+
+    const hasWidth =
+      Number.isFinite(Number(layout.background_width)) && Number(layout.background_width) > 0
+    const hasHeight =
+      Number.isFinite(Number(layout.background_height)) && Number(layout.background_height) > 0
+    if (hasWidth && hasHeight) return layout
+
+    const media = await MediaFile.findByPk(baseImageMediaId, {
+      attributes: ['media_id', 'width', 'height'],
+      transaction
+    })
+    if (!media || !media.width || !media.height) return layout
+
+    logger.info('[DIYService] 镶嵌模板底图尺寸自动回填', {
+      base_image_media_id: baseImageMediaId,
+      background_width: media.width,
+      background_height: media.height
+    })
+    return { ...layout, background_width: media.width, background_height: media.height }
+  }
+
+  /**
    * 发布前置护栏（手围驱动方案 §11.5，与既有"底图/预览图必填"护栏同哲学）
    *
-   * 仅对串珠模板校验（slots 镶嵌模板无手围/长度概念）：
-   * 1. 尺寸规则完整：size_options 每档必须含数值型 wrist_size_mm 或 target_length_mm
-   *    （手链品类两者都要；项链品类允许只配 target_length_mm）
-   * 2. 素材物理数据完整：模板可用素材（material_group_codes 范围内已启用）不得存在
-   *    沿绳占用无法派生的项（拍板 Q6：拒绝发布，错误信息列出素材编码清单）
+   * 按布局模式分支校验：
+   * - 镶嵌（slots）模板：layout.background_width/height 必须为正数（拍板决议 D.6，
+   *   缺失则渲染端吃 800×1000 缺省导致槽位错位，错误码 DIY_SLOT_BG_SIZE_MISSING）
+   * - 串珠模板（slots 无手围/长度概念，以下两条仅串珠适用）：
+   *   1. 尺寸规则完整：size_options 每档必须含数值型 wrist_size_mm 或 target_length_mm
+   *      （手链品类两者都要；项链品类允许只配 target_length_mm）
+   *   2. 素材物理数据完整：模板可用素材（material_group_codes 范围内已启用）不得存在
+   *      沿绳占用无法派生的项（拍板 Q6：拒绝发布，错误信息列出素材编码清单）
    *
    * @param {DiyTemplate} template - 待发布的模板实例
    * @returns {Promise<void>} 校验不通过时抛错（statusCode=400 + errorCode）
    * @private
    */
   static async _assertPublishable(template) {
+    /*
+     * 镶嵌（slots）模板护栏（拍板决议 D.6）：layout.background_width/height 必须为正数，
+     * 否则标注器/小程序渲染端会吃 800×1000 缺省值，底图真实比例不同（如 640×960）时
+     * contain 缩放后槽位坐标整体错位。与"底图/预览图必填"护栏同哲学：发布时拦截。
+     */
+    if (template.layout?.shape === SLOTS_SHAPE) {
+      const bgWidth = Number(template.layout?.background_width)
+      const bgHeight = Number(template.layout?.background_height)
+      if (
+        !Number.isFinite(bgWidth) ||
+        bgWidth <= 0 ||
+        !Number.isFinite(bgHeight) ||
+        bgHeight <= 0
+      ) {
+        const error = new Error(
+          '发布失败：镶嵌模板必须填写底图真实像素尺寸（layout.background_width/background_height），否则小程序渲染槽位会错位'
+        )
+        error.statusCode = 400
+        error.errorCode = 'DIY_SLOT_BG_SIZE_MISSING'
+        throw error
+      }
+      return
+    }
+
     if (!isBeadingTemplate(template)) return
 
     // ---- 护栏 1：尺寸档位数据完整 ----

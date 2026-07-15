@@ -102,7 +102,12 @@ router.get(
   })
 )
 
-/** 获取材料分组列表（用于前端 Tab） */
+/**
+ * 获取材料分组列表（用于小程序分组 Tab 动态渲染，拍板 16）
+ *
+ * 返回 [{ group_code, count, display_name, color_hex }]，展示名/色值取自
+ * system_dictionaries（dict_type='diy_material_group'），小程序直接消费不做本地映射
+ */
 router.get(
   '/material-groups',
   asyncHandler(async (req, res) => {

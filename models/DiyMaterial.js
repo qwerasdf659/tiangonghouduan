@@ -64,7 +64,8 @@ module.exports = sequelize => {
       group_code: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        comment: '材料分组编码'
+        comment:
+          '材料分组编码（DIY 自有分组，自由字符串无外键；展示名/色值取自 system_dictionaries dict_type=diy_material_group，与资产字典 asset_group_defs 解耦，拍板1）'
       },
       diameter: {
         type: DataTypes.DECIMAL(5, 1),

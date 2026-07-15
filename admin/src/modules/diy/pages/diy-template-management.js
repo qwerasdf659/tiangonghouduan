@@ -21,6 +21,7 @@ import { logger } from '@/utils/logger.js'
 import { Alpine, createPageMixin } from '@/alpine/index.js'
 import { imageUploadMixin } from '@/alpine/mixins/image-upload.js'
 import { API_PREFIX } from '@/api/base.js'
+import { DIY_GROUP_OPTIONS } from '../constants.js'
 import {
   getTemplateList,
   getTemplateDetail,
@@ -164,6 +165,8 @@ function diyTemplateManagement() {
     statusOptions: STATUS_OPTIONS,
     shapeLabels: SHAPE_LABELS,
     statusLabels: STATUS_LABELS,
+    /* DIY 素材分组选项（拍板 13：镶嵌模板限定素材分组的运营配置入口） */
+    groupOptions: DIY_GROUP_OPTIONS,
 
     async init() {
       logger.info('[DIY] 模板管理页面初始化')
@@ -501,6 +504,35 @@ function diyTemplateManagement() {
 
     get isSlotMode() {
       return this.form.layout?.shape === 'slots'
+    },
+
+    // ==================== 允许素材分组编辑（拍板 13） ====================
+
+    /**
+     * 切换某个分组是否在模板允许范围内（material_group_codes 多选）
+     * 空数组语义=不限制全部允许；镶嵌模板通常勾选 blue/red/green 限定只填宝石
+     * @param {string} groupCode - DIY 素材分组码（white/pink/.../blue/red/green）
+     * @returns {void}
+     */
+    toggleMaterialGroup(groupCode) {
+      if (!Array.isArray(this.form.material_group_codes)) {
+        this.form.material_group_codes = []
+      }
+      const idx = this.form.material_group_codes.indexOf(groupCode)
+      if (idx >= 0) {
+        this.form.material_group_codes.splice(idx, 1)
+      } else {
+        this.form.material_group_codes.push(groupCode)
+      }
+    },
+
+    /**
+     * 判断某分组是否已勾选（HTML checkbox 绑定）
+     * @param {string} groupCode - DIY 素材分组码
+     * @returns {boolean} 是否已在允许范围内
+     */
+    isMaterialGroupChecked(groupCode) {
+      return (this.form.material_group_codes || []).includes(groupCode)
     },
 
     // ==================== 尺寸档位编辑（手围驱动方案 §11.6-1） ====================

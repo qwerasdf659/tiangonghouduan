@@ -14,6 +14,16 @@ const OrderNoGenerator = require('../../utils/OrderNoGenerator')
 const { AssetCode } = require('../../constants/AssetCode')
 const { Category, DiyMaterial, DiyTemplate, MediaFile } = require('../../models')
 const TransactionManager = require('../../utils/TransactionManager')
+const DisplayNameService = require('../DisplayNameService')
+
+/**
+ * DIY 材料分组字典类型（system_dictionaries.dict_type）
+ *
+ * 拍板 1（2026-07-15 定案）：DIY 材料分组是 DIY 自有维度，展示名/色值从
+ * system_dictionaries（dict_type='diy_material_group'）取，与资产字典
+ * asset_group_defs（源晶/市场交易域）完全解耦，不做任何 join。
+ */
+const DIY_MATERIAL_GROUP_DICT_TYPE = 'diy_material_group'
 
 /**
  * 计算单颗素材的沿绳占用长度（毫米）— 手围驱动方案唯一派生口径
@@ -442,7 +452,8 @@ class DiyMaterialService {
   /**
    * 用户端：获取模板可用材料列表
    * 根据模板的 material_group_codes 和 category_id 筛选
-   * 支持按 slot_id 的 allowed_diameters 约束过滤
+   * 支持按 slot_id 的槽位级三种约束过滤（allowed_diameters / allowed_group_codes /
+   * allowed_shapes，拍板 15：三者同款 Op.in 写法，槽位精细化约束齐全）
    * 支持按 item_type 素材大类过滤（饰品/配饰/吊坠 Tab，拍板决议 11.3-9：同一接口不另开）
    *
    * 输出经 toUserMaterialJSON 收敛（数据最小化 + 库存掩码，拍板决议 11.5-D）
@@ -467,11 +478,20 @@ class DiyMaterialService {
       where.group_code = { [Op.in]: allowedGroups }
     }
 
-    // 按槽位的 allowed_diameters 约束过滤
+    /*
+     * 按槽位级约束过滤（拍板 15）：运营在槽位标注器给某个镶口配置的
+     * 直径 / 分组 / 形状约束，beads 接口按槽位下发时全部生效
+     */
     if (params.slot_id && template.layout?.slot_definitions) {
       const slot = template.layout.slot_definitions.find(s => s.slot_id === params.slot_id)
       if (slot?.allowed_diameters?.length > 0) {
         where.diameter = { [Op.in]: slot.allowed_diameters }
+      }
+      if (slot?.allowed_group_codes?.length > 0) {
+        where.group_code = { [Op.in]: slot.allowed_group_codes }
+      }
+      if (slot?.allowed_shapes?.length > 0) {
+        where.shape = { [Op.in]: slot.allowed_shapes }
       }
     }
 
@@ -501,23 +521,42 @@ class DiyMaterialService {
   }
 
   /**
-   * 获取材料分组列表（用于前端 Tab 展示）
-   * @returns {Object[]} 分组列表
+   * 获取材料分组列表（用于小程序分组 Tab 动态渲染）
+   *
+   * 拍板 16（2026-07-15 定案）：分组的中文名 + 色值由后端下发，小程序不做本地
+   * label 映射。展示字段经 DisplayNameService 从 system_dictionaries
+   * （dict_type='diy_material_group'，Redis 缓存命中无 N+1）批量取，
+   * 与资产字典 asset_group_defs 解耦。字典缺行时降级：display_name 回退裸
+   * group_code、color_hex 为 null（暴露问题由运营补字典，不做隐藏兜底）。
+   *
+   * @returns {Promise<Object[]>} 分组列表
+   *   [{ group_code, count, display_name, color_hex }]
    */
   static async getMaterialGroups() {
     const groups = await DiyMaterial.findAll({
-      attributes: [
-        'group_code',
-        [fn('COUNT', col('diy_material_id')), 'count'],
-        [fn('MIN', col('display_name')), 'sample_name']
-      ],
+      attributes: ['group_code', [fn('COUNT', col('diy_material_id')), 'count']],
       where: { is_enabled: true },
       group: ['group_code'],
       order: [['group_code', 'ASC']],
       raw: true
     })
 
-    return groups
+    /* 批量取中文名 + 色值（DisplayNameService.batchGet 入参 {type, code}，返回 Map） */
+    const items = groups.map(g => ({
+      type: DIY_MATERIAL_GROUP_DICT_TYPE,
+      code: g.group_code
+    }))
+    const names = await DisplayNameService.batchGet(items)
+
+    return groups.map(g => {
+      const hit = names.get(`${DIY_MATERIAL_GROUP_DICT_TYPE}:${g.group_code}`)
+      return {
+        group_code: g.group_code,
+        count: Number(g.count),
+        display_name: hit?.name || g.group_code,
+        color_hex: hit?.color || null
+      }
+    })
   }
 }
 

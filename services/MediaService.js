@@ -65,6 +65,15 @@ const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 
 /**
+ * DIY 素材图垫正方形的目标边长（像素）
+ *
+ * 拍板决议 D.7.1：珠子/宝石图上传时统一垫成正方形（透明底、主体居中），
+ * 填进小程序渲染端的正圆/椭圆槽位时不变形不偏心。512px 覆盖 w375 衍生档且
+ * 保留放大余量。
+ */
+const PAD_SQUARE_SIZE = 512
+
+/**
  * 媒体服务类
  *
  * @description 统一处理媒体上传、关联、查询、清理等业务逻辑
@@ -197,6 +206,8 @@ class MediaService {
    * @param {string} [options.mime_type='image/jpeg'] - MIME 类型
    * @param {number} [options.uploaded_by] - 上传用户 ID
    * @param {boolean} [options.trim_transparent=false] - 是否裁剪透明边距（DIY 素材图场景）
+   * @param {boolean} [options.pad_to_square=false] - 是否垫成正方形（透明底、主体居中，
+   *   DIY 珠子/宝石图场景；通常与 trim_transparent 联用：先裁边→再垫方，拍板决议 D.7.1）
    *
    * @returns {Promise<Object>} 上传结果
    * @returns {boolean} result.duplicate - 是否为重复文件
@@ -211,6 +222,7 @@ class MediaService {
     let mimeType = options.mime_type || 'image/jpeg'
     const uploadedBy = options.uploaded_by ?? null
     const trimTransparent = options.trim_transparent ?? false
+    const padToSquare = options.pad_to_square ?? false
 
     /*
      * 超限自动压缩（2026-06-13）：图片超过 5MB 时先用 sharp 压缩到限制内，
@@ -242,6 +254,31 @@ class MediaService {
       } catch (trimErr) {
         _logger.warn('MediaService: 裁剪透明边距失败，使用原图', { error: trimErr.message })
         processedBuffer = workingBuffer
+      }
+    }
+
+    /*
+     * 0.5 垫成正方形（DIY 珠子/宝石图场景，拍板决议 D.7.1）
+     *     fit:'contain' 保证主体完整不裁切，透明底填充四周；
+     *     输出统一 PNG（保留透明通道），运营传任意比例图都不会填槽变形
+     */
+    if (padToSquare && ['image/png', 'image/webp', 'image/jpeg'].includes(mimeType)) {
+      try {
+        processedBuffer = await sharp(processedBuffer)
+          .resize({
+            width: PAD_SQUARE_SIZE,
+            height: PAD_SQUARE_SIZE,
+            fit: 'contain',
+            background: { r: 0, g: 0, b: 0, alpha: 0 }
+          })
+          .png()
+          .toBuffer()
+        mimeType = 'image/png'
+        _logger.info('MediaService: 已垫成正方形（DIY 素材图规整）', {
+          target_size: PAD_SQUARE_SIZE
+        })
+      } catch (padErr) {
+        _logger.warn('MediaService: 垫正方形失败，使用当前图', { error: padErr.message })
       }
     }
 

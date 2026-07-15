@@ -713,9 +713,8 @@ class DiyWorkService {
       throw error
     }
 
-    const totalCost = work.total_cost || []
-    // 兼容新格式 { price_snapshot, payments } 和旧格式 [{ asset_code, amount }]
-    const payments = Array.isArray(totalCost) ? totalCost : totalCost?.payments || []
+    // total_cost 唯一格式：{ price_snapshot, payments }（与 completeDesign 同口径，旧数组格式已废除且 diy_works 无存量）
+    const payments = work.total_cost?.payments || []
 
     // 逐项解冻材料（BalanceService.unfreeze 要求 user_id + idempotency_key）
     for (const cost of payments) {

@@ -48,6 +48,8 @@ const uploadBatch = multer({
  * @description 上传单张图片到媒体库
  * @body {string} [folder='uploads'] - 存储文件夹
  * @body {string} [trim_transparent='false'] - 是否裁剪透明边距（DIY 素材图场景传 'true'）
+ * @body {string} [pad_to_square='false'] - 是否垫成正方形（透明底、主体居中；
+ *   DIY 珠子/宝石图场景传 'true'，与 trim_transparent 联用：先裁边→再垫方，拍板决议 D.7.1）
  */
 router.post(
   '/upload',
@@ -64,7 +66,8 @@ router.post(
       original_name: req.file.originalname,
       mime_type: req.file.mimetype,
       uploaded_by: req.user?.user_id,
-      trim_transparent: req.body.trim_transparent === 'true' || req.body.trim_transparent === true
+      trim_transparent: req.body.trim_transparent === 'true' || req.body.trim_transparent === true,
+      pad_to_square: req.body.pad_to_square === 'true' || req.body.pad_to_square === true
     })
     return res.apiSuccess(result, '文件上传成功')
   })

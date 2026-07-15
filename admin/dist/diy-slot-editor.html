@@ -11,14 +11,15 @@
 
 
 
-  <script type="module" crossorigin src="/admin/assets/diy-slot-editor-CGq_HKZd.js"></script>
+  <script type="module" crossorigin src="/admin/assets/diy-slot-editor-PvtyL_kg.js"></script>
   <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
   <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
   <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
   <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
-  <link rel="modulepreload" crossorigin href="/admin/assets/index-Bl7IvXqV.js">
-  <link rel="modulepreload" crossorigin href="/admin/assets/main-Cbt3wNkY.js">
-  <link rel="modulepreload" crossorigin href="/admin/assets/diy-S3YEyTQI.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-BzZd00Na.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-CD4ziYoF.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/constants-CHwEsQNJ.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/diy-DtFnCrNS.js">
   <link rel="modulepreload" crossorigin href="/admin/assets/vendor-konva-DAgnYANn.js">
   <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
 </head>
@@ -214,11 +215,12 @@
         <div class="flex-1 overflow-x-auto overflow-y-hidden px-3 py-2">
           <div class="flex gap-3 h-full">
             <template x-for="mat in filteredMaterials" :key="mat.diy_material_id">
-              <div @click="mat._diameterAllowed !== false && applyToSlot(mat)"
+              <!-- _slotAllowed：槽位级三种约束（直径/分组/形状）预览过滤标记，与后端 beads 接口同口径 -->
+              <div @click="mat._slotAllowed !== false && applyToSlot(mat)"
                    :class="[
-                     hasSelectedSlot && mat._diameterAllowed !== false ? 'cursor-pointer hover:border-blue-400 hover:shadow-md' : '',
+                     hasSelectedSlot && mat._slotAllowed !== false ? 'cursor-pointer hover:border-blue-400 hover:shadow-md' : '',
                      !hasSelectedSlot ? 'opacity-50 cursor-not-allowed' : '',
-                     mat._diameterAllowed === false ? 'opacity-30 cursor-not-allowed border-red-200' : ''
+                     mat._slotAllowed === false ? 'opacity-30 cursor-not-allowed border-red-200' : ''
                    ]"
                    class="shrink-0 w-24 border rounded-lg p-2 flex flex-col items-center transition-all bg-white relative">
                 <div class="w-14 h-14 rounded-full overflow-hidden bg-gray-50 flex items-center justify-center border">
@@ -227,7 +229,8 @@
                 </div>
                 <div class="text-xs font-medium mt-1 text-center leading-tight truncate w-full" x-text="mat.display_name"></div>
                 <div class="text-xs text-gray-500" x-text="mat.diameter + 'mm'"></div>
-                <div class="text-xs font-medium text-blue-600" x-text="'¥' + mat.price"></div>
+                <!-- 定价单位是星石/源晶资产（非人民币），与后端 price_asset_code 一致 -->
+                <div class="text-xs font-medium text-blue-600" x-text="mat.price + (mat.price_asset_code === 'star_stone' ? ' 星石' : ' ' + (mat.price_asset_code || ''))"></div>
               </div>
             </template>
             <div x-show="filteredMaterials.length === 0" class="flex items-center text-gray-400 text-sm px-4">

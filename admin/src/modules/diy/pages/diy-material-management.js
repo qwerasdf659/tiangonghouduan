@@ -22,6 +22,7 @@
 import { logger } from '@/utils/logger.js'
 import { Alpine, createPageMixin } from '@/alpine/index.js'
 import { imageUploadMixin } from '@/alpine/mixins/image-upload.js'
+import { DIY_GROUP_LABELS, DIY_GROUP_OPTIONS } from '../constants.js'
 import {
   getAdminMaterialList,
   createMaterial,
@@ -30,25 +31,14 @@ import {
   getDiyStats
 } from '@/api/diy.js'
 
-/** 分组标签（对齐 asset_group_defs） */
-const GROUP_LABELS = {
-  yellow: '黄水晶',
-  red: '红/粉水晶',
-  orange: '橙/茶水晶',
-  green: '绿水晶',
-  blue: '蓝水晶',
-  purple: '紫水晶'
-}
+/**
+ * 分组标签（DIY 自有分组维度，与资产字典 asset_group_defs 解耦，拍板 1）
+ * 复用 DIY 模块共享常量，权威字典源为后端 system_dictionaries（dict_type='diy_material_group'）
+ */
+const GROUP_LABELS = DIY_GROUP_LABELS
 
-/** 分组选项（表单下拉用） */
-const ALL_GROUP_OPTIONS = [
-  { value: 'yellow', label: '黄水晶' },
-  { value: 'red', label: '红/粉水晶' },
-  { value: 'orange', label: '橙/茶水晶' },
-  { value: 'green', label: '绿水晶' },
-  { value: 'blue', label: '蓝水晶' },
-  { value: 'purple', label: '紫水晶' }
-]
+/** 分组选项（表单下拉用，顺序与字典 sort_order 一致） */
+const ALL_GROUP_OPTIONS = DIY_GROUP_OPTIONS
 
 /** 形状标签 */
 const SHAPE_LABELS = {
@@ -424,8 +414,9 @@ function diyMaterialManagement() {
 
       this.imagePreviewUrl = URL.createObjectURL(file)
 
-      /* DIY 素材图片上传时自动裁剪透明边距，确保宝石内容填满槽位区域 */
-      const result = await this.uploadImage(file, { trim_transparent: true })
+      /* DIY 素材图上传时先裁透明边距、再垫成正方形（透明底居中，拍板决议 D.7.1），
+         确保任意比例原图填进正圆/椭圆槽位都不变形不偏心 */
+      const result = await this.uploadImage(file, { trim_transparent: true, pad_to_square: true })
       if (result) {
         this.imageMediaId = result.media_id
         if (result.public_url) {
