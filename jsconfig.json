@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "checkJs": false,
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "maxNodeModuleJsDepth": 0,
+    "baseUrl": "."
+  },
+  "include": [
+    "app.js",
+    "bootstrap/**/*.js",
+    "callbacks/**/*.js",
+    "config/**/*.js",
+    "constants/**/*.js",
+    "jobs/**/*.js",
+    "middleware/**/*.js",
+    "models/**/*.js",
+    "routes/**/*.js",
+    "services/**/*.js",
+    "shared/**/*.js",
+    "utils/**/*.js",
+    "migrations/**/*.js",
+    "seeders/**/*.js",
+    "scripts/**/*.js",
+    "tests/**/*.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "admin",
+    "backup",
+    "backups",
+    "logs",
+    "uploads",
+    "data",
+    "appendonlydir",
+    "coverage",
+    "docs",
+    ".git"
+  ]
+}

@@ -195,3 +195,10 @@
 2026-07-15T13:11:02: 13133:C 15 Jul 2026 21:11:02.547 # Redis version=7.0.15, bits=64, commit=00000000, modified=0, pid=13133, just started
 2026-07-15T13:11:02: 13133:C 15 Jul 2026 21:11:02.547 # Configuration loaded
 2026-07-15T13:11:02: 13133:M 15 Jul 2026 21:11:02.547 # Server initialized
+2026-07-15T17:50:55: 13133:signal-handler (1784137855) Received SIGINT scheduling shutdown...
+2026-07-15T17:50:55: 13133:M 16 Jul 2026 01:50:55.363 # User requested shutdown...
+2026-07-15T17:50:55: 13133:M 16 Jul 2026 01:50:55.370 # Redis is now ready to exit, bye bye...
+2026-07-15T17:50:58: 27197:C 15 Jul 2026 17:50:58.866 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+2026-07-15T17:50:58: 27197:C 15 Jul 2026 17:50:58.866 # Redis version=7.0.15, bits=64, commit=00000000, modified=0, pid=27197, just started
+2026-07-15T17:50:58: 27197:C 15 Jul 2026 17:50:58.866 # Configuration loaded
+2026-07-15T17:50:58: 27197:M 15 Jul 2026 17:50:58.867 # Server initialized

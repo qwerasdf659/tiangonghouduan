@@ -4379,3 +4379,515 @@ For more information, check the blog post at https://a.co/cUPnyil
 {"body":{"status":"published"},"error_code":"UNKNOWN","error_details":null,"error_message":"发布失败：镶嵌模板必须填写底图真实像素尺寸（layout.background_width/background_height），否则小程序渲染槽位会错位","error_name":"Error","error_stack":"Error: 发布失败：镶嵌模板必须填写底图真实像素尺寸（layout.background_width/background_height），否则小程序渲染槽位会错位\n    at Function._assertPublishable (/home/devbox/project/services/diy/TemplateService.js:578:23)\n    at Function._assertPublishable [as updateTemplateStatus] (/home/devbox/project/services/diy/TemplateService.js:336:32)\n    at processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at /home/devbox/project/routes/v4/console/diy/templates.js:110:18\n    at Function.execute (/home/devbox/project/utils/TransactionManager.js:123:24)\n    at /home/devbox/project/routes/v4/console/diy/templates.js:109:5","level":"error","message":"全局错误处理","method":"PUT","path":"/api/v4/console/diy/templates/162/status","request_id":"req_83eb21eb-be7d-4a8f-a149-472504fb14bc","stack":"Error: \n    at SmartLogger.error (/home/devbox/project/utils/logger.js:337:50)\n    at error (/home/devbox/project/middleware/errorHandler.js:57:10)\n    at Layer.handle_error (/home/devbox/project/node_modules/express/lib/router/layer.js:71:5)\n    at trim_prefix (/home/devbox/project/node_modules/express/lib/router/index.js:326:13)\n    at /home/devbox/project/node_modules/express/lib/router/index.js:286:9\n    at Function.process_params (/home/devbox/project/node_modules/express/lib/router/index.js:346:12)\n    at next (/home/devbox/project/node_modules/express/lib/router/index.js:280:10)\n    at Layer.handle_error (/home/devbox/project/node_modules/express/lib/router/layer.js:67:12)\n    at trim_prefix (/home/devbox/project/node_modules/express/lib/router/index.js:326:13)\n    at /home/devbox/project/node_modules/express/lib/router/index.js:286:9\n    at param (/home/devbox/project/node_modules/express/lib/router/index.js:365:14)\n    at param (/home/devbox/project/node_modules/express/lib/router/index.js:376:14)\n    at Function.process_params (/home/devbox/project/node_modules/express/lib/router/index.js:421:3)\n    at next (/home/devbox/project/node_modules/express/lib/router/index.js:280:10)\n    at /home/devbox/project/node_modules/express/lib/router/index.js:646:15\n    at next (/home/devbox/project/node_modules/express/lib/router/index.js:265:14)\n    at /home/devbox/project/node_modules/express/lib/router/index.js:646:15\n    at next (/home/devbox/project/node_modules/express/lib/router/index.js:265:14)\n    at /home/devbox/project/node_modules/express/lib/router/index.js:646:15\n    at next (/home/devbox/project/node_modules/express/lib/router/index.js:265:14)\n    at next (/home/devbox/project/node_modules/express/lib/router/route.js:141:14)\n    at processTicksAndRejections (node:internal/process/task_queues:95:5)","status_code":400,"timestamp":"2026-07-15 14:13:57.859"}
 {"level":"error","message":"检测库存告警失败:","name":"SequelizeDatabaseError","original":{"code":"ER_BAD_FIELD_ERROR","errno":1054,"sql":"SELECT `lottery_campaign_prize_id`, `lottery_campaign_id`, `prize_definition_id`, `win_weight`, `stock_quantity`, `reward_tier`, `is_fallback`, `sort_order`, `status`, `max_daily_wins`, `max_user_wins`, `total_win_count`, `daily_win_count`, `created_at`, `updated_at` FROM `lottery_campaign_prizes` AS `LotteryCampaignPrize` WHERE `LotteryCampaignPrize`.`lottery_campaign_id` = 1 AND `LotteryCampaignPrize`.`status` = 'active' AND `LotteryCampaignPrize`.`remaining_stock` < 10;","sqlMessage":"Unknown column 'LotteryCampaignPrize.remaining_stock' in 'where clause'","sqlState":"42S22"},"parameters":{},"parent":{"code":"ER_BAD_FIELD_ERROR","errno":1054,"sql":"SELECT `lottery_campaign_prize_id`, `lottery_campaign_id`, `prize_definition_id`, `win_weight`, `stock_quantity`, `reward_tier`, `is_fallback`, `sort_order`, `status`, `max_daily_wins`, `max_user_wins`, `total_win_count`, `daily_win_count`, `created_at`, `updated_at` FROM `lottery_campaign_prizes` AS `LotteryCampaignPrize` WHERE `LotteryCampaignPrize`.`lottery_campaign_id` = 1 AND `LotteryCampaignPrize`.`status` = 'active' AND `LotteryCampaignPrize`.`remaining_stock` < 10;","sqlMessage":"Unknown column 'LotteryCampaignPrize.remaining_stock' in 'where clause'","sqlState":"42S22"},"sql":"SELECT `lottery_campaign_prize_id`, `lottery_campaign_id`, `prize_definition_id`, `win_weight`, `stock_quantity`, `reward_tier`, `is_fallback`, `sort_order`, `status`, `max_daily_wins`, `max_user_wins`, `total_win_count`, `daily_win_count`, `created_at`, `updated_at` FROM `lottery_campaign_prizes` AS `LotteryCampaignPrize` WHERE `LotteryCampaignPrize`.`lottery_campaign_id` = 1 AND `LotteryCampaignPrize`.`status` = 'active' AND `LotteryCampaignPrize`.`remaining_stock` < 10;","stack":"Error\n    at SmartLogger.error (/home/devbox/project/utils/logger.js:337:50)\n    at LotteryAlertDetectorService.checkInventoryAlert (/home/devbox/project/services/lottery/LotteryAlertDetectorService.js:126:14)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async Promise.all (index 0)\n    at async LotteryAlertDetectorService.runAlertDetection (/home/devbox/project/services/lottery/LotteryAlertDetectorService.js:62:11)\n    at async run (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:977:27)\n    at async ScheduledTasks._runWithRedisLock (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:203:7)","timestamp":"2026-07-15 22:40:00.231"}
 {"level":"error","message":"对账发现异常","results":{"assets":{"balance_consistency":{"excluded_campaign_scoped":["budget_points"],"mismatch_count":3,"status":"FAIL"},"global":[{"asset_code":"budget_points","total_net":0,"tx_count":756},{"asset_code":"points","total_net":-67006,"tx_count":1797},{"asset_code":"red_core_shard","total_net":6000,"tx_count":740},{"asset_code":"star_stone","total_net":26330,"tx_count":1424},{"asset_code":"star_stone_quota","total_net":0,"tx_count":1364}],"global_conservation":{"status":"FAIL"}},"items":{"conservation":{"imbalanced_count":0,"status":"PASS"},"mint_consistency":{"items_excluding_test":37,"mints":37,"status":"PASS"},"owner_consistency":{"mismatch_count":18,"status":"FAIL"}}},"stack":"Error\n    at SmartLogger.error (/home/devbox/project/utils/logger.js:337:50)\n    at Object.error (/home/devbox/project/utils/logger.js:480:37)\n    at executeReconciliation (/home/devbox/project/scripts/reconcile-items.js:195:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async distributedLock.withLock.ttl (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:817:28)\n    at async UnifiedDistributedLock.withLock (/home/devbox/project/utils/UnifiedDistributedLock.js:284:22)\n    at async Task._execution (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:808:9)","timestamp":"2026-07-15 22:50:00.517"}
+{"level":"error","message":"检测库存告警失败:","name":"SequelizeDatabaseError","original":{"code":"ER_BAD_FIELD_ERROR","errno":1054,"sql":"SELECT `lottery_campaign_prize_id`, `lottery_campaign_id`, `prize_definition_id`, `win_weight`, `stock_quantity`, `reward_tier`, `is_fallback`, `sort_order`, `status`, `max_daily_wins`, `max_user_wins`, `total_win_count`, `daily_win_count`, `created_at`, `updated_at` FROM `lottery_campaign_prizes` AS `LotteryCampaignPrize` WHERE `LotteryCampaignPrize`.`lottery_campaign_id` = 1 AND `LotteryCampaignPrize`.`status` = 'active' AND `LotteryCampaignPrize`.`remaining_stock` < 10;","sqlMessage":"Unknown column 'LotteryCampaignPrize.remaining_stock' in 'where clause'","sqlState":"42S22"},"parameters":{},"parent":{"code":"ER_BAD_FIELD_ERROR","errno":1054,"sql":"SELECT `lottery_campaign_prize_id`, `lottery_campaign_id`, `prize_definition_id`, `win_weight`, `stock_quantity`, `reward_tier`, `is_fallback`, `sort_order`, `status`, `max_daily_wins`, `max_user_wins`, `total_win_count`, `daily_win_count`, `created_at`, `updated_at` FROM `lottery_campaign_prizes` AS `LotteryCampaignPrize` WHERE `LotteryCampaignPrize`.`lottery_campaign_id` = 1 AND `LotteryCampaignPrize`.`status` = 'active' AND `LotteryCampaignPrize`.`remaining_stock` < 10;","sqlMessage":"Unknown column 'LotteryCampaignPrize.remaining_stock' in 'where clause'","sqlState":"42S22"},"sql":"SELECT `lottery_campaign_prize_id`, `lottery_campaign_id`, `prize_definition_id`, `win_weight`, `stock_quantity`, `reward_tier`, `is_fallback`, `sort_order`, `status`, `max_daily_wins`, `max_user_wins`, `total_win_count`, `daily_win_count`, `created_at`, `updated_at` FROM `lottery_campaign_prizes` AS `LotteryCampaignPrize` WHERE `LotteryCampaignPrize`.`lottery_campaign_id` = 1 AND `LotteryCampaignPrize`.`status` = 'active' AND `LotteryCampaignPrize`.`remaining_stock` < 10;","stack":"Error\n    at SmartLogger.error (/home/devbox/project/utils/logger.js:337:50)\n    at LotteryAlertDetectorService.checkInventoryAlert (/home/devbox/project/services/lottery/LotteryAlertDetectorService.js:126:14)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async Promise.all (index 0)\n    at async LotteryAlertDetectorService.runAlertDetection (/home/devbox/project/services/lottery/LotteryAlertDetectorService.js:62:11)\n    at async run (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:977:27)\n    at async ScheduledTasks._runWithRedisLock (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:203:7)","timestamp":"2026-07-15 23:40:00.625"}
+{"level":"error","message":"对账发现异常","results":{"assets":{"balance_consistency":{"excluded_campaign_scoped":["budget_points"],"mismatch_count":3,"status":"FAIL"},"global":[{"asset_code":"budget_points","total_net":0,"tx_count":756},{"asset_code":"points","total_net":-67006,"tx_count":1797},{"asset_code":"red_core_shard","total_net":6000,"tx_count":740},{"asset_code":"star_stone","total_net":26330,"tx_count":1424},{"asset_code":"star_stone_quota","total_net":0,"tx_count":1364}],"global_conservation":{"status":"FAIL"}},"items":{"conservation":{"imbalanced_count":0,"status":"PASS"},"mint_consistency":{"items_excluding_test":37,"mints":37,"status":"PASS"},"owner_consistency":{"mismatch_count":18,"status":"FAIL"}}},"stack":"Error\n    at SmartLogger.error (/home/devbox/project/utils/logger.js:337:50)\n    at Object.error (/home/devbox/project/utils/logger.js:480:37)\n    at executeReconciliation (/home/devbox/project/scripts/reconcile-items.js:195:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async distributedLock.withLock.ttl (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:817:28)\n    at async UnifiedDistributedLock.withLock (/home/devbox/project/utils/UnifiedDistributedLock.js:284:22)\n    at async Task._execution (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:808:9)","timestamp":"2026-07-15 23:50:01.345"}
+2026-07-16T00:14:01: 🐌 慢查询检测: {
+  sql: 'Executed (default): UPDATE `reminder_rules` SET `last_check_at`=?,`next_check_at`=?,`updated_at`=? WHERE `reminder_rule_id` = ?',
+  timing: '1061ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T16:14:01.441Z'
+}
+{"level":"error","message":"检测库存告警失败:","name":"SequelizeDatabaseError","original":{"code":"ER_BAD_FIELD_ERROR","errno":1054,"sql":"SELECT `lottery_campaign_prize_id`, `lottery_campaign_id`, `prize_definition_id`, `win_weight`, `stock_quantity`, `reward_tier`, `is_fallback`, `sort_order`, `status`, `max_daily_wins`, `max_user_wins`, `total_win_count`, `daily_win_count`, `created_at`, `updated_at` FROM `lottery_campaign_prizes` AS `LotteryCampaignPrize` WHERE `LotteryCampaignPrize`.`lottery_campaign_id` = 1 AND `LotteryCampaignPrize`.`status` = 'active' AND `LotteryCampaignPrize`.`remaining_stock` < 10;","sqlMessage":"Unknown column 'LotteryCampaignPrize.remaining_stock' in 'where clause'","sqlState":"42S22"},"parameters":{},"parent":{"code":"ER_BAD_FIELD_ERROR","errno":1054,"sql":"SELECT `lottery_campaign_prize_id`, `lottery_campaign_id`, `prize_definition_id`, `win_weight`, `stock_quantity`, `reward_tier`, `is_fallback`, `sort_order`, `status`, `max_daily_wins`, `max_user_wins`, `total_win_count`, `daily_win_count`, `created_at`, `updated_at` FROM `lottery_campaign_prizes` AS `LotteryCampaignPrize` WHERE `LotteryCampaignPrize`.`lottery_campaign_id` = 1 AND `LotteryCampaignPrize`.`status` = 'active' AND `LotteryCampaignPrize`.`remaining_stock` < 10;","sqlMessage":"Unknown column 'LotteryCampaignPrize.remaining_stock' in 'where clause'","sqlState":"42S22"},"sql":"SELECT `lottery_campaign_prize_id`, `lottery_campaign_id`, `prize_definition_id`, `win_weight`, `stock_quantity`, `reward_tier`, `is_fallback`, `sort_order`, `status`, `max_daily_wins`, `max_user_wins`, `total_win_count`, `daily_win_count`, `created_at`, `updated_at` FROM `lottery_campaign_prizes` AS `LotteryCampaignPrize` WHERE `LotteryCampaignPrize`.`lottery_campaign_id` = 1 AND `LotteryCampaignPrize`.`status` = 'active' AND `LotteryCampaignPrize`.`remaining_stock` < 10;","stack":"Error\n    at SmartLogger.error (/home/devbox/project/utils/logger.js:337:50)\n    at LotteryAlertDetectorService.checkInventoryAlert (/home/devbox/project/services/lottery/LotteryAlertDetectorService.js:126:14)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async Promise.all (index 0)\n    at async LotteryAlertDetectorService.runAlertDetection (/home/devbox/project/services/lottery/LotteryAlertDetectorService.js:62:11)\n    at async run (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:977:27)\n    at async ScheduledTasks._runWithRedisLock (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:203:7)","timestamp":"2026-07-16 00:40:00.979"}
+2026-07-16T00:50:02: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT item_id, SUM(delta) AS balance\n' +
+    '    FROM item_ledger\n' +
+    '    GROUP BY item_id\n' +
+    '    HAVING balance != 0',
+  timing: '2498ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T16:50:02.693Z'
+}
+{"level":"error","message":"对账发现异常","results":{"assets":{"balance_consistency":{"excluded_campaign_scoped":["budget_points"],"mismatch_count":3,"status":"FAIL"},"global":[{"asset_code":"budget_points","total_net":0,"tx_count":756},{"asset_code":"points","total_net":-67006,"tx_count":1797},{"asset_code":"red_core_shard","total_net":6000,"tx_count":740},{"asset_code":"star_stone","total_net":26330,"tx_count":1424},{"asset_code":"star_stone_quota","total_net":0,"tx_count":1364}],"global_conservation":{"status":"FAIL"}},"items":{"conservation":{"imbalanced_count":0,"status":"PASS"},"mint_consistency":{"items_excluding_test":37,"mints":37,"status":"PASS"},"owner_consistency":{"mismatch_count":18,"status":"FAIL"}}},"stack":"Error\n    at SmartLogger.error (/home/devbox/project/utils/logger.js:337:50)\n    at Object.error (/home/devbox/project/utils/logger.js:480:37)\n    at executeReconciliation (/home/devbox/project/scripts/reconcile-items.js:195:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async distributedLock.withLock.ttl (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:817:28)\n    at async UnifiedDistributedLock.withLock (/home/devbox/project/utils/UnifiedDistributedLock.js:284:22)\n    at async Task._execution (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:808:9)","timestamp":"2026-07-16 00:50:03.751"}
+2026-07-16T01:00:01: 🐌 慢查询检测: {
+  sql: 'Executed (default): INSERT INTO `admin_notifications` (`admin_notification_id`,`admin_id`,`title`,`content`,`notification_type`,`priority`,`is_read`,`source_type`,`source_id`,`extra_data`,`created_at`',
+  timing: '1068ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:00:01.545Z'
+}
+2026-07-16T01:05:01: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `report_template_id`, `template_code`, `template_name`, `template_description`, `template_type`, `category`, `data_source_config`, `columns_config`, `filters_config`, `aggre',
+  timing: '1174ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:05:01.710Z'
+}
+2026-07-16T01:16:57: 🐌 慢查询检测: {
+  sql: 'Executed (default): UPDATE `users` SET `last_active_at`=? WHERE `user_id` = ?',
+  timing: '1158ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:16:57.311Z'
+}
+2026-07-16T01:16:57: 🐌 慢查询检测: {
+  sql: 'Executed (default): UPDATE `users` SET `last_active_at`=? WHERE `user_id` = ?',
+  timing: '1159ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:16:57.311Z'
+}
+2026-07-16T01:16:57: 🐌 慢查询检测: {
+  sql: "Executed (default): SELECT count(*) AS `count` FROM `ad_campaigns` AS `AdCampaign` WHERE `AdCampaign`.`status` = 'pending_review';",
+  timing: '1232ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:16:57.391Z'
+}
+2026-07-16T01:16:57: 🐌 慢查询检测: {
+  sql: "Executed (default): SELECT count(*) AS `count` FROM `lottery_draws` AS `LotteryDraw` WHERE `LotteryDraw`.`created_at` >= '2026-07-16 00:00:00';",
+  timing: '1230ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:16:57.391Z'
+}
+2026-07-16T01:16:57: 🐌 慢查询检测: {
+  sql: "Executed (default): SELECT count(*) AS `count` FROM `lottery_draws` AS `LotteryDraw` WHERE `LotteryDraw`.`created_at` >= '2026-07-09 01:16:56';",
+  timing: '1230ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:16:57.391Z'
+}
+2026-07-16T01:16:57: 🐌 慢查询检测: {
+  sql: "Executed (default): SELECT count(*) AS `count` FROM `feedbacks` AS `Feedback` WHERE `Feedback`.`status` = 'pending';",
+  timing: '1232ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:16:57.391Z'
+}
+2026-07-16T01:16:57: 🐌 慢查询检测: {
+  sql: "Executed (default): SELECT count(*) AS `count` FROM `redemption_orders` AS `RedemptionOrder` WHERE `RedemptionOrder`.`status` = 'pending';",
+  timing: '1233ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:16:57.392Z'
+}
+2026-07-16T01:16:57: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `LotteryAlert`.`lottery_alert_id`, `LotteryAlert`.`lottery_campaign_id`, `LotteryAlert`.`alert_type`, `LotteryAlert`.`severity`, `LotteryAlert`.`status`, `LotteryAlert`.`rul',
+  timing: '1260ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:16:57.420Z'
+}
+2026-07-16T01:16:57: 🐌 慢查询检测: {
+  sql: "Executed (default): SELECT count(*) AS `count` FROM `customer_service_sessions` AS `CustomerServiceSession` WHERE `CustomerServiceSession`.`status` IN ('waiting', 'assigned', 'active');",
+  timing: '1265ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:16:57.424Z'
+}
+2026-07-16T01:16:57: 🐌 慢查询检测: {
+  sql: "Executed (default): SELECT SUM(CASE WHEN business_type IN ('lottery_reward', 'consumption_reward', 'admin_adjust') \n" +
+    '                AND delta_amount > 0 THEN delta_amount ELSE 0 END) AS `issuance`, SU',
+  timing: '1261ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:16:57.424Z'
+}
+2026-07-16T01:16:57: 🐌 慢查询检测: {
+  sql: "Executed (default): SELECT count(DISTINCT(`user_id`)) AS `count` FROM `lottery_draws` AS `LotteryDraw` WHERE `LotteryDraw`.`created_at` >= '2026-07-16 00:00:00';",
+  timing: '1266ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:16:57.427Z'
+}
+2026-07-16T01:16:57: 🐌 慢查询检测: {
+  sql: "Executed (default): SELECT count(DISTINCT(`user_id`)) AS `count` FROM `lottery_draws` AS `LotteryDraw` WHERE `LotteryDraw`.`created_at` >= '2026-07-09 01:16:56';",
+  timing: '1264ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:16:57.427Z'
+}
+2026-07-16T01:18:44: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `AdCampaign`.`ad_campaign_id`, `AdCampaign`.`business_id`, `AdCampaign`.`campaign_category`, `AdCampaign`.`advertiser_user_id`, `AdCampaign`.`ad_slot_id`, `AdCampaign`.`camp',
+  timing: '1184ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:18:44.133Z'
+}
+2026-07-16T01:18:44: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `AdCampaign`.`ad_campaign_id`, `AdCampaign`.`business_id`, `AdCampaign`.`campaign_category`, `AdCampaign`.`advertiser_user_id`, `AdCampaign`.`ad_slot_id`, `AdCampaign`.`camp',
+  timing: '1183ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:18:44.133Z'
+}
+2026-07-16T01:18:44: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `AdCampaign`.`ad_campaign_id`, `AdCampaign`.`business_id`, `AdCampaign`.`campaign_category`, `AdCampaign`.`advertiser_user_id`, `AdCampaign`.`ad_slot_id`, `AdCampaign`.`camp',
+  timing: '1180ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:18:44.133Z'
+}
+2026-07-16T01:18:45: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `lottery_strategy_config_id`, `lottery_campaign_id`, `config_group`, `config_key`, `config_value`, `value_type`, `description`, `is_active`, `priority`, `effective_start`, `',
+  timing: '1579ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:18:45.507Z'
+}
+2026-07-16T01:19:12: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `DiyMaterial`.`diy_material_id`, `DiyMaterial`.`material_code`, `DiyMaterial`.`display_name`, `DiyMaterial`.`material_name`, `DiyMaterial`.`group_code`, `DiyMaterial`.`diame',
+  timing: '1364ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:19:12.924Z'
+}
+2026-07-16T01:19:12: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `DiyMaterial`.`diy_material_id`, `DiyMaterial`.`material_code`, `DiyMaterial`.`display_name`, `DiyMaterial`.`material_name`, `DiyMaterial`.`group_code`, `DiyMaterial`.`diame',
+  timing: '8855ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:19:12.924Z'
+}
+2026-07-16T01:20:05: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT count(*) AS `count` FROM `admin_notifications` AS `AdminNotification` WHERE `AdminNotification`.`admin_id` = 32;',
+  timing: '9629ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:20:05.379Z'
+}
+2026-07-16T01:20:05: 🐌 慢查询检测: {
+  sql: 'Executed (default): UPDATE `users` SET `last_active_at`=? WHERE `user_id` = ?',
+  timing: '9633ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:20:05.381Z'
+}
+2026-07-16T01:20:15: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT hold_id, item_id, hold_type, holder_ref, expires_at\n' +
+    '      FROM item_holds\n' +
+    '      WHERE expires_at IS NOT NULL AND expires_at < NOW()\n' +
+    '      LIMIT 100',
+  timing: '14223ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:20:15.077Z'
+}
+2026-07-16T01:20:15: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `ExchangeItem`.`exchange_item_id`, `ExchangeItem`.`item_name`, `ExchangeItem`.`stock_alert_threshold`, `skus`.`sku_id` AS `skus.sku_id`, `skus`.`stock` AS `skus.stock` FROM ',
+  timing: '14224ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:20:15.080Z'
+}
+2026-07-16T01:20:15: 🐌 慢查询检测: {
+  sql: "Executed (default): UPDATE `bid_products` SET `status`=?,`updated_at`=? WHERE `status` = ? AND `start_time` <= '2026-07-16 01:20:00'",
+  timing: '14229ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:20:15.080Z'
+}
+2026-07-16T01:20:15: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `reminder_rule_id`, `rule_code`, `rule_name`, `rule_description`, `rule_type`, `trigger_condition`, `target_entity`, `notification_channels`, `notification_template`, `notif',
+  timing: '14226ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:20:15.081Z'
+}
+2026-07-16T01:20:15: 🐌 慢查询检测: {
+  sql: "Executed (default): UPDATE `exchange_items` SET `status`=?,`publish_at`=?,`updated_at`=? WHERE `publish_at` <= '2026-07-16 01:20:00' AND `status` = ?",
+  timing: '14230ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:20:15.082Z'
+}
+2026-07-16T01:20:22: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `admin_notification_id`, `admin_id`, `title`, `content`, `notification_type`, `priority`, `is_read`, `read_at`, `source_type`, `source_id`, `extra_data`, `expires_at`, `crea',
+  timing: '26829ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:20:22.579Z'
+}
+2026-07-16T01:20:27: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `DiyMaterial`.`diy_material_id`, `DiyMaterial`.`material_code`, `DiyMaterial`.`display_name`, `DiyMaterial`.`material_name`, `DiyMaterial`.`group_code`, `DiyMaterial`.`diame',
+  timing: '34254ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:20:27.378Z'
+}
+2026-07-16T01:20:27: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `DiyMaterial`.`diy_material_id`, `DiyMaterial`.`material_code`, `DiyMaterial`.`display_name`, `DiyMaterial`.`material_name`, `DiyMaterial`.`group_code`, `DiyMaterial`.`diame',
+  timing: '23489ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:20:27.378Z'
+}
+2026-07-16T01:20:27: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `DiyMaterial`.`diy_material_id`, `DiyMaterial`.`material_code`, `DiyMaterial`.`display_name`, `DiyMaterial`.`material_name`, `DiyMaterial`.`group_code`, `DiyMaterial`.`diame',
+  timing: '26468ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:20:27.378Z'
+}
+2026-07-16T01:20:27: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `DiyTemplate`.`diy_template_id`, `DiyTemplate`.`template_code`, `DiyTemplate`.`display_name`, `DiyTemplate`.`category_id`, `DiyTemplate`.`layout`, `DiyTemplate`.`bead_rules`',
+  timing: '20012ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:20:27.380Z'
+}
+2026-07-16T01:21:57: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `LotteryAlert`.`lottery_alert_id`, `LotteryAlert`.`lottery_campaign_id`, `LotteryAlert`.`alert_type`, `LotteryAlert`.`severity`, `LotteryAlert`.`status`, `LotteryAlert`.`rul',
+  timing: '2210ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:21:57.971Z'
+}
+2026-07-16T01:21:59: 🐌 慢查询检测: {
+  sql: "Executed (default): SELECT count(DISTINCT(`user_id`)) AS `count` FROM `lottery_draws` AS `LotteryDraw` WHERE `LotteryDraw`.`created_at` >= '2026-07-16 00:00:00';",
+  timing: '3610ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:21:59.374Z'
+}
+2026-07-16T01:21:59: 🐌 慢查询检测: {
+  sql: "Executed (default): SELECT count(DISTINCT(`user_id`)) AS `count` FROM `lottery_draws` AS `LotteryDraw` WHERE `LotteryDraw`.`created_at` >= '2026-07-09 01:21:55';",
+  timing: '3610ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:21:59.375Z'
+}
+2026-07-16T01:26:57: 🐌 慢查询检测: {
+  sql: "Executed (default): SELECT SUM(CASE WHEN business_type IN ('lottery_reward', 'consumption_reward', 'admin_adjust') \n" +
+    '                AND delta_amount > 0 THEN delta_amount ELSE 0 END) AS `issuance`, SU',
+  timing: '1470ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:26:57.235Z'
+}
+2026-07-16T01:26:57: 🐌 慢查询检测: {
+  sql: "Executed (default): SELECT count(*) AS `count` FROM `customer_service_sessions` AS `CustomerServiceSession` WHERE `CustomerServiceSession`.`status` IN ('waiting', 'assigned', 'active');",
+  timing: '1486ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:26:57.249Z'
+}
+2026-07-16T01:26:57: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `LotteryAlert`.`lottery_alert_id`, `LotteryAlert`.`lottery_campaign_id`, `LotteryAlert`.`alert_type`, `LotteryAlert`.`severity`, `LotteryAlert`.`status`, `LotteryAlert`.`rul',
+  timing: '1566ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:26:57.330Z'
+}
+2026-07-16T01:26:57: 🐌 慢查询检测: {
+  sql: "Executed (default): SELECT count(DISTINCT(`user_id`)) AS `count` FROM `lottery_draws` AS `LotteryDraw` WHERE `LotteryDraw`.`created_at` >= '2026-07-16 00:00:00';",
+  timing: '1888ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:26:57.653Z'
+}
+2026-07-16T01:26:57: 🐌 慢查询检测: {
+  sql: "Executed (default): SELECT count(DISTINCT(`user_id`)) AS `count` FROM `lottery_draws` AS `LotteryDraw` WHERE `LotteryDraw`.`created_at` >= '2026-07-09 01:26:55';",
+  timing: '1888ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:26:57.653Z'
+}
+{"level":"error","message":"检测库存告警失败:","name":"SequelizeDatabaseError","original":{"code":"ER_BAD_FIELD_ERROR","errno":1054,"sql":"SELECT `lottery_campaign_prize_id`, `lottery_campaign_id`, `prize_definition_id`, `win_weight`, `stock_quantity`, `reward_tier`, `is_fallback`, `sort_order`, `status`, `max_daily_wins`, `max_user_wins`, `total_win_count`, `daily_win_count`, `created_at`, `updated_at` FROM `lottery_campaign_prizes` AS `LotteryCampaignPrize` WHERE `LotteryCampaignPrize`.`lottery_campaign_id` = 1 AND `LotteryCampaignPrize`.`status` = 'active' AND `LotteryCampaignPrize`.`remaining_stock` < 10;","sqlMessage":"Unknown column 'LotteryCampaignPrize.remaining_stock' in 'where clause'","sqlState":"42S22"},"parameters":{},"parent":{"code":"ER_BAD_FIELD_ERROR","errno":1054,"sql":"SELECT `lottery_campaign_prize_id`, `lottery_campaign_id`, `prize_definition_id`, `win_weight`, `stock_quantity`, `reward_tier`, `is_fallback`, `sort_order`, `status`, `max_daily_wins`, `max_user_wins`, `total_win_count`, `daily_win_count`, `created_at`, `updated_at` FROM `lottery_campaign_prizes` AS `LotteryCampaignPrize` WHERE `LotteryCampaignPrize`.`lottery_campaign_id` = 1 AND `LotteryCampaignPrize`.`status` = 'active' AND `LotteryCampaignPrize`.`remaining_stock` < 10;","sqlMessage":"Unknown column 'LotteryCampaignPrize.remaining_stock' in 'where clause'","sqlState":"42S22"},"sql":"SELECT `lottery_campaign_prize_id`, `lottery_campaign_id`, `prize_definition_id`, `win_weight`, `stock_quantity`, `reward_tier`, `is_fallback`, `sort_order`, `status`, `max_daily_wins`, `max_user_wins`, `total_win_count`, `daily_win_count`, `created_at`, `updated_at` FROM `lottery_campaign_prizes` AS `LotteryCampaignPrize` WHERE `LotteryCampaignPrize`.`lottery_campaign_id` = 1 AND `LotteryCampaignPrize`.`status` = 'active' AND `LotteryCampaignPrize`.`remaining_stock` < 10;","stack":"Error\n    at SmartLogger.error (/home/devbox/project/utils/logger.js:337:50)\n    at LotteryAlertDetectorService.checkInventoryAlert (/home/devbox/project/services/lottery/LotteryAlertDetectorService.js:126:14)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async Promise.all (index 0)\n    at async LotteryAlertDetectorService.runAlertDetection (/home/devbox/project/services/lottery/LotteryAlertDetectorService.js:62:11)\n    at async run (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:977:27)\n    at async ScheduledTasks._runWithRedisLock (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:203:7)","timestamp":"2026-07-16 01:40:00.332"}
+2026-07-16T01:41:56: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `LotteryAlert`.`lottery_alert_id`, `LotteryAlert`.`lottery_campaign_id`, `LotteryAlert`.`alert_type`, `LotteryAlert`.`severity`, `LotteryAlert`.`status`, `LotteryAlert`.`rul',
+  timing: '1144ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:41:56.925Z'
+}
+2026-07-16T01:46:58: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `LotteryAlert`.`lottery_alert_id`, `LotteryAlert`.`lottery_campaign_id`, `LotteryAlert`.`alert_type`, `LotteryAlert`.`severity`, `LotteryAlert`.`status`, `LotteryAlert`.`rul',
+  timing: '1118ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:46:58.596Z'
+}
+2026-07-16T01:46:58: 🐌 慢查询检测: {
+  sql: "Executed (default): SELECT count(DISTINCT(`user_id`)) AS `count` FROM `lottery_draws` AS `LotteryDraw` WHERE `LotteryDraw`.`created_at` >= '2026-07-16 00:00:00';",
+  timing: '1135ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:46:58.614Z'
+}
+2026-07-16T01:46:58: 🐌 慢查询检测: {
+  sql: "Executed (default): SELECT count(DISTINCT(`user_id`)) AS `count` FROM `lottery_draws` AS `LotteryDraw` WHERE `LotteryDraw`.`created_at` >= '2026-07-09 01:46:57';",
+  timing: '1135ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:46:58.615Z'
+}
+2026-07-16T01:49:04: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `admin_notification_id`, `admin_id`, `title`, `content`, `notification_type`, `priority`, `is_read`, `read_at`, `source_type`, `source_id`, `extra_data`, `expires_at`, `crea',
+  timing: '8931ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:49:04.696Z'
+}
+2026-07-16T01:49:43: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `AdCampaign`.`ad_campaign_id`, `AdCampaign`.`business_id`, `AdCampaign`.`campaign_category`, `AdCampaign`.`advertiser_user_id`, `AdCampaign`.`ad_slot_id`, `AdCampaign`.`camp',
+  timing: '9891ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:49:43.000Z'
+}
+2026-07-16T01:49:43: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `AdCampaign`.`ad_campaign_id`, `AdCampaign`.`business_id`, `AdCampaign`.`campaign_category`, `AdCampaign`.`advertiser_user_id`, `AdCampaign`.`ad_slot_id`, `AdCampaign`.`camp',
+  timing: '9891ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:49:43.000Z'
+}
+2026-07-16T01:49:43: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `AdCampaign`.`ad_campaign_id`, `AdCampaign`.`business_id`, `AdCampaign`.`campaign_category`, `AdCampaign`.`advertiser_user_id`, `AdCampaign`.`ad_slot_id`, `AdCampaign`.`camp',
+  timing: '9890ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:49:43.000Z'
+}
+2026-07-16T01:49:43: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `LotteryCampaignPrize`.`lottery_campaign_prize_id`, `LotteryCampaignPrize`.`lottery_campaign_id`, `LotteryCampaignPrize`.`prize_definition_id`, `LotteryCampaignPrize`.`win_w',
+  timing: '8909ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:49:43.001Z'
+}
+2026-07-16T01:49:43: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `lottery_strategy_config_id`, `lottery_campaign_id`, `config_group`, `config_key`, `config_value`, `value_type`, `description`, `is_active`, `priority`, `effective_start`, `',
+  timing: '8909ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:49:43.003Z'
+}
+2026-07-16T01:49:58: 🐌 慢查询检测: {
+  sql: 'Executed (default): UPDATE `users` SET `last_active_at`=? WHERE `user_id` = ?',
+  timing: '2482ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:49:58.248Z'
+}
+2026-07-16T01:50:07: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT l.item_id, l.account_id AS ledger_owner, i.owner_account_id AS cache_owner\n' +
+    '    FROM (\n' +
+    '      SELECT item_id, account_id\n' +
+    '      FROM item_ledger\n' +
+    '      GROUP BY item_id, account',
+  timing: '7014ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:50:07.573Z'
+}
+{"level":"error","message":"对账发现异常","results":{"assets":{"balance_consistency":{"excluded_campaign_scoped":["budget_points"],"mismatch_count":3,"status":"FAIL"},"global":[{"asset_code":"budget_points","total_net":0,"tx_count":756},{"asset_code":"points","total_net":-67006,"tx_count":1797},{"asset_code":"red_core_shard","total_net":6000,"tx_count":740},{"asset_code":"star_stone","total_net":26330,"tx_count":1424},{"asset_code":"star_stone_quota","total_net":0,"tx_count":1364}],"global_conservation":{"status":"FAIL"}},"items":{"conservation":{"imbalanced_count":0,"status":"PASS"},"mint_consistency":{"items_excluding_test":37,"mints":37,"status":"PASS"},"owner_consistency":{"mismatch_count":18,"status":"FAIL"}}},"stack":"Error\n    at SmartLogger.error (/home/devbox/project/utils/logger.js:337:50)\n    at Object.error (/home/devbox/project/utils/logger.js:480:37)\n    at executeReconciliation (/home/devbox/project/scripts/reconcile-items.js:195:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async distributedLock.withLock.ttl (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:817:28)\n    at async UnifiedDistributedLock.withLock (/home/devbox/project/utils/UnifiedDistributedLock.js:284:22)\n    at async Task._execution (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:808:9)","timestamp":"2026-07-16 01:50:07.596"}
+2026-07-16T01:50:10: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT er.exchange_record_id\n' +
+    '       FROM exchange_records er\n' +
+    '       LEFT JOIN asset_transactions atx1 ON atx1.asset_transaction_id = er.debit_transaction_id\n' +
+    '       LEFT JOIN asset_',
+  timing: '3357ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:50:10.979Z'
+}
+2026-07-16T01:50:55: [UnifiedRedisClient] 订阅客户端错误: Error: connect ECONNREFUSED 127.0.0.1:6379
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1607:16) {
+  errno: -111,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 6379
+}
+2026-07-16T01:50:55: [UnifiedRedisClient] 订阅客户端错误: Error: connect ECONNREFUSED 127.0.0.1:6379
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1607:16) {
+  errno: -111,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 6379
+}
+2026-07-16T01:50:55: [UnifiedRedisClient] 主客户端连接错误: Error: connect ECONNREFUSED 127.0.0.1:6379
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1607:16) {
+  errno: -111,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 6379
+}
+2026-07-16T01:50:55: [UnifiedRedisClient] 主客户端连接错误: Error: connect ECONNREFUSED 127.0.0.1:6379
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1607:16) {
+  errno: -111,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 6379
+}
+2026-07-16T01:51:02: (node:27208) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.
+ SDK releases are limited to address critical bug fixes and security issues only.
+
+Please migrate your code to use AWS SDK for JavaScript (v3).
+For more information, check the blog post at https://a.co/cUPnyil
+(Use `node --trace-warnings ...` to show where the warning was created)
+2026-07-16T01:51:02: (node:27215) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.
+ SDK releases are limited to address critical bug fixes and security issues only.
+
+Please migrate your code to use AWS SDK for JavaScript (v3).
+For more information, check the blog post at https://a.co/cUPnyil
+(Use `node --trace-warnings ...` to show where the warning was created)
+2026-07-16T01:51:02: (node:27196) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.
+ SDK releases are limited to address critical bug fixes and security issues only.
+
+Please migrate your code to use AWS SDK for JavaScript (v3).
+For more information, check the blog post at https://a.co/cUPnyil
+(Use `node --trace-warnings ...` to show where the warning was created)
+2026-07-16T01:51:02: (node:27226) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.
+ SDK releases are limited to address critical bug fixes and security issues only.
+
+Please migrate your code to use AWS SDK for JavaScript (v3).
+For more information, check the blog post at https://a.co/cUPnyil
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"error":"Table 'restaurant_points_dev.admin_operation_logs' doesn't exist","level":"error","message":"[启动校验] target_type 校验出错","stack":"Error\n    at SmartLogger.error (/home/devbox/project/utils/logger.js:337:50)\n    at validateTargetTypeConsistency (/home/devbox/project/constants/AuditTargetTypes.js:307:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async initializeApp (/home/devbox/project/app.js:174:30)","timestamp":"2026-07-16 01:51:03.581"}
+{"error":"Table 'restaurant_points_dev.admin_operation_logs' doesn't exist","level":"error","message":"[启动校验] target_type 校验出错","stack":"Error\n    at SmartLogger.error (/home/devbox/project/utils/logger.js:337:50)\n    at validateTargetTypeConsistency (/home/devbox/project/constants/AuditTargetTypes.js:307:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async initializeApp (/home/devbox/project/app.js:174:30)","timestamp":"2026-07-16 01:51:03.582"}
+{"error":"Table 'restaurant_points_dev.admin_operation_logs' doesn't exist","level":"error","message":"[启动校验] target_type 校验出错","stack":"Error\n    at SmartLogger.error (/home/devbox/project/utils/logger.js:337:50)\n    at validateTargetTypeConsistency (/home/devbox/project/constants/AuditTargetTypes.js:307:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async initializeApp (/home/devbox/project/app.js:174:30)","timestamp":"2026-07-16 01:51:03.583"}
+{"error":"Table 'restaurant_points_dev.admin_operation_logs' doesn't exist","level":"error","message":"[启动校验] target_type 校验出错","stack":"Error\n    at SmartLogger.error (/home/devbox/project/utils/logger.js:337:50)\n    at validateTargetTypeConsistency (/home/devbox/project/constants/AuditTargetTypes.js:307:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async initializeApp (/home/devbox/project/app.js:174:30)","timestamp":"2026-07-16 01:51:03.585"}
+2026-07-16T01:51:04: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `system_dictionary_id`, `dict_type`, `dict_code`, `dict_name`, `dict_color`, `sort_order`, `is_enabled`, `remark`, `version`, `updated_by`, `created_at`, `updated_at` FROM `',
+  timing: '1109ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:51:04.704Z'
+}
+2026-07-16T01:51:04: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `system_dictionary_id`, `dict_type`, `dict_code`, `dict_name`, `dict_color`, `sort_order`, `is_enabled`, `remark`, `version`, `updated_by`, `created_at`, `updated_at` FROM `',
+  timing: '1110ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:51:04.704Z'
+}
+2026-07-16T01:51:04: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `system_dictionary_id`, `dict_type`, `dict_code`, `dict_name`, `dict_color`, `sort_order`, `is_enabled`, `remark`, `version`, `updated_by`, `created_at`, `updated_at` FROM `',
+  timing: '1116ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:51:04.706Z'
+}
+2026-07-16T01:51:04: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `system_dictionary_id`, `dict_type`, `dict_code`, `dict_name`, `dict_color`, `sort_order`, `is_enabled`, `remark`, `version`, `updated_by`, `created_at`, `updated_at` FROM `',
+  timing: '1116ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:51:04.709Z'
+}
+2026-07-16T01:52:58: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `admin_notification_id`, `admin_id`, `title`, `content`, `notification_type`, `priority`, `is_read`, `read_at`, `source_type`, `source_id`, `extra_data`, `expires_at`, `crea',
+  timing: '2523ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:52:58.305Z'
+}
+2026-07-16T01:53:56: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `admin_notification_id`, `admin_id`, `title`, `content`, `notification_type`, `priority`, `is_read`, `read_at`, `source_type`, `source_id`, `extra_data`, `expires_at`, `crea',
+  timing: '1119ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T17:53:56.897Z'
+}
+2026-07-16T02:00:01: 🐌 慢查询检测: {
+  sql: "Executed (default): DELETE FROM `authentication_sessions` WHERE `expires_at` < '2026-07-16 02:00:00'",
+  timing: '1067ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T18:00:01.975Z'
+}
+2026-07-16T02:30:01: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `trade_dispute_id`, `user_id`, `order_type`, `order_id`, `dispute_type`, `title`, `description`, `evidence`, `status`, `priority`, `assigned_to`, `approval_chain_instance_id',
+  timing: '1375ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T18:30:01.635Z'
+}
+2026-07-16T02:30:01: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `ApprovalChainStep`.`step_id`, `ApprovalChainStep`.`instance_id`, `ApprovalChainStep`.`node_id`, `ApprovalChainStep`.`step_number`, `ApprovalChainStep`.`assignee_user_id`, `',
+  timing: '1378ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T18:30:01.636Z'
+}
+2026-07-16T02:30:01: 🐌 慢查询检测: {
+  sql: "Executed (default): DELETE FROM `authentication_sessions` WHERE `expires_at` < '2026-07-16 02:30:00'",
+  timing: '1374ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T18:30:01.647Z'
+}
+2026-07-16T02:30:01: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `media_id`, `object_key`, `thumbnail_keys`, `original_name`, `file_size`, `mime_type`, `width`, `height`, `content_hash`, `folder`, `tags`, `uploaded_by`, `status`, `trashed',
+  timing: '1371ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T18:30:01.665Z'
+}
+2026-07-16T02:34:40: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `system_setting_id`, `category`, `setting_key`, `setting_value`, `value_type`, `description`, `is_visible`, `is_readonly`, `updated_by`, `created_at`, `updated_at` FROM `sys',
+  timing: '1611ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T18:34:40.665Z'
+}
+2026-07-16T02:34:42: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `lottery_strategy_config_id`, `lottery_campaign_id`, `config_group`, `config_key`, `config_value`, `value_type`, `description`, `is_active`, `priority`, `effective_start`, `',
+  timing: '1163ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T18:34:42.010Z'
+}
+2026-07-16T02:35:01: 🐌 慢查询检测: {
+  sql: 'Executed (default): INSERT INTO `reminder_history` (`reminder_history_id`,`reminder_rule_id`,`trigger_time`,`trigger_data`,`matched_count`,`notification_status`,`is_acknowledged`,`created_at`) VALUES ',
+  timing: '1311ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T18:35:01.678Z'
+}
+{"level":"error","message":"检测库存告警失败:","name":"SequelizeDatabaseError","original":{"code":"ER_BAD_FIELD_ERROR","errno":1054,"sql":"SELECT `lottery_campaign_prize_id`, `lottery_campaign_id`, `prize_definition_id`, `win_weight`, `stock_quantity`, `reward_tier`, `is_fallback`, `sort_order`, `status`, `max_daily_wins`, `max_user_wins`, `total_win_count`, `daily_win_count`, `created_at`, `updated_at` FROM `lottery_campaign_prizes` AS `LotteryCampaignPrize` WHERE `LotteryCampaignPrize`.`lottery_campaign_id` = 1 AND `LotteryCampaignPrize`.`status` = 'active' AND `LotteryCampaignPrize`.`remaining_stock` < 10;","sqlMessage":"Unknown column 'LotteryCampaignPrize.remaining_stock' in 'where clause'","sqlState":"42S22"},"parameters":{},"parent":{"code":"ER_BAD_FIELD_ERROR","errno":1054,"sql":"SELECT `lottery_campaign_prize_id`, `lottery_campaign_id`, `prize_definition_id`, `win_weight`, `stock_quantity`, `reward_tier`, `is_fallback`, `sort_order`, `status`, `max_daily_wins`, `max_user_wins`, `total_win_count`, `daily_win_count`, `created_at`, `updated_at` FROM `lottery_campaign_prizes` AS `LotteryCampaignPrize` WHERE `LotteryCampaignPrize`.`lottery_campaign_id` = 1 AND `LotteryCampaignPrize`.`status` = 'active' AND `LotteryCampaignPrize`.`remaining_stock` < 10;","sqlMessage":"Unknown column 'LotteryCampaignPrize.remaining_stock' in 'where clause'","sqlState":"42S22"},"sql":"SELECT `lottery_campaign_prize_id`, `lottery_campaign_id`, `prize_definition_id`, `win_weight`, `stock_quantity`, `reward_tier`, `is_fallback`, `sort_order`, `status`, `max_daily_wins`, `max_user_wins`, `total_win_count`, `daily_win_count`, `created_at`, `updated_at` FROM `lottery_campaign_prizes` AS `LotteryCampaignPrize` WHERE `LotteryCampaignPrize`.`lottery_campaign_id` = 1 AND `LotteryCampaignPrize`.`status` = 'active' AND `LotteryCampaignPrize`.`remaining_stock` < 10;","stack":"Error\n    at SmartLogger.error (/home/devbox/project/utils/logger.js:337:50)\n    at LotteryAlertDetectorService.checkInventoryAlert (/home/devbox/project/services/lottery/LotteryAlertDetectorService.js:126:14)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async Promise.all (index 0)\n    at async LotteryAlertDetectorService.runAlertDetection (/home/devbox/project/services/lottery/LotteryAlertDetectorService.js:62:11)\n    at async run (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:977:27)\n    at async ScheduledTasks._runWithRedisLock (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:203:7)","timestamp":"2026-07-16 02:40:00.484"}
+2026-07-16T02:50:02: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT `reminder_rule_id`, `rule_code`, `rule_name`, `rule_description`, `rule_type`, `trigger_condition`, `target_entity`, `notification_channels`, `notification_template`, `notif',
+  timing: '1784ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T18:50:02.469Z'
+}
+2026-07-16T02:50:02: 🐌 慢查询检测: {
+  sql: 'Executed (default): SELECT item_id, SUM(delta) AS balance\n' +
+    '    FROM item_ledger\n' +
+    '    GROUP BY item_id\n' +
+    '    HAVING balance != 0',
+  timing: '1785ms',
+  threshold: '1000ms',
+  timestamp: '2026-07-15T18:50:02.470Z'
+}
+{"level":"error","message":"对账发现异常","results":{"assets":{"balance_consistency":{"excluded_campaign_scoped":["budget_points"],"mismatch_count":3,"status":"FAIL"},"global":[{"asset_code":"budget_points","total_net":0,"tx_count":770},{"asset_code":"points","total_net":-67006,"tx_count":1807},{"asset_code":"red_core_shard","total_net":6000,"tx_count":754},{"asset_code":"star_stone","total_net":26330,"tx_count":1470},{"asset_code":"star_stone_quota","total_net":0,"tx_count":1410}],"global_conservation":{"status":"FAIL"}},"items":{"conservation":{"imbalanced_count":0,"status":"PASS"},"mint_consistency":{"items_excluding_test":37,"mints":37,"status":"PASS"},"owner_consistency":{"mismatch_count":18,"status":"FAIL"}}},"stack":"Error\n    at SmartLogger.error (/home/devbox/project/utils/logger.js:337:50)\n    at Object.error (/home/devbox/project/utils/logger.js:480:37)\n    at executeReconciliation (/home/devbox/project/scripts/reconcile-items.js:195:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async distributedLock.withLock.ttl (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:817:28)\n    at async UnifiedDistributedLock.withLock (/home/devbox/project/utils/UnifiedDistributedLock.js:284:22)\n    at async Task._execution (/home/devbox/project/scripts/maintenance/scheduled_tasks.js:808:9)","timestamp":"2026-07-16 02:50:03.480"}
