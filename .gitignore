@@ -3,3 +3,5 @@ node_modules/
 
 # 超过 GitHub 100MB 硬性限制的单个文件（本地保留，不入库）
 backups/2026-06-22/sql/full_database_backup.sql
+logs/out.log
+logs/debug1.log

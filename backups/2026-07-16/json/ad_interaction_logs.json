@@ -1,0 +1,1562 @@
+[
+  {
+    "ad_interaction_log_id": 122,
+    "ad_campaign_id": 358,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-22 13:12:39"
+  },
+  {
+    "ad_interaction_log_id": 123,
+    "ad_campaign_id": 358,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-22 13:20:07"
+  },
+  {
+    "ad_interaction_log_id": 124,
+    "ad_campaign_id": 358,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-22 13:40:15"
+  },
+  {
+    "ad_interaction_log_id": 125,
+    "ad_campaign_id": 358,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-22 16:25:23"
+  },
+  {
+    "ad_interaction_log_id": 126,
+    "ad_campaign_id": 358,
+    "user_id": 12796,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-22 20:37:51"
+  },
+  {
+    "ad_interaction_log_id": 127,
+    "ad_campaign_id": 358,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-22 20:38:03"
+  },
+  {
+    "ad_interaction_log_id": 128,
+    "ad_campaign_id": 358,
+    "user_id": 12797,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-22 22:30:36"
+  },
+  {
+    "ad_interaction_log_id": 129,
+    "ad_campaign_id": 358,
+    "user_id": 12797,
+    "ad_slot_id": 16,
+    "interaction_type": "click",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-22 22:31:28"
+  },
+  {
+    "ad_interaction_log_id": 130,
+    "ad_campaign_id": 358,
+    "user_id": 12797,
+    "ad_slot_id": 16,
+    "interaction_type": "click",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-22 22:31:30"
+  },
+  {
+    "ad_interaction_log_id": 131,
+    "ad_campaign_id": 358,
+    "user_id": 12797,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-22 22:31:38"
+  },
+  {
+    "ad_interaction_log_id": 132,
+    "ad_campaign_id": 358,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-22 22:31:55"
+  },
+  {
+    "ad_interaction_log_id": 133,
+    "ad_campaign_id": 358,
+    "user_id": 12797,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-22 22:37:08"
+  },
+  {
+    "ad_interaction_log_id": 134,
+    "ad_campaign_id": 358,
+    "user_id": 12797,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-22 22:37:17"
+  },
+  {
+    "ad_interaction_log_id": 135,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-25 08:39:28"
+  },
+  {
+    "ad_interaction_log_id": 136,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-25 09:48:51"
+  },
+  {
+    "ad_interaction_log_id": 137,
+    "ad_campaign_id": 359,
+    "user_id": 12799,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-25 09:49:15"
+  },
+  {
+    "ad_interaction_log_id": 138,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 00:01:52"
+  },
+  {
+    "ad_interaction_log_id": 139,
+    "ad_campaign_id": 359,
+    "user_id": 12798,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 00:04:08"
+  },
+  {
+    "ad_interaction_log_id": 140,
+    "ad_campaign_id": 359,
+    "user_id": 12797,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 00:04:55"
+  },
+  {
+    "ad_interaction_log_id": 141,
+    "ad_campaign_id": 359,
+    "user_id": 12796,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 00:12:01"
+  },
+  {
+    "ad_interaction_log_id": 142,
+    "ad_campaign_id": 359,
+    "user_id": 12796,
+    "ad_slot_id": 16,
+    "interaction_type": "click",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 00:17:50"
+  },
+  {
+    "ad_interaction_log_id": 143,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 00:17:54"
+  },
+  {
+    "ad_interaction_log_id": 144,
+    "ad_campaign_id": 359,
+    "user_id": 12800,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 00:18:41"
+  },
+  {
+    "ad_interaction_log_id": 145,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 00:20:15"
+  },
+  {
+    "ad_interaction_log_id": 146,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 06:17:30"
+  },
+  {
+    "ad_interaction_log_id": 147,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 06:21:00"
+  },
+  {
+    "ad_interaction_log_id": 148,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 06:21:25"
+  },
+  {
+    "ad_interaction_log_id": 149,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 06:26:20"
+  },
+  {
+    "ad_interaction_log_id": 150,
+    "ad_campaign_id": 359,
+    "user_id": 12801,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 06:59:19"
+  },
+  {
+    "ad_interaction_log_id": 151,
+    "ad_campaign_id": 359,
+    "user_id": 12801,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 07:00:06"
+  },
+  {
+    "ad_interaction_log_id": 152,
+    "ad_campaign_id": 359,
+    "user_id": 12802,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 07:01:13"
+  },
+  {
+    "ad_interaction_log_id": 153,
+    "ad_campaign_id": 359,
+    "user_id": 12798,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 07:02:42"
+  },
+  {
+    "ad_interaction_log_id": 154,
+    "ad_campaign_id": 359,
+    "user_id": 12798,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 07:04:34"
+  },
+  {
+    "ad_interaction_log_id": 155,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 07:06:46"
+  },
+  {
+    "ad_interaction_log_id": 156,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 11:29:17"
+  },
+  {
+    "ad_interaction_log_id": 157,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 16:32:14"
+  },
+  {
+    "ad_interaction_log_id": 158,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 16:32:54"
+  },
+  {
+    "ad_interaction_log_id": 159,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 16:34:57"
+  },
+  {
+    "ad_interaction_log_id": 160,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 16:35:27"
+  },
+  {
+    "ad_interaction_log_id": 161,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 16:36:00"
+  },
+  {
+    "ad_interaction_log_id": 162,
+    "ad_campaign_id": 359,
+    "user_id": 12796,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 16:36:08"
+  },
+  {
+    "ad_interaction_log_id": 163,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-26 16:37:21"
+  },
+  {
+    "ad_interaction_log_id": 164,
+    "ad_campaign_id": 359,
+    "user_id": 12802,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-27 06:27:13"
+  },
+  {
+    "ad_interaction_log_id": 165,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-27 06:27:25"
+  },
+  {
+    "ad_interaction_log_id": 166,
+    "ad_campaign_id": 359,
+    "user_id": 12796,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-27 06:27:44"
+  },
+  {
+    "ad_interaction_log_id": 167,
+    "ad_campaign_id": 359,
+    "user_id": 12801,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-27 06:28:26"
+  },
+  {
+    "ad_interaction_log_id": 168,
+    "ad_campaign_id": 359,
+    "user_id": 12798,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-27 06:29:33"
+  },
+  {
+    "ad_interaction_log_id": 169,
+    "ad_campaign_id": 359,
+    "user_id": 12796,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-27 06:31:51"
+  },
+  {
+    "ad_interaction_log_id": 170,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-27 06:32:08"
+  },
+  {
+    "ad_interaction_log_id": 171,
+    "ad_campaign_id": 359,
+    "user_id": 12796,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-27 07:29:13"
+  },
+  {
+    "ad_interaction_log_id": 172,
+    "ad_campaign_id": 359,
+    "user_id": 12796,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-27 07:30:01"
+  },
+  {
+    "ad_interaction_log_id": 173,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-27 07:30:45"
+  },
+  {
+    "ad_interaction_log_id": 174,
+    "ad_campaign_id": 359,
+    "user_id": 12803,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-27 08:02:18"
+  },
+  {
+    "ad_interaction_log_id": 175,
+    "ad_campaign_id": 359,
+    "user_id": 12803,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-27 08:03:19"
+  },
+  {
+    "ad_interaction_log_id": 176,
+    "ad_campaign_id": 359,
+    "user_id": 12803,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-27 08:05:22"
+  },
+  {
+    "ad_interaction_log_id": 177,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-27 23:56:37"
+  },
+  {
+    "ad_interaction_log_id": 178,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-27 23:56:51"
+  },
+  {
+    "ad_interaction_log_id": 179,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 01:52:37"
+  },
+  {
+    "ad_interaction_log_id": 180,
+    "ad_campaign_id": 359,
+    "user_id": 12803,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 01:54:12"
+  },
+  {
+    "ad_interaction_log_id": 181,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 02:35:07"
+  },
+  {
+    "ad_interaction_log_id": 182,
+    "ad_campaign_id": 359,
+    "user_id": 12804,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 03:05:46"
+  },
+  {
+    "ad_interaction_log_id": 183,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 03:05:52"
+  },
+  {
+    "ad_interaction_log_id": 184,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 03:05:55"
+  },
+  {
+    "ad_interaction_log_id": 185,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 03:42:50"
+  },
+  {
+    "ad_interaction_log_id": 186,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 04:46:15"
+  },
+  {
+    "ad_interaction_log_id": 187,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "click",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 04:46:19"
+  },
+  {
+    "ad_interaction_log_id": 188,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "click",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 04:46:19"
+  },
+  {
+    "ad_interaction_log_id": 189,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 04:47:21"
+  },
+  {
+    "ad_interaction_log_id": 190,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 04:48:01"
+  },
+  {
+    "ad_interaction_log_id": 191,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 07:37:22"
+  },
+  {
+    "ad_interaction_log_id": 192,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 07:57:02"
+  },
+  {
+    "ad_interaction_log_id": 193,
+    "ad_campaign_id": 359,
+    "user_id": 12805,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 07:59:36"
+  },
+  {
+    "ad_interaction_log_id": 194,
+    "ad_campaign_id": 359,
+    "user_id": 12805,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 08:48:15"
+  },
+  {
+    "ad_interaction_log_id": 195,
+    "ad_campaign_id": 359,
+    "user_id": 12803,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 09:00:18"
+  },
+  {
+    "ad_interaction_log_id": 196,
+    "ad_campaign_id": 359,
+    "user_id": 12805,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 09:00:31"
+  },
+  {
+    "ad_interaction_log_id": 197,
+    "ad_campaign_id": 359,
+    "user_id": 12805,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 14:38:41"
+  },
+  {
+    "ad_interaction_log_id": 198,
+    "ad_campaign_id": 359,
+    "user_id": 12805,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 20:22:57"
+  },
+  {
+    "ad_interaction_log_id": 199,
+    "ad_campaign_id": 359,
+    "user_id": 12805,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 20:35:32"
+  },
+  {
+    "ad_interaction_log_id": 200,
+    "ad_campaign_id": 359,
+    "user_id": 12805,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 20:35:54"
+  },
+  {
+    "ad_interaction_log_id": 201,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 20:45:19"
+  },
+  {
+    "ad_interaction_log_id": 202,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 20:46:03"
+  },
+  {
+    "ad_interaction_log_id": 203,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 20:54:08"
+  },
+  {
+    "ad_interaction_log_id": 204,
+    "ad_campaign_id": 359,
+    "user_id": 12805,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 20:54:30"
+  },
+  {
+    "ad_interaction_log_id": 205,
+    "ad_campaign_id": 359,
+    "user_id": 12805,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 21:03:52"
+  },
+  {
+    "ad_interaction_log_id": 206,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 21:05:50"
+  },
+  {
+    "ad_interaction_log_id": 207,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 21:11:30"
+  },
+  {
+    "ad_interaction_log_id": 208,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 22:11:02"
+  },
+  {
+    "ad_interaction_log_id": 209,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 22:33:53"
+  },
+  {
+    "ad_interaction_log_id": 210,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 22:49:16"
+  },
+  {
+    "ad_interaction_log_id": 211,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 22:57:23"
+  },
+  {
+    "ad_interaction_log_id": 212,
+    "ad_campaign_id": 359,
+    "user_id": 12805,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 23:46:06"
+  },
+  {
+    "ad_interaction_log_id": 213,
+    "ad_campaign_id": 359,
+    "user_id": 12805,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 23:54:48"
+  },
+  {
+    "ad_interaction_log_id": 214,
+    "ad_campaign_id": 359,
+    "user_id": 12806,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 23:58:11"
+  },
+  {
+    "ad_interaction_log_id": 215,
+    "ad_campaign_id": 359,
+    "user_id": 12803,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-28 23:58:28"
+  },
+  {
+    "ad_interaction_log_id": 216,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-29 00:16:30"
+  },
+  {
+    "ad_interaction_log_id": 217,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-29 01:13:32"
+  },
+  {
+    "ad_interaction_log_id": 218,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-29 01:24:21"
+  },
+  {
+    "ad_interaction_log_id": 219,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-29 02:41:13"
+  },
+  {
+    "ad_interaction_log_id": 220,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-29 03:11:55"
+  },
+  {
+    "ad_interaction_log_id": 221,
+    "ad_campaign_id": 359,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-06-29 06:07:52"
+  },
+  {
+    "ad_interaction_log_id": 222,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-07 22:03:29"
+  },
+  {
+    "ad_interaction_log_id": 223,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-08 04:27:28"
+  },
+  {
+    "ad_interaction_log_id": 224,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-08 04:57:52"
+  },
+  {
+    "ad_interaction_log_id": 225,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-08 06:26:27"
+  },
+  {
+    "ad_interaction_log_id": 226,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-08 06:27:11"
+  },
+  {
+    "ad_interaction_log_id": 227,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-08 22:45:55"
+  },
+  {
+    "ad_interaction_log_id": 228,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-08 22:46:31"
+  },
+  {
+    "ad_interaction_log_id": 229,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-09 02:42:29"
+  },
+  {
+    "ad_interaction_log_id": 230,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-11 09:52:48"
+  },
+  {
+    "ad_interaction_log_id": 231,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-11 14:34:55"
+  },
+  {
+    "ad_interaction_log_id": 232,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-12 00:24:33"
+  },
+  {
+    "ad_interaction_log_id": 233,
+    "ad_campaign_id": 366,
+    "user_id": 12873,
+    "ad_slot_id": 16,
+    "interaction_type": "click",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-12 00:30:53"
+  },
+  {
+    "ad_interaction_log_id": 234,
+    "ad_campaign_id": 366,
+    "user_id": 12873,
+    "ad_slot_id": 16,
+    "interaction_type": "click",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-12 00:30:53"
+  },
+  {
+    "ad_interaction_log_id": 235,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-12 00:31:53"
+  },
+  {
+    "ad_interaction_log_id": 236,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-12 02:27:01"
+  },
+  {
+    "ad_interaction_log_id": 237,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-12 02:27:02"
+  },
+  {
+    "ad_interaction_log_id": 238,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-12 03:10:49"
+  },
+  {
+    "ad_interaction_log_id": 239,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-12 04:00:54"
+  },
+  {
+    "ad_interaction_log_id": 240,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-12 06:18:13"
+  },
+  {
+    "ad_interaction_log_id": 241,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-12 06:18:49"
+  },
+  {
+    "ad_interaction_log_id": 242,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-15 04:33:33"
+  },
+  {
+    "ad_interaction_log_id": 243,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-15 06:11:37"
+  },
+  {
+    "ad_interaction_log_id": 244,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-15 06:28:14"
+  },
+  {
+    "ad_interaction_log_id": 245,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-15 06:33:41"
+  },
+  {
+    "ad_interaction_log_id": 246,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-15 09:21:30"
+  },
+  {
+    "ad_interaction_log_id": 247,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-15 21:01:20"
+  },
+  {
+    "ad_interaction_log_id": 248,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-15 22:45:18"
+  },
+  {
+    "ad_interaction_log_id": 249,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-15 23:15:59"
+  },
+  {
+    "ad_interaction_log_id": 250,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-15 23:16:16"
+  },
+  {
+    "ad_interaction_log_id": 251,
+    "ad_campaign_id": 366,
+    "user_id": 32,
+    "ad_slot_id": 16,
+    "interaction_type": "impression",
+    "extra_data": {
+      "position": "lottery",
+      "slot_type": "top_banner"
+    },
+    "created_at": "2026-07-16 02:37:01"
+  }
+]

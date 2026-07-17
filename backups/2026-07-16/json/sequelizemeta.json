@@ -1,0 +1,17 @@
+[
+  {
+    "name": "20260711090000-baseline-v4.2.0-squashed.js"
+  },
+  {
+    "name": "20260712040000-migrate-data-adjust-growth-level-thresholds.js"
+  },
+  {
+    "name": "20260712041000-migrate-data-delete-inactive-growth-levels.js"
+  },
+  {
+    "name": "20260715040000-create-table-consumption-bonus-rules.js"
+  },
+  {
+    "name": "20260715210000-migrate-data-add-diy-material-group-dictionary.js"
+  }
+]

@@ -1,0 +1,416 @@
+[
+  {
+    "diy_template_id": 116,
+    "category_id": 191,
+    "layout": {
+      "shape": "circle"
+    },
+    "sort_order": 1,
+    "created_at": "2026-07-15 21:03:09",
+    "updated_at": "2026-07-15 21:03:09",
+    "template_code": "DT26071500011653",
+    "display_name": "手串",
+    "status": "published",
+    "is_enabled": 1,
+    "bead_rules": {
+      "margin": 0,
+      "default_diameter": 8,
+      "allowed_diameters": []
+    },
+    "sizing_rules": {
+      "default_size": "15",
+      "size_options": [
+        {
+          "label": "12",
+          "display": "手围 12cm（约 16 颗）",
+          "bead_count": 16,
+          "wrist_size_mm": 120,
+          "target_length_mm": 135
+        },
+        {
+          "label": "13",
+          "display": "手围 13cm（约 18 颗）",
+          "bead_count": 18,
+          "wrist_size_mm": 130,
+          "target_length_mm": 145
+        },
+        {
+          "label": "14",
+          "display": "手围 14cm（约 19 颗）",
+          "bead_count": 19,
+          "wrist_size_mm": 140,
+          "target_length_mm": 155
+        },
+        {
+          "label": "15",
+          "display": "手围 15cm（约 20 颗）",
+          "bead_count": 20,
+          "wrist_size_mm": 150,
+          "target_length_mm": 165
+        },
+        {
+          "label": "16",
+          "display": "手围 16cm（约 21 颗）",
+          "bead_count": 21,
+          "wrist_size_mm": 160,
+          "target_length_mm": 175
+        },
+        {
+          "label": "17",
+          "display": "手围 17cm（约 23 颗）",
+          "bead_count": 23,
+          "wrist_size_mm": 170,
+          "target_length_mm": 185
+        },
+        {
+          "label": "18",
+          "display": "手围 18cm（约 24 颗）",
+          "bead_count": 24,
+          "wrist_size_mm": 180,
+          "target_length_mm": 195
+        },
+        {
+          "label": "15x2",
+          "display": "手围 15cm 双圈（约 41 颗）",
+          "bead_count": 41,
+          "wrist_size_mm": 150,
+          "target_length_mm": 330
+        },
+        {
+          "label": "15x3",
+          "display": "手围 15cm 三圈（约 61 颗）",
+          "bead_count": 61,
+          "wrist_size_mm": 150,
+          "target_length_mm": 495
+        }
+      ],
+      "elastic_margin_mm": 15
+    },
+    "capacity_rules": {
+      "max_beads": 0,
+      "min_beads": 1
+    },
+    "material_group_codes": [
+      "white",
+      "pink",
+      "purple",
+      "yellow"
+    ],
+    "preview_media_id": 177,
+    "base_image_media_id": 177,
+    "meta": null
+  },
+  {
+    "diy_template_id": 117,
+    "category_id": 293,
+    "layout": {
+      "shape": "circle"
+    },
+    "sort_order": 2,
+    "created_at": "2026-07-15 21:03:09",
+    "updated_at": "2026-07-15 21:03:09",
+    "template_code": "DT2607150001178B",
+    "display_name": "108佛珠",
+    "status": "published",
+    "is_enabled": 1,
+    "bead_rules": {
+      "margin": 0,
+      "default_diameter": 8,
+      "allowed_diameters": []
+    },
+    "sizing_rules": {
+      "default_size": "108x8",
+      "size_options": [
+        {
+          "label": "54x8",
+          "display": "54颗 · 8mm珠",
+          "bead_count": 54,
+          "target_length_mm": 432
+        },
+        {
+          "label": "108x6",
+          "display": "108颗 · 6mm珠",
+          "bead_count": 108,
+          "target_length_mm": 648
+        },
+        {
+          "label": "108x8",
+          "display": "108颗 · 8mm珠",
+          "bead_count": 108,
+          "target_length_mm": 864
+        }
+      ],
+      "elastic_margin_mm": 15
+    },
+    "capacity_rules": {
+      "max_beads": 0,
+      "min_beads": 1
+    },
+    "material_group_codes": [
+      "white",
+      "pink",
+      "purple",
+      "yellow"
+    ],
+    "preview_media_id": 164,
+    "base_image_media_id": 164,
+    "meta": null
+  },
+  {
+    "diy_template_id": 118,
+    "category_id": 192,
+    "layout": {
+      "shape": "slots",
+      "background_width": 640,
+      "slot_definitions": [
+        {
+          "x": 0.51,
+          "y": 0.672,
+          "label": "主石",
+          "width": 0.15,
+          "height": 0.1,
+          "slot_id": "main",
+          "required": true,
+          "rotation": 0,
+          "allowed_shapes": [],
+          "render_diameter": null,
+          "allowed_diameters": [],
+          "allowed_group_codes": []
+        }
+      ],
+      "background_height": 960
+    },
+    "sort_order": 3,
+    "created_at": "2026-07-15 21:03:09",
+    "updated_at": "2026-07-15 21:03:09",
+    "template_code": "DT2607150001181B",
+    "display_name": "托帕石项链",
+    "status": "published",
+    "is_enabled": 1,
+    "bead_rules": null,
+    "sizing_rules": null,
+    "capacity_rules": null,
+    "material_group_codes": [
+      "blue",
+      "red",
+      "green"
+    ],
+    "preview_media_id": 165,
+    "base_image_media_id": 165,
+    "meta": null
+  },
+  {
+    "diy_template_id": 119,
+    "category_id": 193,
+    "layout": {
+      "shape": "slots",
+      "background_width": 640,
+      "slot_definitions": [
+        {
+          "x": 0.505,
+          "y": 0.285,
+          "label": "主石",
+          "width": 0.17,
+          "height": 0.113,
+          "slot_id": "main",
+          "required": true,
+          "rotation": 0,
+          "allowed_shapes": [],
+          "render_diameter": null,
+          "allowed_diameters": [],
+          "allowed_group_codes": []
+        }
+      ],
+      "background_height": 960
+    },
+    "sort_order": 4,
+    "created_at": "2026-07-15 21:03:09",
+    "updated_at": "2026-07-15 21:03:09",
+    "template_code": "DT26071500011946",
+    "display_name": "主石戒指",
+    "status": "published",
+    "is_enabled": 1,
+    "bead_rules": null,
+    "sizing_rules": null,
+    "capacity_rules": null,
+    "material_group_codes": [
+      "blue",
+      "red",
+      "green"
+    ],
+    "preview_media_id": 167,
+    "base_image_media_id": 167,
+    "meta": null
+  },
+  {
+    "diy_template_id": 120,
+    "category_id": 194,
+    "layout": {
+      "shape": "slots",
+      "background_width": 640,
+      "slot_definitions": [
+        {
+          "x": 0.49,
+          "y": 0.605,
+          "label": "主石",
+          "width": 0.28,
+          "height": 0.187,
+          "slot_id": "main",
+          "required": true,
+          "rotation": 0,
+          "allowed_shapes": [],
+          "render_diameter": null,
+          "allowed_diameters": [],
+          "allowed_group_codes": []
+        }
+      ],
+      "background_height": 960
+    },
+    "sort_order": 5,
+    "created_at": "2026-07-15 21:03:09",
+    "updated_at": "2026-07-15 21:03:09",
+    "template_code": "DT260715000120CB",
+    "display_name": "水滴吊坠",
+    "status": "published",
+    "is_enabled": 1,
+    "bead_rules": null,
+    "sizing_rules": null,
+    "capacity_rules": null,
+    "material_group_codes": [
+      "blue",
+      "red",
+      "green"
+    ],
+    "preview_media_id": 166,
+    "base_image_media_id": 166,
+    "meta": null
+  },
+  {
+    "diy_template_id": 121,
+    "category_id": 291,
+    "layout": {
+      "shape": "slots",
+      "background_width": 512,
+      "slot_definitions": [
+        {
+          "x": 0.295,
+          "y": 0.565,
+          "label": "左耳",
+          "width": 0.24,
+          "height": 0.16,
+          "slot_id": "left",
+          "required": true,
+          "rotation": 0,
+          "allowed_shapes": [],
+          "render_diameter": null,
+          "allowed_diameters": [],
+          "allowed_group_codes": []
+        },
+        {
+          "x": 0.705,
+          "y": 0.565,
+          "label": "右耳",
+          "width": 0.24,
+          "height": 0.16,
+          "slot_id": "right",
+          "required": true,
+          "rotation": 0,
+          "allowed_shapes": [],
+          "render_diameter": null,
+          "allowed_diameters": [],
+          "allowed_group_codes": []
+        }
+      ],
+      "background_height": 768
+    },
+    "sort_order": 6,
+    "created_at": "2026-07-15 21:03:09",
+    "updated_at": "2026-07-15 21:03:09",
+    "template_code": "DT26071500012160",
+    "display_name": "一对耳钉",
+    "status": "published",
+    "is_enabled": 1,
+    "bead_rules": null,
+    "sizing_rules": null,
+    "capacity_rules": null,
+    "material_group_codes": [
+      "blue",
+      "red",
+      "green"
+    ],
+    "preview_media_id": 160,
+    "base_image_media_id": 160,
+    "meta": null
+  },
+  {
+    "diy_template_id": 122,
+    "category_id": 292,
+    "layout": {
+      "shape": "slots",
+      "background_width": 512,
+      "slot_definitions": [
+        {
+          "x": 0.502,
+          "y": 0.362,
+          "label": "上珠",
+          "width": 0.145,
+          "height": 0.097,
+          "slot_id": "top",
+          "required": true,
+          "rotation": 0,
+          "allowed_shapes": [],
+          "render_diameter": null,
+          "allowed_diameters": [],
+          "allowed_group_codes": []
+        },
+        {
+          "x": 0.499,
+          "y": 0.521,
+          "label": "中珠",
+          "width": 0.145,
+          "height": 0.097,
+          "slot_id": "middle",
+          "required": true,
+          "rotation": 0,
+          "allowed_shapes": [],
+          "render_diameter": null,
+          "allowed_diameters": [],
+          "allowed_group_codes": []
+        },
+        {
+          "x": 0.502,
+          "y": 0.666,
+          "label": "下珠",
+          "width": 0.145,
+          "height": 0.097,
+          "slot_id": "bottom",
+          "required": true,
+          "rotation": 0,
+          "allowed_shapes": [],
+          "render_diameter": null,
+          "allowed_diameters": [],
+          "allowed_group_codes": []
+        }
+      ],
+      "background_height": 768
+    },
+    "sort_order": 7,
+    "created_at": "2026-07-15 21:03:09",
+    "updated_at": "2026-07-15 21:03:09",
+    "template_code": "DT2607150001229B",
+    "display_name": "手机链包挂",
+    "status": "published",
+    "is_enabled": 1,
+    "bead_rules": null,
+    "sizing_rules": null,
+    "capacity_rules": null,
+    "material_group_codes": [
+      "blue",
+      "red",
+      "green"
+    ],
+    "preview_media_id": 159,
+    "base_image_media_id": 159,
+    "meta": null
+  }
+]

@@ -576,6 +576,15 @@ export function useRolesPermissionsMethods() {
     },
 
     /**
+     * 移除用户指定名称的角色（多角色场景：从角色标签的 × 按钮触发，精确移除某一个）
+     * @param {number|string} userId - 用户 ID
+     * @param {string} roleName - 要移除的角色名
+     */
+    async revokeUserRoleByName(userId, roleName) {
+      return this.revokeUserRole({ user_id: userId, role_name: roleName })
+    },
+
+    /**
      * 移除用户的一个角色（多角色并集：只删该角色，零角色时后端兜底 user）
      * @param {Object} userRole - 用户角色列表行（含 user.user_id / role.role_name）
      */

@@ -153,9 +153,9 @@ router.get(
  * POST / - 创建物品模板
  *
  * 请求体：
- * - template_code: 模板代码（唯一，必填）
  * - item_type: 物品类型（必填）
  * - display_name: 显示名称（必填）
+ * - 注：template_code（模板编码）由后端自动生成（IT+YYYYMMDD+序号），前端无需传
  * - category_id: 品类主键（categories.category_id）
  * - rarity_code: 稀有度代码
  * - description: 描述

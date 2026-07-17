@@ -11,16 +11,16 @@
 
 
 
-  <script type="module" crossorigin src="/admin/assets/user-management-BdyqOWsd.js"></script>
+  <script type="module" crossorigin src="/admin/assets/user-management-4uH6fuTZ.js"></script>
   <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
   <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
   <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
   <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
-  <link rel="modulepreload" crossorigin href="/admin/assets/index-BzZd00Na.js">
-  <link rel="modulepreload" crossorigin href="/admin/assets/main-CD4ziYoF.js">
-  <link rel="modulepreload" crossorigin href="/admin/assets/asset-DTDNEGnh.js">
-  <link rel="modulepreload" crossorigin href="/admin/assets/core-BDWACm7G.js">
-  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-C5xulW0E.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Crfp49js.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/asset-6pzCGwl1.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/core-_f_zJUj9.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-ClYS6XHm.css">
 </head>
 <body class="themed-bg-subtle min-h-screen">
   
@@ -68,6 +68,7 @@
          @confirm-delete-role="confirmDeleteRole($event.detail)"
          @open-change-role="openChangeRoleModal($event.detail)"
          @revoke-user-role="revokeUserRole($event.detail)"
+         @revoke-user-role-by-name="revokeUserRoleByName($event.detail.user_id, $event.detail.role_name)"
          @view-premium-detail="viewPremiumDetail($event.detail)"
          @open-risk-modal="openRiskModal($event.detail)"
          @freeze-user="freezeUser($event.detail)"
@@ -346,14 +347,14 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y">
-                  <template x-for="(row, idx) in data" :key="row.user_id + '_' + idx">
+                  <template x-for="row in data" :key="row.user_id">
                     <tr class="themed-hover-bg">
                       <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                         <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
                       </template>
                       <td class="px-4 py-3">
                         <button @click="$dispatch('open-change-role', row)" class="text-purple-500 hover:text-purple-700 text-sm">增加角色</button>
-                        <button @click="$dispatch('revoke-user-role', row)" class="ml-3 text-red-500 hover:text-red-700 text-sm">移除</button>
+                        <span class="ml-3 text-xs text-gray-400">（移除角色点标签上的 ×）</span>
                       </td>
                     </tr>
                   </template>

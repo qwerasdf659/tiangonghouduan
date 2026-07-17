@@ -52,6 +52,7 @@
          @confirm-delete-role="confirmDeleteRole($event.detail)"
          @open-change-role="openChangeRoleModal($event.detail)"
          @revoke-user-role="revokeUserRole($event.detail)"
+         @revoke-user-role-by-name="revokeUserRoleByName($event.detail.user_id, $event.detail.role_name)"
          @view-premium-detail="viewPremiumDetail($event.detail)"
          @open-risk-modal="openRiskModal($event.detail)"
          @freeze-user="freezeUser($event.detail)"
@@ -330,14 +331,14 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y">
-                  <template x-for="(row, idx) in data" :key="row.user_id + '_' + idx">
+                  <template x-for="row in data" :key="row.user_id">
                     <tr class="themed-hover-bg">
                       <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                         <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
                       </template>
                       <td class="px-4 py-3">
                         <button @click="$dispatch('open-change-role', row)" class="text-purple-500 hover:text-purple-700 text-sm">增加角色</button>
-                        <button @click="$dispatch('revoke-user-role', row)" class="ml-3 text-red-500 hover:text-red-700 text-sm">移除</button>
+                        <span class="ml-3 text-xs text-gray-400">（移除角色点标签上的 ×）</span>
                       </td>
                     </tr>
                   </template>

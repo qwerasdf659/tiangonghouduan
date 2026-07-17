@@ -68,8 +68,8 @@ describe('物品模板管理API测试 - P2优先级', () => {
 
     admin_token = login_response.body.data.access_token
 
-    // 3. 生成测试用的唯一模板码
-    test_template_code = `TEST_TPL_${Date.now()}`
+    // 3. 模板编码由后端自动生成，此处不预造码；创建用例成功后回填真实生成的 template_code
+    test_template_code = null
   }, 60000)
 
   // ===== 测试用例1：获取物品模板列表 =====
@@ -196,8 +196,8 @@ describe('物品模板管理API测试 - P2优先级', () => {
         return
       }
 
+      // 模板编码由后端自动生成（IT+YYYYMMDD+序号），运营/前端无需传 template_code
       const newTemplate = {
-        template_code: test_template_code,
         item_type: 'collectible',
         category_id: categories[0].category_id,
         rarity_code: rarities[0].rarity_code,
@@ -220,40 +220,43 @@ describe('物品模板管理API测试 - P2优先级', () => {
 
       const data = response.body.data
       expect(data).toHaveProperty('item_template_id')
-      expect(data.template_code).toBe(test_template_code)
+      // 断言后端自动生成了 IT 前缀编码（而非运营传入）
+      expect(data.template_code).toMatch(/^IT\d{11}$/)
       expect(data.display_name).toBe('测试物品模板')
 
-      // 保存创建的模板ID供后续测试使用
+      // 保存创建的模板ID与后端生成的编码供后续测试使用
       test_template_id = data.item_template_id
+      test_template_code = data.template_code
     })
 
-    test('应该拒绝重复的模板码', async () => {
-      // 如果之前创建失败，跳过此测试
-      if (!test_template_id) {
-        console.log('跳过测试：之前未成功创建测试模板')
-        return
-      }
-
-      const duplicateTemplate = {
-        template_code: test_template_code, // 使用相同的模板码
+    test('连续创建两个模板应各自生成唯一编码', async () => {
+      // 模板编码后端自动生成后，不存在"运营撞码"场景；改为验证编码唯一性
+      const build = name => ({
         item_type: 'collectible',
-        display_name: '重复测试',
+        display_name: name,
         is_enabled: false
-      }
+      })
 
-      const response = await request(app)
+      const res1 = await request(app)
         .post('/api/v4/console/item-templates')
         .set('Authorization', `Bearer ${admin_token}`)
-        .send(duplicateTemplate)
+        .send(build('唯一编码测试A'))
+      const res2 = await request(app)
+        .post('/api/v4/console/item-templates')
+        .set('Authorization', `Bearer ${admin_token}`)
+        .send(build('唯一编码测试B'))
 
-      // 应该拒绝重复的模板码（409 Conflict是正确的HTTP语义）
-      expect(response.status).toBe(409)
-      expect(response.body.success).toBe(false)
+      expect(res1.status).toBe(200)
+      expect(res2.status).toBe(200)
+      expect(res1.body.data.template_code).toMatch(/^IT\d{11}$/)
+      expect(res2.body.data.template_code).toMatch(/^IT\d{11}$/)
+      // 两次生成的编码必须不同（序号递增）
+      expect(res1.body.data.template_code).not.toBe(res2.body.data.template_code)
     })
 
     test('应该验证必填字段', async () => {
       const incompleteTemplate = {
-        // 缺少必填字段（template_code, item_type）
+        // 缺少必填字段 item_type（template_code 已由后端自动生成，不再是必填项）
         display_name: '不完整的模板'
       }
 
@@ -269,7 +272,6 @@ describe('物品模板管理API测试 - P2优先级', () => {
 
     test('应该拒绝无token的请求', async () => {
       const response = await request(app).post('/api/v4/console/item-templates').send({
-        template_code: 'NO_AUTH_TEST',
         item_type: 'collectible',
         display_name: '无授权测试'
       })
@@ -530,15 +532,18 @@ describe('物品模板管理API测试 - P2优先级', () => {
 
   // ===== 测试清理（After All Tests） =====
   afterAll(async () => {
-    // 清理测试数据（如果之前测试没有删除）
-    if (test_template_id) {
-      try {
-        await ItemTemplate.destroy({
-          where: { item_template_id: test_template_id }
-        })
-      } catch (err) {
-        console.log('清理测试数据失败:', err.message)
-      }
+    /*
+     * 清理本套件创建的全部测试模板：按测试专属 display_name 精确匹配，
+     * 避免残留污染真实库（模板编码后端自动生成，无法靠固定码删除，故按测试名清理）
+     */
+    try {
+      await ItemTemplate.destroy({
+        where: {
+          display_name: ['测试物品模板', '更新后的测试物品模板', '唯一编码测试A', '唯一编码测试B']
+        }
+      })
+    } catch (err) {
+      console.log('清理测试数据失败:', err.message)
     }
 
     await sequelize.close()

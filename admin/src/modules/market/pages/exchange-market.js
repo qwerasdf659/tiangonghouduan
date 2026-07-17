@@ -20,6 +20,7 @@ import {
 } from '../../../utils/index.js'
 import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
 import { request } from '../../../api/base.js'
+import { itemTemplateFormMixin } from '../../../alpine/mixins/item-template-form.js'
 import { EXCHANGE_ENDPOINTS, ExchangeAPI } from '../../../api/market/exchange.js'
 import { ExchangeItemAPI } from '../../../api/exchange-item/index.js'
 import { SystemCoreAPI } from '../../../api/system/core.js'
@@ -126,6 +127,8 @@ document.addEventListener('alpine:init', () => {
       ...useExchangeStatsState(),
       ...useBarterRecipesState(),
       ...useRedeemRequirementsState(),
+      // 物品模板表单逻辑（与物品模板页共用同一份 Mixin）：支持在「新增商品」弹窗内边建模板边关联
+      ...itemTemplateFormMixin(),
 
       // ========== 市场统计 ==========
       /** 市场统计数据 - 直接使用后端字段名 */
@@ -413,24 +416,49 @@ document.addEventListener('alpine:init', () => {
       ...useRedeemRequirementsMethods(),
 
       /**
-       * 编辑 SKU 并同步 spec_values 到 JSON 字符串
+       * 打开「新建物品模板」弹窗（复用公共模板表单 Mixin），在新增商品流程内边建边关联
+       */
+      openTemplateCreator() {
+        this.resetTemplateForm() // Mixin：清空模板表单为新建态
+        this.showModal('templateCreatorModal')
+      },
+
+      /**
+       * 模板保存成功钩子（覆盖 Mixin 默认空实现）：
+       * 关闭模板弹窗 → 把新模板加入下拉选项 → 自动回填 item_template_id 到商品表单
+       * @param {Object} created - 后端返回的已创建模板
+       */
+      onTemplateSaved(created) {
+        this.hideModal('templateCreatorModal')
+        if (created && created.item_template_id) {
+          // 追加到下拉并自动选中（与 loadItemTemplates 的选项结构一致）
+          this.itemTemplateOptions = [
+            {
+              value: created.item_template_id,
+              label: `${created.display_name || created.template_code} (${created.item_type})`,
+              item_type: created.item_type,
+              rarity_code: created.rarity_code
+            },
+            ...this.itemTemplateOptions.filter(o => o.value !== created.item_template_id)
+          ]
+          this.itemForm.item_template_id = created.item_template_id
+        }
+      },
+
+      /**
+       * 编辑 SKU：把 spec_values 回显为可视化键值对（运营无需读写 JSON）
        * @param {Object} sku - SKU 对象
        */
       editSkuWithStr(sku) {
         this.editSku(sku)
-        this.skuForm.spec_values_str = JSON.stringify(sku.spec_values || {}, null, 2)
+        this.skuSpecPairs = this.objectToPairs(sku.spec_values)
       },
 
       /**
-       * 保存 SKU 前将 spec_values_str 转回对象
+       * 保存 SKU：从可视化键值对拼成 spec_values 对象（运营无需手写 JSON）
        */
       async saveSkuFromForm() {
-        try {
-          this.skuForm.spec_values = JSON.parse(this.skuForm.spec_values_str || '{}')
-        } catch {
-          this.showError?.('规格值 JSON 格式错误')
-          return
-        }
+        this.skuForm.spec_values = this.pairsToObject(this.skuSpecPairs)
         await this.saveSku()
         this.hideModal('skuModal')
       },

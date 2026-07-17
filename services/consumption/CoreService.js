@@ -335,6 +335,8 @@ class CoreService {
    *   各加成独立按基础分计算（加法叠加，禁止乘法叠加）
    * - 硬封顶：可用积分总倍数 ≤ 3.0（EARN_MULTIPLIER_HARD_CAP）；预算注入率 ≤ 16%（BUDGET_INJECTION_RATE_HARD_CAP）
    * - 预算笔：round(消费金额 × budget_ratio × 总倍数) 封顶后入预算桶（含活动归集判定）
+   * - 星石配额笔：floor(消费金额 × star_stone_quota_ratio × 总倍数)（2026-07-16 拍板①A/②A：
+   *   与预算笔同口径复用总倍数——含等级+活动加成，仅受总倍数硬顶 3.0 约束，无额外注入率封顶）
    * - 升级即时通知（拍板⑬-(d)）：发分前后两次派生等级，跨档则在事务提交后（transaction.afterCommit）
    *   经 NotificationService 发站内通知——通知失败不影响发分（工程加固 §9-1）
    *
@@ -551,7 +553,17 @@ class CoreService {
       }
     }
 
-    // ── 4. 星石配额（既有链路，不受等级倍数影响）──────────────────────
+    // ── 4. 星石配额（随等级/活动倍数放大，与预算笔同口径 totalMultiplier）──
+    /*
+     * 星石配额发放公式（2026-07-16 拍板①A/②A）：
+     *   星石配额 = floor(消费金额 × star_stone_quota_ratio × totalMultiplier)
+     * - star_stone_quota_ratio：个人覆盖优先，其次全局默认（getEffectiveRatio）
+     * - totalMultiplier：复用第 2 步已算好的总倍数 = min(1 + Σ加成率, 3.0)，
+     *   含等级倍率（earn_multiplier_locked）+ 活动加成，与预算积分完全同一套口径；
+     *   历史 earn_multiplier_locked 为 NULL 的存量记录 → _buildBonusRules 按 1.00 处理，
+     *   即 totalMultiplier=1.0，行为与放大前一致（不影响存量）。
+     * - 封顶：仅受总倍数硬顶 3.0 约束（拍板②A：星石配额是兑换额度非抽奖预算，不加额外注入率封顶）。
+     */
     let starStoneQuotaAllocated = 0
     try {
       const quotaConfig = await CoreService._getStarStoneQuotaConfig()
@@ -561,7 +573,7 @@ class CoreService {
           'star_stone_quota_ratio',
           quotaConfig.ratio
         )
-        const quotaAmount = Math.floor(amountNumber * effectiveRatio)
+        const quotaAmount = Math.floor(amountNumber * effectiveRatio * totalMultiplier)
         if (quotaAmount > 0) {
           // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
           const quotaResult = await BalanceService.changeBalance(
@@ -577,7 +589,8 @@ class CoreService {
                 reference_id: recordId,
                 consumption_amount: record.consumption_amount,
                 quota_ratio: effectiveRatio,
-                description: `消费${record.consumption_amount}元，发放星石配额${quotaAmount}`
+                earn_multiplier_applied: totalMultiplier,
+                description: `消费${record.consumption_amount}元，按${totalMultiplier}倍发放星石配额${quotaAmount}`
               }
             },
             { transaction }

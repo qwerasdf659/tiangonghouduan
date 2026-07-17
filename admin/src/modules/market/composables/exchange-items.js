@@ -91,8 +91,10 @@ export function useExchangeItemsState() {
     storeScopeOptions: [],
     /** @type {Array<Object>} 商家选项（核销范围=商家全门店时单选） */
     merchantScopeOptions: [],
-    /** @type {string} 商品参数表编辑用 JSON 字符串 */
-    attributesStr: '{}',
+    /** @type {Array<{key:string,value:string}>} 商品参数表可视化键值对（运营录入用，提交时拼成对象） */
+    attributePairs: [],
+    /** @type {Array<{key:string,value:string}>} SKU 规格值可视化键值对（运营录入用，提交时拼成对象） */
+    skuSpecPairs: [],
     /** @type {Object|null} 富文本编辑器实例 */
     _richEditorInstance: null,
     /** @type {Array<Object>} 稀有度选项（动态加载自 rarity_defs 字典表） */
@@ -169,6 +171,48 @@ export function useExchangeItemsMethods() {
 
   return {
     ...sortMixin,
+
+    /**
+     * 对象 → 可视化键值对数组（编辑回显用）。空对象返回空数组。
+     * @param {Object|null} obj - 键值对象（如 { 材质:'水晶' }）
+     * @returns {Array<{key:string,value:string}>} 键值对数组
+     */
+    objectToPairs(obj) {
+      if (!obj || typeof obj !== 'object') return []
+      return Object.entries(obj).map(([key, value]) => ({ key, value: String(value ?? '') }))
+    },
+
+    /**
+     * 可视化键值对数组 → 对象（提交用）。忽略键为空的行；返回空对象时上层可转 null。
+     * @param {Array<{key:string,value:string}>} pairs - 键值对数组
+     * @returns {Object} 键值对象
+     */
+    pairsToObject(pairs) {
+      const obj = {}
+      ;(pairs || []).forEach(p => {
+        const k = (p.key ?? '').trim()
+        if (k) obj[k] = (p.value ?? '').trim()
+      })
+      return obj
+    },
+
+    /**
+     * 给指定键值对数组追加一个空行
+     * @param {'attributePairs'|'skuSpecPairs'} field - 目标数组字段名
+     */
+    addPairRow(field) {
+      if (!Array.isArray(this[field])) this[field] = []
+      this[field].push({ key: '', value: '' })
+    },
+
+    /**
+     * 删除指定键值对数组的某一行
+     * @param {'attributePairs'|'skuSpecPairs'} field - 目标数组字段名
+     * @param {number} index - 行索引
+     */
+    removePairRow(field, index) {
+      if (Array.isArray(this[field])) this[field].splice(index, 1)
+    },
     /**
      * 加载资产类型列表
      */
@@ -407,6 +451,7 @@ export function useExchangeItemsMethods() {
       this.showcaseImages = []
       this.tagInput = ''
       this.usageRuleInput = ''
+      this.attributePairs = [] // 商品参数表可视化键值对，新增时清空
       this.loadDictionaries()
       this.loadScopeOptions()
       this.loadSeriesOptions()
@@ -463,7 +508,8 @@ export function useExchangeItemsMethods() {
         item.series && item.series_seq != null
           ? formatSeriesNo(item.series.series_code, item.series_seq, item.series.seq_pad)
           : ''
-      this.attributesStr = item.attributes ? JSON.stringify(item.attributes, null, 2) : '{}'
+      // 商品参数表回显为可视化键值对（运营无需读写 JSON）
+      this.attributePairs = this.objectToPairs(item.attributes)
       this.itemImagePreviewUrl =
         item.primary_image?.thumbnail_url ||
         item.primary_image?.public_url ||
@@ -691,20 +737,9 @@ export function useExchangeItemsMethods() {
         return
       }
 
-      if (
-        this.attributesStr &&
-        this.attributesStr.trim() !== '{}' &&
-        this.attributesStr.trim() !== ''
-      ) {
-        try {
-          this.itemForm.attributes = JSON.parse(this.attributesStr)
-        } catch {
-          this.showError?.('商品参数表 JSON 格式错误')
-          return
-        }
-      } else {
-        this.itemForm.attributes = null
-      }
+      // 商品参数表：从可视化键值对拼成对象（空则存 null），运营无需手写 JSON
+      const attrObj = this.pairsToObject(this.attributePairs)
+      this.itemForm.attributes = Object.keys(attrObj).length > 0 ? attrObj : null
 
       if (!this.itemForm.publish_at) this.itemForm.publish_at = null
       if (!this.itemForm.unpublish_at) this.itemForm.unpublish_at = null
@@ -833,8 +868,9 @@ export function useExchangeItemsMethods() {
         return
       }
 
-      if (file.size > 5 * 1024 * 1024) {
-        this.showError?.('图片大小不能超过 5MB')
+      // 上限放宽到 20MB（与后端 multer 一致）：超过 5MB 的图交后端 sharp 自动无损压缩到 5MB 内（等比缩放+降质，不裁内容）
+      if (file.size > 20 * 1024 * 1024) {
+        this.showError?.('图片大小不能超过 20MB（5MB 以内直接使用，5-20MB 将由系统自动压缩）')
         return
       }
 
@@ -884,8 +920,9 @@ export function useExchangeItemsMethods() {
         this.showError?.('仅支持 JPG/PNG/GIF/WebP 格式')
         return
       }
-      if (file.size > 5 * 1024 * 1024) {
-        this.showError?.('图片大小不能超过 5MB')
+      // 上限放宽到 20MB（与后端 multer 一致）：超过 5MB 的图交后端 sharp 自动无损压缩到 5MB 内（等比缩放+降质，不裁内容）
+      if (file.size > 20 * 1024 * 1024) {
+        this.showError?.('图片大小不能超过 20MB（5MB 以内直接使用，5-20MB 将由系统自动压缩）')
         return
       }
       try {
@@ -962,9 +999,10 @@ export function useExchangeItemsMethods() {
      */
     async removeGalleryImage(mediaId) {
       try {
+        // 后端 detach 为 DELETE 方法（解绑=删除关联，RESTful 语义），不可用 POST（会 404）
         await request({
           url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_DETACH(mediaId),
-          method: 'POST',
+          method: 'DELETE',
           data: {
             attachable_type: 'exchange_item',
             attachable_id: this.editingItemId,
@@ -999,8 +1037,9 @@ export function useExchangeItemsMethods() {
         this.showError?.('仅支持 JPG/PNG/GIF/WebP 格式')
         return
       }
-      if (file.size > 5 * 1024 * 1024) {
-        this.showError?.('图片大小不能超过 5MB')
+      // 上限放宽到 20MB（与后端 multer 一致）：超过 5MB 的图交后端 sharp 自动无损压缩到 5MB 内（等比缩放+降质，不裁内容）
+      if (file.size > 20 * 1024 * 1024) {
+        this.showError?.('图片大小不能超过 20MB（5MB 以内直接使用，5-20MB 将由系统自动压缩）')
         return
       }
 
@@ -1251,8 +1290,9 @@ export function useExchangeItemsMethods() {
         this.showError?.('仅支持 JPG/PNG/GIF/WebP 格式')
         return
       }
-      if (file.size > 5 * 1024 * 1024) {
-        this.showError?.('图片大小不能超过 5MB')
+      // 上限放宽到 20MB（与后端 multer 一致）：超过 5MB 的图交后端 sharp 自动无损压缩到 5MB 内（等比缩放+降质，不裁内容）
+      if (file.size > 20 * 1024 * 1024) {
+        this.showError?.('图片大小不能超过 20MB（5MB 以内直接使用，5-20MB 将由系统自动压缩）')
         return
       }
 
@@ -1518,8 +1558,9 @@ export function useExchangeItemsMethods() {
         this.showError?.('仅支持 JPG/PNG/GIF/WebP 格式')
         return
       }
-      if (file.size > 5 * 1024 * 1024) {
-        this.showError?.('图片大小不能超过 5MB')
+      // 上限放宽到 20MB（与后端 multer 一致）：超过 5MB 的图交后端 sharp 自动无损压缩到 5MB 内（等比缩放+降质，不裁内容）
+      if (file.size > 20 * 1024 * 1024) {
+        this.showError?.('图片大小不能超过 20MB（5MB 以内直接使用，5-20MB 将由系统自动压缩）')
         return
       }
       try {
@@ -1568,9 +1609,10 @@ export function useExchangeItemsMethods() {
      */
     async removeSkuGalleryImage(mediaId) {
       try {
+        // 后端 detach 为 DELETE 方法（解绑=删除关联，RESTful 语义），不可用 POST（会 404）
         await request({
           url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_DETACH(mediaId),
-          method: 'POST',
+          method: 'DELETE',
           data: {
             attachable_type: 'exchange_item_sku',
             attachable_id: this.editingSkuId,

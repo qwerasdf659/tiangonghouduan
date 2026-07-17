@@ -110,17 +110,18 @@ router.get('/verify', authenticateToken, verifyRateLimiter, async (req, res) => 
  */
 router.post('/refresh', async (req, res) => {
   /**
-   * 🔐 安全模式：仅从HttpOnly Cookie读取refresh_token
-   * - Cookie由浏览器自动携带（credentials: 'include'）
-   * - 不支持请求体传递（防止XSS窃取）
+   * 🔐 refresh_token 读取（双通道，兼容浏览器与小程序）：
+   * - 浏览器端（admin web）：优先从 HttpOnly Cookie 读（credentials:'include' 自动携带，防 XSS）
+   * - 小程序端（微信）：无浏览器 Cookie 机制，从请求体 refresh_token 读（wx storage 持久化后带上）
+   * Cookie 优先，请求体兜底；两者都无则报错。
    */
-  const refresh_token = req.cookies.refresh_token
+  const refresh_token = req.cookies.refresh_token || req.body?.refresh_token
 
   if (!refresh_token) {
     return res.apiError(
-      '刷新Token不能为空，请确保请求携带Cookie',
+      '刷新Token不能为空',
       'REFRESH_TOKEN_REQUIRED',
-      { hint: '前端请求需要添加 credentials: "include"' },
+      { hint: '浏览器端请添加 credentials:"include"；小程序端请在请求体传 refresh_token' },
       400
     )
   }
@@ -245,6 +246,12 @@ router.post('/refresh', async (req, res) => {
 
   const responseData = {
     access_token: tokens.access_token,
+    /*
+     * refresh_token 双通道下发：浏览器端已通过上方 HttpOnly Cookie 旋转（更安全）；
+     * 小程序端无 Cookie，需从响应体拿到轮换后的新 refresh_token 存入 wx storage 供下次刷新。
+     * 浏览器端可忽略此字段（继续用 Cookie）。
+     */
+    refresh_token: tokens.refresh_token,
     user: {
       user_id: user.user_id,
       mobile: user.mobile,

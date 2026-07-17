@@ -241,7 +241,8 @@ export function imageUploadMixin(config = {}) {
         const url = SYSTEM_ADMIN_ENDPOINTS.MEDIA_DETACH(mediaId)
         const data = { attachable_type: attachableType, attachable_id: attachableId }
         if (role != null) data.role = role
-        const result = await request({ url, method: 'POST', data })
+        // 后端 detach 为 DELETE 方法（解绑=删除关联，RESTful 语义），不可用 POST（会 404）
+        const result = await request({ url, method: 'DELETE', data })
         return result.success === true
       } catch (error) {
         logger.error('解绑媒体失败', {

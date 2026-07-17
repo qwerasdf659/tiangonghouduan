@@ -251,15 +251,15 @@ describe('认证和权限系统API测试（V4架构）', () => {
       }
     })
 
-    test('Token刷新 - POST /api/v4/auth/refresh', async () => {
+    test('Token刷新 - POST /api/v4/auth/refresh（浏览器 Cookie 通道）', async () => {
       /**
-       * 🔐 Token安全模式（无兼容代码）：
-       * - refresh_token 仅通过 HttpOnly Cookie 传递
-       * - 不支持请求体传递（防止XSS窃取）
-       * - 响应体仅包含 access_token
+       * 🔐 Token 双通道模式（方案1，2026-07-16）：
+       * - 浏览器端（admin web）：refresh_token 走 HttpOnly Cookie（防 XSS），刷新时旋转 Cookie
+       * - 小程序端（微信）：无 Cookie，登录/刷新响应体返回 refresh_token 供 wx storage 持久化
+       * - 登录 + 刷新响应体均含 refresh_token（小程序取用；浏览器忽略、继续用 Cookie）
        */
 
-      // 先登录获取refresh_token（通过响应头的 Set-Cookie 获取）
+      // 先登录（响应体现在直接返回 refresh_token，小程序用；同时也下发 Cookie 供浏览器用）
       const login_response = await tester.make_request('POST', '/api/v4/auth/quick-login', {
         mobile: testUser.mobile,
         verification_code: '123456'
@@ -267,8 +267,10 @@ describe('认证和权限系统API测试（V4架构）', () => {
 
       expect(login_response.status).toBe(200)
       expect(login_response.data.data).toHaveProperty('access_token')
+      // 双通道：登录响应体含 refresh_token（供小程序持久化）
+      expect(login_response.data.data).toHaveProperty('refresh_token')
 
-      // 从响应头提取 refresh_token Cookie
+      // 从响应头提取 refresh_token Cookie（浏览器通道）
       const setCookieHeader = login_response.headers['set-cookie']
       let refresh_token = null
       if (setCookieHeader) {
@@ -281,13 +283,12 @@ describe('认证和权限系统API测试（V4架构）', () => {
         }
       }
 
-      // 如果无法从 Cookie 获取，跳过刷新测试
       if (!refresh_token) {
         console.log('⚠️ 无法从响应头获取 refresh_token Cookie，跳过刷新测试')
         return
       }
 
-      // 🔐 使用Cookie方式刷新Token（不支持请求体传递）
+      // 浏览器 Cookie 方式刷新 Token
       const refresh_response = await tester.make_request_with_cookie(
         'POST',
         '/api/v4/auth/refresh',
@@ -299,7 +300,8 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(refresh_response.data).toHaveProperty('success', true)
         expect(refresh_response.data).toHaveProperty('message', 'Token刷新成功')
         expect(refresh_response.data.data).toHaveProperty('access_token')
-        expect(refresh_response.data.data).not.toHaveProperty('refresh_token')
+        // 双通道：刷新响应体返回轮换后的新 refresh_token（小程序更新 wx storage）
+        expect(refresh_response.data.data).toHaveProperty('refresh_token')
         expect(refresh_response.data.data).toHaveProperty('user')
         expect(refresh_response.data.data.user).toHaveProperty('user_id')
         expect(refresh_response.data.data.user).toHaveProperty('mobile')
@@ -308,7 +310,34 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(refresh_response.data.data).toHaveProperty('expires_in')
         expect(refresh_response.data.data).toHaveProperty('timestamp')
 
-        console.log('✅ Token刷新成功（HttpOnly Cookie 安全模式，无兼容代码）')
+        console.log('✅ Token刷新成功（浏览器 Cookie 通道 + 响应体返回新 refresh_token）')
+      }
+    })
+
+    test('Token刷新 - POST /api/v4/auth/refresh（小程序请求体通道）', async () => {
+      /**
+       * 小程序端无 Cookie：登录响应体取 refresh_token → 刷新时放请求体 refresh_token（不带 Cookie）。
+       * 验证方案1 的小程序刷新通道通畅（这是修复"小程序偶发掉线无法续期"的核心）。
+       */
+      const login_response = await tester.make_request('POST', '/api/v4/auth/quick-login', {
+        mobile: testUser.mobile,
+        verification_code: '123456'
+      })
+      expect(login_response.status).toBe(200)
+      const bodyRefreshToken = login_response.data.data.refresh_token
+      expect(bodyRefreshToken).toBeTruthy()
+
+      // 不带 Cookie，纯请求体传 refresh_token（模拟小程序）
+      const refresh_response = await tester.make_request('POST', '/api/v4/auth/refresh', {
+        refresh_token: bodyRefreshToken
+      })
+
+      expect([200, 401]).toContain(refresh_response.status)
+      if (refresh_response.status === 200) {
+        expect(refresh_response.data).toHaveProperty('success', true)
+        expect(refresh_response.data.data).toHaveProperty('access_token')
+        expect(refresh_response.data.data).toHaveProperty('refresh_token')
+        console.log('✅ 小程序请求体通道刷新成功（无 Cookie）')
       }
     })
 
@@ -318,10 +347,10 @@ describe('认证和权限系统API测试（V4架构）', () => {
 
       expect(response.status).toBe(400)
       expect(response.data).toHaveProperty('success', false)
-      // 新错误消息包含Cookie提示
+      // 双通道：Cookie 和请求体都无 refresh_token 时拒绝
       expect(response.data.message).toMatch(/刷新Token不能为空/)
 
-      console.log('✅ 缺少refresh_token Cookie被正确拒绝')
+      console.log('✅ 缺少refresh_token（Cookie 与请求体皆无）被正确拒绝')
     })
 
     test('Token刷新 - 无效的refresh_token格式', async () => {

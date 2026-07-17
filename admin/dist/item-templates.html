@@ -11,15 +11,16 @@
 
 
 
-  <script type="module" crossorigin src="/admin/assets/item-templates-Cjj_tz73.js"></script>
+  <script type="module" crossorigin src="/admin/assets/item-templates-DQqcIxkD.js"></script>
   <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
   <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
   <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
   <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
-  <link rel="modulepreload" crossorigin href="/admin/assets/index-BzZd00Na.js">
-  <link rel="modulepreload" crossorigin href="/admin/assets/main-CD4ziYoF.js">
-  <link rel="modulepreload" crossorigin href="/admin/assets/asset-DTDNEGnh.js">
-  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-C5xulW0E.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Crfp49js.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/asset-6pzCGwl1.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/item-template-form-BKdECuxu.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-ClYS6XHm.css">
 </head>
 <body class="themed-bg-subtle min-h-screen" x-data="itemTemplatesPage()" x-init="init()">
   
@@ -194,8 +195,10 @@
               <input type="text" class="w-full px-3 py-2 border rounded-lg" x-model="form.display_name" required>
             </div>
             <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">模板编码 <span class="text-red-500">*</span></label>
-              <input type="text" class="w-full px-3 py-2 border rounded-lg" x-model="form.template_code" required placeholder="唯一标识">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">模板编码</label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed" x-model="form.template_code" disabled readonly
+                     :placeholder="form.template_id ? '' : '保存后由系统自动生成（IT+日期+序号）'">
+              <p class="text-xs text-gray-400 mt-1" x-text="form.template_id ? '模板编码创建后不可修改' : '无需填写，后端自动生成唯一编码'"></p>
             </div>
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">物品类型</label>
@@ -264,7 +267,7 @@
                       清除
                     </button>
                   </div>
-                  <p class="text-xs themed-text-muted">支持 JPG/PNG/GIF/WebP，最大 5MB</p>
+                  <p class="text-xs themed-text-muted">支持 JPG/PNG/GIF/WebP；5MB 以内直接使用，超出将自动压缩（上限 20MB）</p>
                   <p x-show="form.primary_media_id" class="text-xs font-mono themed-text-muted break-all" x-text="'媒体ID: ' + form.primary_media_id"></p>
                 </div>
               </div>
@@ -289,7 +292,12 @@
                   </label>
                 </template>
               </div>
-              <p class="text-xs themed-text-muted mt-1">勾选后覆盖该模板的默认操作规则（留空使用 item_type 级别的默认配置）</p>
+              <div class="mt-2 text-xs themed-text-muted bg-gray-50 border border-gray-100 rounded-lg p-3 leading-relaxed">
+                <p class="font-medium text-gray-600 mb-1">💡 不确定就留空——标准券/实物无需勾选</p>
+                <p>· <b>留空</b>：自动按物品类型走系统默认（券/实物/奖品=生成核销码到店核销；道具/服务=直接使用），标准商品这样最省事。</p>
+                <p>· <b>勾选</b>：仅当本商品是特例、要覆盖默认时才勾，例如“想让这张券可转卖”“既能到店核销又能线上直接用”。</p>
+                <p class="mt-1">三项含义：<b>直接使用</b>=背包点一下当场生效消耗（线上）；<b>生成核销码</b>=生成码到店核销（线下）；<b>上架交易市场</b>=允许用户转卖给他人。</p>
+              </div>
             </div>
             <div class="md:col-span-2">
               <label class="block text-sm font-medium themed-text-secondary mb-1">限量总数上限（max_edition）</label>

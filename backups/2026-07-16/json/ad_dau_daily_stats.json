@@ -1,0 +1,194 @@
+[
+  {
+    "ad_dau_daily_stat_id": 114,
+    "stat_date": "2026-06-21",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-23 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 115,
+    "stat_date": "2026-06-22",
+    "dau_count": 3,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-24 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 116,
+    "stat_date": "2026-06-23",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-25 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 117,
+    "stat_date": "2026-06-24",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-26 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 118,
+    "stat_date": "2026-06-25",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-27 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 119,
+    "stat_date": "2026-06-26",
+    "dau_count": 2,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-28 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 120,
+    "stat_date": "2026-06-27",
+    "dau_count": 4,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-29 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 121,
+    "stat_date": "2026-06-28",
+    "dau_count": 3,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-06-30 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 122,
+    "stat_date": "2026-06-29",
+    "dau_count": 2,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-07-01 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 123,
+    "stat_date": "2026-06-30",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-07-02 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 124,
+    "stat_date": "2026-07-01",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-07-03 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 125,
+    "stat_date": "2026-07-02",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-07-04 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 126,
+    "stat_date": "2026-07-03",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-07-05 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 127,
+    "stat_date": "2026-07-04",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-07-06 00:30:01"
+  },
+  {
+    "ad_dau_daily_stat_id": 128,
+    "stat_date": "2026-07-05",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-07-07 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 129,
+    "stat_date": "2026-07-06",
+    "dau_count": 1,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-07-08 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 130,
+    "stat_date": "2026-07-07",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-07-09 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 131,
+    "stat_date": "2026-07-08",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-07-10 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 132,
+    "stat_date": "2026-07-09",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-07-11 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 133,
+    "stat_date": "2026-07-10",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-07-12 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 134,
+    "stat_date": "2026-07-11",
+    "dau_count": 5,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-07-13 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 135,
+    "stat_date": "2026-07-12",
+    "dau_count": 2,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-07-14 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 136,
+    "stat_date": "2026-07-13",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-07-15 00:30:00"
+  },
+  {
+    "ad_dau_daily_stat_id": 137,
+    "stat_date": "2026-07-14",
+    "dau_count": 0,
+    "dau_coefficient": "0.3750",
+    "source": "last_active_at",
+    "created_at": "2026-07-16 00:30:00"
+  }
+]

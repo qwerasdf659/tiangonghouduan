@@ -78,8 +78,9 @@ export function useMediaMethods() {
         return
       }
 
-      if (file.size > 5 * 1024 * 1024) {
-        this.showError('图片大小不能超过5MB')
+      // 上限放宽到 20MB（与后端 multer 一致）：超过 5MB 的图交后端 sharp 自动无损压缩到 5MB 内
+      if (file.size > 20 * 1024 * 1024) {
+        this.showError('图片大小不能超过20MB（5MB 以内直接使用，5-20MB 将由系统自动压缩）')
         return
       }
 

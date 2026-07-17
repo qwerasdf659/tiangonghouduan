@@ -304,6 +304,14 @@ class MallQueryService {
       // 构建 ExchangeItem 表查询条件（price/stock 筛选在嵌套 include 中）
       const where = { status }
 
+      /*
+       * 售卖就绪过滤（2026-07-17 半成品泄漏兜底）：仅返回"有有效价格"的商品。
+       * min_cost_amount 是 SPU 物化汇总列，由有效 SKU + 渠道价回填；无 SKU/无价的半成品该列为 null。
+       * 上架护栏（后端 _assertItemPublishable）治本、此处治标兜底存量脏数据，二者叠加确保
+       * 小程序不会看到"无规格/无价格"的商品（点进详情报加载异常，损害体验）。
+       */
+      where.min_cost_amount = { [Op.ne]: null }
+
       // 空间筛选（lucky/premium）— 臻选空间/幸运空间核心逻辑
       if (space) {
         where.space = { [Op.in]: [space, 'both'] }

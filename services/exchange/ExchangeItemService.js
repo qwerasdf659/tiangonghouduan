@@ -276,6 +276,13 @@ class ExchangeItemService {
     const willMintOnCreate = payload.mint_instance === undefined ? true : !!payload.mint_instance
     ExchangeItemService._assertMintInstanceHasTemplate(willMintOnCreate, payload.item_template_id)
 
+    /*
+     * 新建强制草稿态（2026-07-17 上架护栏）：新建商品此刻尚无 SKU/价格，一律落 inactive，
+     * 待运营配好规格与价格后再经 updateExchangeItem 显式上架（届时走 _assertItemPublishable）。
+     * 防止"新建即 active（默认值）"导致无 SKU 半成品泄漏到小程序。
+     */
+    payload.status = 'inactive'
+
     // 生成 SPU 平台展示码 item_code（无意义随机码 SP+12 位，唯一索引兜底，撞码重试）
     payload.item_code = await ProductCodeGenerator.generateUnique('SP', async code => {
       const existing = await ExchangeItem.findOne({ where: { item_code: code }, transaction })
@@ -347,6 +354,15 @@ class ExchangeItemService {
     const templateAfterUpdate =
       payload.item_template_id === undefined ? row.item_template_id : payload.item_template_id
     ExchangeItemService._assertMintInstanceHasTemplate(willMintAfterUpdate, templateAfterUpdate)
+
+    /*
+     * 上架护栏（2026-07-17）：本次更新要把商品置为 active（上架）时，
+     * 强制校验已有可售 SKU + 有效价格，杜绝无 SKU 半成品上架泄漏到小程序。
+     * 仅在"目标状态为 active 且当前不是 active（即发生上架动作）"时校验，避免编辑已上架商品其它字段时误拦。
+     */
+    if (payload.status === 'active' && row.status !== 'active') {
+      await this._assertItemPublishable(pid, transaction)
+    }
 
     await row.update(payload, { transaction })
 
@@ -867,6 +883,51 @@ class ExchangeItemService {
       throw new BusinessError(
         '需铸造实例的商品（mint_instance=true）必须关联物品模板（item_template_id）——模板承载参考价与物品类型，无模板铸造会产生缺陷物品',
         'PRODUCT_CENTER_TEMPLATE_REQUIRED',
+        400
+      )
+    }
+  }
+
+  /**
+   * 上架护栏断言：商品置为 active（上架）前，必须已配好可售 SKU + 有效价格
+   *
+   * 业务背景（2026-07-17 根因修复）：exchange_items.status 默认 active，若运营新建后
+   * 未加 SKU/价格就上架，小程序列表（仅按 status='active' 过滤）会拉到这个"半成品"，
+   * 用户点进详情因无 SKU/价格报"加载异常"，严重影响体验。故上架时强制校验：
+   *   ① 至少 1 个 status='active' 的 SKU；
+   *   ② 该商品在 exchange_channel_prices 有 is_enabled=1 的有效渠道价（cost_amount）。
+   *
+   * @private
+   * @param {number} exchangeItemId - 商品 ID
+   * @param {Object} transaction - Sequelize 事务
+   * @returns {Promise<void>} 校验通过无返回，违规抛 BusinessError(400)
+   */
+  async _assertItemPublishable(exchangeItemId, transaction) {
+    const { ExchangeItemSku } = this.models
+    const activeSkuCount = await ExchangeItemSku.count({
+      where: { exchange_item_id: exchangeItemId, status: 'active' },
+      transaction
+    })
+    if (activeSkuCount === 0) {
+      throw new BusinessError(
+        '上架失败：商品必须先添加至少一个启用的规格（SKU）才能上架，请先配置规格与价格',
+        'PRODUCT_CENTER_NO_ACTIVE_SKU',
+        400
+      )
+    }
+
+    // 校验存在有效渠道价（active SKU 关联 is_enabled=1 且 cost_amount>0 的渠道价）
+    const [priceRow] = await this.sequelize.query(
+      `SELECT COUNT(*) AS cnt
+       FROM exchange_item_skus s
+       JOIN exchange_channel_prices ecp ON ecp.sku_id = s.sku_id AND ecp.is_enabled = 1
+       WHERE s.exchange_item_id = :pid AND s.status = 'active' AND ecp.cost_amount > 0`,
+      { replacements: { pid: exchangeItemId }, type: this.sequelize.QueryTypes.SELECT, transaction }
+    )
+    if (!priceRow || Number(priceRow.cnt) === 0) {
+      throw new BusinessError(
+        '上架失败：商品的规格必须设置有效的兑换价格才能上架，请先为规格配置价格',
+        'PRODUCT_CENTER_NO_VALID_PRICE',
         400
       )
     }

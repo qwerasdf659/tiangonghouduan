@@ -34,6 +34,50 @@ import {
 // 导入用户画像分析API
 import { UserSegmentsAPI } from '../../../api/user-segments.js'
 
+/**
+ * 角色名 → 标签配色（Tailwind class）。未命中走默认灰色。
+ */
+const ROLE_TAG_COLORS = {
+  super_admin: 'bg-red-100 text-red-700',
+  admin: 'bg-orange-100 text-orange-700',
+  regional_manager: 'bg-purple-100 text-purple-700',
+  business_manager: 'bg-indigo-100 text-indigo-700',
+  merchant_manager: 'bg-blue-100 text-blue-700',
+  merchant_staff: 'bg-cyan-100 text-cyan-700',
+  sales_staff: 'bg-teal-100 text-teal-700',
+  ops: 'bg-green-100 text-green-700',
+  user: 'bg-gray-100 text-gray-600'
+}
+
+/**
+ * HTML 转义（用于把角色名安全插入 x-html 渲染的单元格）
+ * @param {string} text - 原始文本
+ * @returns {string} 转义后文本
+ */
+function escapeRoleHtml(text) {
+  const div = document.createElement('div')
+  div.textContent = String(text ?? '')
+  return div.innerHTML
+}
+
+/**
+ * 渲染单个角色为彩色标签，带一个 × 移除按钮（点击委托到页面 removeRoleTag）
+ * @param {string} roleName - 角色名
+ * @param {number|string} userId - 用户 ID（供 × 按钮定位）
+ * @returns {string} 标签 HTML
+ */
+function renderRoleTag(roleName, userId) {
+  const safe = escapeRoleHtml(roleName)
+  const color = ROLE_TAG_COLORS[roleName] || 'bg-gray-100 text-gray-600'
+  const removeBtn =
+    userId != null
+      ? `<button type="button" class="ml-1 leading-none text-current opacity-60 hover:opacity-100"
+           data-role-remove data-user-id="${escapeRoleHtml(userId)}" data-role-name="${safe}"
+           title="移除该角色">&times;</button>`
+      : ''
+  return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mr-1 mb-1 ${color}">${safe}${removeBtn}</span>`
+}
+
 document.addEventListener('alpine:init', () => {
   logger.info('[UserManagement] 注册 Alpine 组件 (模块化 v4.0)...')
 
@@ -887,10 +931,16 @@ document.addEventListener('alpine:init', () => {
         { key: 'nickname', label: '昵称' },
         {
           key: 'role_name',
-          label: '当前角色',
-          render: (val, row) => row.role_display || val || '-'
+          label: '拥有角色',
+          render: (val, row) => {
+            const list = Array.isArray(row.roles) && row.roles.length > 0 ? row.roles : []
+            if (list.length === 0) {
+              return '<span class="text-gray-400">-</span>'
+            }
+            return list.map(name => renderRoleTag(name, row.user_id)).join('')
+          }
         },
-        { key: 'role_level', label: '角色级别', type: 'number' }
+        { key: 'role_level', label: '角色级别（最高）', type: 'number' }
       ],
       dataSource: async params => {
         const res = await request({
@@ -910,6 +960,17 @@ document.addEventListener('alpine:init', () => {
     const origInit = table.init
     table.init = async function () {
       window.addEventListener('refresh-user-roles', () => this.loadData())
+      // 事件委托：角色标签上的 × 按钮（x-html 静态节点无法绑 @click，用委托捕获）
+      this.$root.addEventListener('click', e => {
+        const btn = e.target.closest('[data-role-remove]')
+        if (!btn) return
+        e.preventDefault()
+        e.stopPropagation()
+        this.$dispatch('revoke-user-role-by-name', {
+          user_id: btn.dataset.userId,
+          role_name: btn.dataset.roleName
+        })
+      })
       if (origInit) await origInit.call(this)
     }
     return table

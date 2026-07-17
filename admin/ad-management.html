@@ -275,7 +275,7 @@
                 <tr class="themed-hover-bg">
                   <td class="px-4 py-3 text-sm" x-text="c.ad_campaign_id"></td>
                   <td class="px-4 py-3 text-sm font-medium" x-text="c.campaign_name"></td>
-                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="c.ad_slot?.slot_name || '-'"></td>
+                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="c.adSlot?.slot_name || '-'"></td>
                   <td class="px-4 py-3 text-sm">
                     <span class="text-xs px-2.5 py-1 rounded-full font-medium text-white" :class="statusColor(c.status)" x-text="statusText(c.status)"></span>
                   </td>

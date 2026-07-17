@@ -31,9 +31,9 @@
 
 import { logger, $confirmDanger } from '../../../utils/index.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
-import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
 import { buildURL, request } from '../../../api/base.js'
 import { createCrudMixin } from '../../../alpine/mixins/index.js'
+import { itemTemplateFormMixin } from '../../../alpine/mixins/item-template-form.js'
 
 // API请求封装
 const apiRequest = async (url, options = {}) => {
@@ -61,32 +61,6 @@ function hideLoading() {
   }
 }
 
-/** 属性规则默认五档品质（与 C2C 品质文案对齐） */
-function defaultQualityTiers() {
-  const grades = ['完美无瑕', '精良', '良好', '普通', '微瑕']
-  return grades.map(grade => ({
-    min: 0,
-    max: 100,
-    weight: 1,
-    grade
-  }))
-}
-
-function defaultAttributeRulesState() {
-  return {
-    quality_score: {
-      enabled: false,
-      tiers: defaultQualityTiers()
-    },
-    pattern_id: {
-      enabled: false,
-      min: null,
-      max: null
-    },
-    trade_cooldown_days: 7
-  }
-}
-
 document.addEventListener('alpine:init', () => {
   // 使用 createCrudMixin 获取标准功能
   const baseMixin =
@@ -110,6 +84,10 @@ document.addEventListener('alpine:init', () => {
    */
   Alpine.data('itemTemplatesPage', () => ({
     ...baseMixin,
+    // 物品模板表单状态与方法（form/max_edition/attribute_rules/submitTemplate/
+    // uploadTemplateImage/clearTemplateImage/getTypeIcon/getRarityLabel 等）来自公共 Mixin，
+    // 与兑换市场「新增商品」弹窗共用同一份逻辑，避免重复
+    ...itemTemplateFormMixin(),
 
     /** @type {boolean} 页面加载状态 */
     loading: false,
@@ -128,52 +106,6 @@ document.addEventListener('alpine:init', () => {
       active: 0,
       rarities: 0
     },
-    form: {
-      template_id: '',
-      display_name: '',
-      template_code: '',
-      item_type: 'voucher',
-      rarity_code: 'common',
-      is_enabled: true,
-      primary_media_id: null,
-      reference_price_points: 0,
-      value_tier: 'low',
-      description: '',
-      meta: '',
-      use_instructions: '',
-      allowed_actions: []
-    },
-    /** @type {Array<Object>} 可选操作类型 */
-    action_options: [
-      { value: 'use', label: '直接使用（线上生效）' },
-      { value: 'redeem', label: '生成核销码（到店核销）' },
-      { value: 'sell', label: '上架交易市场' }
-    ],
-    /** 限量总数上限（写入 meta.max_edition） */
-    max_edition: null,
-    /** 属性规则表单（写入 meta.attribute_rules） */
-    attribute_rules: defaultAttributeRulesState(),
-    is_submitting: false,
-    /** @type {string|null} 图片上传预览URL */
-    image_preview_url: null,
-    /** @type {boolean} 图片上传中 */
-    image_uploading: false,
-    typeIcons: {
-      prop: '🎟️',
-      voucher: '🎫',
-      coupon: '🎫',
-      points: '💰',
-      gift: '🎁',
-      virtual: '✨',
-      material: '📦'
-    },
-    rarityLabels: {
-      common: '普通',
-      uncommon: '稀有',
-      rare: '精良',
-      epic: '史诗',
-      legendary: '传说'
-    },
 
     /**
      * 组件初始化方法
@@ -185,31 +117,12 @@ document.addEventListener('alpine:init', () => {
     },
 
     /**
-     * 获取物品类型对应的图标
-     * @param {string} itemType - 物品类型标识
-     * @returns {string} 对应的emoji图标
-     * @example
-     * getTypeIcon('voucher') // '🎫'
-     * getTypeIcon('gift')    // '🎁'
+     * 表单保存成功钩子（覆盖 Mixin 默认空实现）：关闭弹窗 + 刷新列表
+     * @param {Object} _created - 后端返回的已保存模板
      */
-    getTypeIcon(itemType) {
-      return this.typeIcons[itemType] || '📦'
-    },
-
-    /**
-     * 获取稀有度的显示标签
-     * @param {string} rarityCode - 稀有度编码
-     * @param {Object} [rarityObj] - 稀有度对象（可选，包含display_name）
-     * @returns {string} 稀有度显示名称
-     * @example
-     * getRarityLabel('common')        // '普通'
-     * getRarityLabel('rare', {display_name: '稀有'}) // '稀有'
-     */
-    getRarityLabel(rarityCode, rarityObj) {
-      if (rarityObj && rarityObj.display_name) {
-        return rarityObj.display_name
-      }
-      return this.rarityLabels[rarityCode] || '普通'
+    onTemplateSaved(_created) {
+      this.hideModal('templateModal')
+      this.loadTemplates()
     },
 
     /**
@@ -309,26 +222,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     openCreateModal() {
-      logger.info('[openCreateModal] 初始化表单')
-      this.max_edition = null
-      this.attribute_rules = defaultAttributeRulesState()
-      this.form = {
-        template_id: '',
-        display_name: '',
-        template_code: '',
-        item_type: 'voucher',
-        rarity_code: 'common',
-        is_enabled: true,
-        primary_media_id: null,
-        reference_price_points: 0,
-        value_tier: 'low',
-        description: '',
-        meta: '',
-        use_instructions: '',
-        allowed_actions: []
-      }
-      this.image_preview_url = null
-      logger.info('[openCreateModal] 表单已初始化:', JSON.stringify(this.form))
+      this.resetTemplateForm() // 来自公共 Mixin：清空表单 + 默认属性规则 + 清预览图
       this.showModal('templateModal')
     },
 
@@ -394,109 +288,6 @@ document.addEventListener('alpine:init', () => {
     },
 
     /**
-     * 提交模板表单（创建或更新）
-     * @async
-     * @description 验证表单数据并提交到后端，根据templateId判断是创建还是更新
-     * @returns {Promise<void>}
-     * @throws {Error} 当JSON格式错误或必填字段缺失时
-     * @fires ASSET_ENDPOINTS.ITEM_TEMPLATE_CREATE
-     * @fires ASSET_ENDPOINTS.ITEM_TEMPLATE_UPDATE
-     */
-    async submitTemplate() {
-      if (this.is_submitting) return
-
-      // 🔍 调试日志：全面诊断表单状态
-      logger.info('[submitTemplate] ========== 开始提交 ==========')
-      logger.info('[submitTemplate] this 类型:', typeof this)
-      logger.info('[submitTemplate] this.form 存在:', !!this.form)
-      logger.info('[submitTemplate] this.form 类型:', typeof this.form)
-      logger.info('[submitTemplate] this.form 完整内容:', JSON.stringify(this.form, null, 2))
-      logger.info('[submitTemplate] display_name 值:', this.form?.display_name)
-      logger.info('[submitTemplate] display_name 类型:', typeof this.form?.display_name)
-      logger.info('[submitTemplate] template_code 值:', this.form?.template_code)
-      logger.info('[submitTemplate] template_code 类型:', typeof this.form?.template_code)
-      logger.info('[submitTemplate] form 所有键:', Object.keys(this.form || {}).join(', '))
-
-      let meta = null
-      try {
-        if (this.form.meta && this.form.meta.trim()) {
-          meta = JSON.parse(this.form.meta)
-        }
-      } catch (_e) {
-        this.showError('格式错误', '扩展属性JSON格式错误')
-        return
-      }
-
-      // 将 use_instructions 和 allowed_actions 合并到 meta JSON 中
-      const finalMeta = meta || {}
-      if (this.form.use_instructions && this.form.use_instructions.trim()) {
-        finalMeta.use_instructions = this.form.use_instructions.trim()
-      }
-      if (this.form.allowed_actions && this.form.allowed_actions.length > 0) {
-        finalMeta.allowed_actions = this.form.allowed_actions
-      }
-
-      finalMeta.attribute_rules = this.buildAttributeRulesPayload()
-
-      const data = {
-        display_name: this.form.display_name,
-        template_code: this.form.template_code,
-        item_type: this.form.item_type,
-        rarity_code: this.form.rarity_code,
-        is_enabled: this.form.is_enabled,
-        primary_media_id: this.form.primary_media_id || null,
-        reference_price_points: this.form.reference_price_points || 0,
-        value_tier: this.form.value_tier || 'low',
-        description: this.form.description || null,
-        max_edition:
-          this.max_edition != null &&
-          this.max_edition !== '' &&
-          !Number.isNaN(Number(this.max_edition))
-            ? Number(this.max_edition)
-            : null,
-        meta: Object.keys(finalMeta).length > 0 ? finalMeta : null
-      }
-
-      if (!data.display_name || !data.template_code) {
-        logger.error(
-          '[submitTemplate] 验证失败 - display_name:',
-          data.display_name,
-          'template_code:',
-          data.template_code
-        )
-        this.showError('验证失败', '请填写模板名称和编码')
-        return
-      }
-
-      this.is_submitting = true
-      this.loading = true
-      showLoading()
-      try {
-        const url = this.form.template_id
-          ? buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATE_UPDATE, { id: this.form.template_id })
-          : ASSET_ENDPOINTS.ITEM_TEMPLATE_CREATE
-        const method = this.form.template_id ? 'PUT' : 'POST'
-
-        const response = await apiRequest(url, { method, data })
-
-        if (response && response.success) {
-          this.hideModal('templateModal')
-          this.showSuccess(`${this.form.template_id ? '更新' : '创建'}成功`)
-          this.loadTemplates()
-        } else {
-          this.showError('保存失败', response?.message || '操作失败')
-        }
-      } catch (error) {
-        logger.error('保存模板失败:', error)
-        this.showError('保存失败', error.message)
-      } finally {
-        this.is_submitting = false
-        this.loading = false
-        hideLoading()
-      }
-    },
-
-    /**
      * 删除物品模板
      * @async
      * @param {number|string} templateId - 模板ID
@@ -529,134 +320,6 @@ document.addEventListener('alpine:init', () => {
       } finally {
         this.loading = false
         hideLoading()
-      }
-    },
-
-    /**
-     * 上传物品模板图片
-     *
-     * 上传成功后将 media_id 写入 form.primary_media_id，
-     * 并设置 image_preview_url 用于前端预览。
-     *
-     * @param {Event} event - 文件选择事件
-     * @returns {Promise<void>}
-     */
-    async uploadTemplateImage(event) {
-      const file = event.target.files?.[0]
-      if (!file) return
-
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-      if (!allowedTypes.includes(file.type)) {
-        this.showError('格式错误', '仅支持 JPG/PNG/GIF/WebP 格式')
-        return
-      }
-
-      if (file.size > 5 * 1024 * 1024) {
-        this.showError('文件过大', '图片大小不能超过 5MB')
-        return
-      }
-
-      try {
-        this.image_uploading = true
-
-        const formData = new FormData()
-        formData.append('image', file)
-        formData.append('business_type', 'uploads')
-
-        const res = await request({
-          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,
-          method: 'POST',
-          data: formData
-        })
-
-        if (res.success && res.data) {
-          this.form.primary_media_id = res.data.media_id ?? null
-          this.image_preview_url = res.data.public_url || res.data.url || null
-          this.showSuccess('图片上传成功')
-          logger.info(
-            '[ItemTemplates] 图片上传成功:',
-            res.data.object_key || res.data.public_url,
-            'primary_media_id:',
-            this.form.primary_media_id
-          )
-        } else {
-          this.showError('上传失败', res.message || '图片上传失败')
-        }
-      } catch (e) {
-        logger.error('[ItemTemplates] 图片上传失败:', e)
-        this.showError('上传失败', '图片上传失败')
-      } finally {
-        this.image_uploading = false
-      }
-    },
-
-    /**
-     * 清除已上传的图片
-     * @returns {void}
-     */
-    clearTemplateImage() {
-      this.form.primary_media_id = null
-      this.image_preview_url = null
-    },
-
-    /**
-     * 将接口中的 attribute_rules 规范化为表单状态
-     */
-    normalizeAttributeRules(raw) {
-      const base = defaultAttributeRulesState()
-      if (!raw || typeof raw !== 'object') {
-        return base
-      }
-      base.quality_score.enabled = !!raw.quality_score?.enabled
-      const tiers = raw.quality_score?.tiers
-      if (Array.isArray(tiers) && tiers.length > 0) {
-        base.quality_score.tiers = tiers.map((t, i) => ({
-          min: t.min != null ? Number(t.min) : 0,
-          max: t.max != null ? Number(t.max) : 100,
-          weight: t.weight != null ? Number(t.weight) : 1,
-          grade: t.grade != null ? String(t.grade) : base.quality_score.tiers[i]?.grade || ''
-        }))
-        while (base.quality_score.tiers.length < 5) {
-          base.quality_score.tiers.push({
-            min: 0,
-            max: 100,
-            weight: 1,
-            grade: defaultQualityTiers()[base.quality_score.tiers.length]?.grade || ''
-          })
-        }
-        base.quality_score.tiers = base.quality_score.tiers.slice(0, 5)
-      }
-      base.pattern_id.enabled = !!raw.pattern_id?.enabled
-      base.pattern_id.min = raw.pattern_id?.min != null ? Number(raw.pattern_id.min) : null
-      base.pattern_id.max = raw.pattern_id?.max != null ? Number(raw.pattern_id.max) : null
-      base.trade_cooldown_days =
-        raw.trade_cooldown_days != null ? Number(raw.trade_cooldown_days) || 7 : 7
-      return base
-    },
-
-    /**
-     * 组装写入 meta 的 attribute_rules（完整结构，便于回显）
-     */
-    buildAttributeRulesPayload() {
-      const q = this.attribute_rules?.quality_score
-      const p = this.attribute_rules?.pattern_id
-      const cd = this.attribute_rules?.trade_cooldown_days
-      return {
-        quality_score: {
-          enabled: !!q?.enabled,
-          tiers: (q?.tiers || defaultQualityTiers()).slice(0, 5).map(t => ({
-            min: Number(t.min) || 0,
-            max: Number(t.max) || 0,
-            weight: Number(t.weight) || 0,
-            grade: t.grade != null ? String(t.grade) : ''
-          }))
-        },
-        pattern_id: {
-          enabled: !!p?.enabled,
-          min: p?.min != null && p.min !== '' ? Number(p.min) : null,
-          max: p?.max != null && p.max !== '' ? Number(p.max) : null
-        },
-        trade_cooldown_days: cd != null && cd !== '' ? Number(cd) || 7 : 7
       }
     },
 

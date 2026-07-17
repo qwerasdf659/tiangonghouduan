@@ -11,14 +11,14 @@
 
 
 
-  <script type="module" crossorigin src="/admin/assets/category-management-BFCRZ3TA.js"></script>
+  <script type="module" crossorigin src="/admin/assets/category-management-bTYRmnVk.js"></script>
   <link rel="modulepreload" crossorigin href="/admin/assets/alpine-DHMHVPoE.js">
   <link rel="modulepreload" crossorigin href="/admin/assets/vendor-z_UyD9yt.js">
   <link rel="modulepreload" crossorigin href="/admin/assets/echarts-DsXiNbrD.js">
   <link rel="modulepreload" crossorigin href="/admin/assets/vendor-socketio-DdI-Egwi.js">
-  <link rel="modulepreload" crossorigin href="/admin/assets/index-BzZd00Na.js">
-  <link rel="modulepreload" crossorigin href="/admin/assets/main-CD4ziYoF.js">
-  <link rel="stylesheet" crossorigin href="/admin/assets/index-Cdcizjov.css">
+  <link rel="modulepreload" crossorigin href="/admin/assets/index-C5xulW0E.js">
+  <link rel="modulepreload" crossorigin href="/admin/assets/main-Crfp49js.js">
+  <link rel="stylesheet" crossorigin href="/admin/assets/index-ClYS6XHm.css">
 </head>
 <body class="themed-bg-subtle min-h-screen">
 
@@ -171,7 +171,7 @@
                     @click="$dispatch('table-action', { action: action.name, row: JSON.parse(JSON.stringify(row)) })"
                     class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
                     :class="action.class || 'themed-text-primary'"
-                    x-html="(action.icon ? action.icon + ' ' : '') + action.label">
+                    x-html="(action.icon ? action.icon + ' ' : '') + (typeof action.label === 'function' ? action.label(row) : action.label)">
                   </button>
                 </template>
               </div>

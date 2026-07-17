@@ -1,2 +1,0 @@
-version	charset	collation
-8.0.30	utf8mb4	utf8mb4_unicode_ci

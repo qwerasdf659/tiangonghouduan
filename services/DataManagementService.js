@@ -89,7 +89,7 @@ const TABLE_DISPLAY_NAMES = Object.freeze({
   api_idempotency_requests: '幂等性请求',
   websocket_startup_logs: 'WebSocket启动日志',
   authentication_sessions: '认证会话',
-  admin_operation_logs: '管理员操作日志',
+  operation_logs: '操作日志（管理员/商家/批量合并单表）',
   ad_impression_logs: '广告曝光日志',
   ad_click_logs: '广告点击日志',
   ad_interaction_logs: '广告互动日志',
@@ -97,8 +97,6 @@ const TABLE_DISPLAY_NAMES = Object.freeze({
   ad_antifraud_logs: '广告反欺诈日志',
   ad_attribution_logs: '广告归因日志',
   reminder_history: '提醒历史',
-  merchant_operation_logs: '商家操作日志',
-  batch_operation_logs: '批量操作日志',
   risk_alerts: '风控告警',
   alert_silence_rules: '告警静默规则',
   ad_report_daily_snapshots: '广告日报快照',
@@ -167,7 +165,7 @@ const L3_AUTO_CLEANUP_TABLES = Object.freeze({
   api_idempotency_requests: 'created_at',
   websocket_startup_logs: 'created_at',
   authentication_sessions: 'created_at',
-  admin_operation_logs: 'created_at',
+  operation_logs: 'created_at',
   ad_impression_logs: 'created_at',
   ad_click_logs: 'created_at',
   ad_interaction_logs: 'created_at',
@@ -175,8 +173,6 @@ const L3_AUTO_CLEANUP_TABLES = Object.freeze({
   ad_antifraud_logs: 'created_at',
   ad_attribution_logs: 'created_at',
   reminder_history: 'created_at',
-  merchant_operation_logs: 'created_at',
-  batch_operation_logs: 'created_at',
   risk_alerts: 'created_at',
   alert_silence_rules: 'created_at',
   // 修正（2026-05-30）：以真实表结构为准，原 report_date 列不存在，实际清理依据为业务日期列 snapshot_date
@@ -191,7 +187,7 @@ const L3_AUTO_CLEANUP_TABLES = Object.freeze({
  * 系统定时任务操作员用户ID（数据库已有专用用户：user_id=11021, nickname='系统定时任务'）
  *
  * 用途：自动清理等无人工操作员的系统任务写审计日志时使用。
- * admin_operation_logs.operator_id 为 NOT NULL + 外键→users.user_id，
+ * operation_logs.operator_id 为 NOT NULL + 外键→users.user_id，
  * 因此系统任务不能用 0（违反外键），须用真实存在的系统用户ID。
  * @constant {number}
  */
@@ -279,13 +275,23 @@ const PRE_LAUNCH_BEHAVIOR_WIPE_TABLES = Object.freeze([
   // —— 系统垫付/审批运行实例（模板保留，实例清）——
   'preset_inventory_debt',
   'preset_budget_debt',
+  /*
+   * 审批链运行实例（模板/节点是配置保留，实例/步骤/动作是行为清）。
+   * 外键链 RESTRICT：approval_chain_step_actions.step_id → approval_chain_steps.step_id
+   * → approval_chain_steps.instance_id → approval_chain_instances。
+   * 故须按 动作 → 步骤 → 实例 顺序清（叶子表在前），否则删父表被外键挡住。
+   */
+  'approval_chain_step_actions',
+  'approval_chain_steps',
   'approval_chain_instances',
   // —— 日志/会话/临时（系统运行产生）——
-  'admin_operation_logs',
-  'merchant_operation_logs',
+  /*
+   * 操作日志三表已合并为单表 operation_logs（技术债重构）；清空后审计在清理完成后重写，
+   * 本次清档审计被自然保留（拍板项2）
+   */
+  'operation_logs',
   'authentication_sessions',
   'websocket_startup_logs',
-  'batch_operation_logs',
   'reminder_history',
   'api_idempotency_requests',
   'system_dictionary_history',
@@ -449,7 +455,7 @@ const DELETE_TOPOLOGY = Object.freeze([
     'user_notifications',
     'user_behavior_tracks',
     'user_ad_tags',
-    'batch_operation_logs',
+    'operation_logs',
     'reminder_history',
     'alert_silence_rules',
     'lottery_simulation_records',
@@ -470,7 +476,6 @@ const DELETE_TOPOLOGY = Object.freeze([
     'preset_inventory_debt',
     'preset_budget_debt',
     'content_review_records',
-    'merchant_operation_logs',
     'feedbacks',
     'item_holds',
     'item_ledger',
@@ -1011,8 +1016,10 @@ class DataManagementService {
   }
 
   /**
-   * 获取清理历史（从 admin_operation_logs 查询）
+   * 获取清理历史（从 operation_logs 查询，operation_type='data_cleanup'）
    *
+   * 说明：操作日志三表已合并为单表 operation_logs（operator_type 区分 admin/merchant/batch）。
+   * operator 展示名用 users.nickname（users 无明文 mobile 列，手机号为加密存储，审计列表不下发明文号）。
    * @param {Object} pagination - { page, page_size }
    * @returns {Promise<Object>} 分页清理历史
    */
@@ -1022,13 +1029,13 @@ class DataManagementService {
 
     const [rows] = await sequelize.query(
       `
-      SELECT aol.admin_operation_log_id, aol.operator_id, u.mobile AS operator_mobile,
-             aol.action, aol.before_data, aol.after_data, aol.reason,
-             aol.created_at
-      FROM admin_operation_logs aol
-      LEFT JOIN users u ON u.user_id = aol.operator_id
-      WHERE aol.operation_type = 'data_cleanup'
-      ORDER BY aol.created_at DESC
+      SELECT ol.operation_log_id, ol.operator_id, u.nickname AS operator_name,
+             ol.action, ol.before_data, ol.after_data, ol.reason,
+             ol.created_at
+      FROM operation_logs ol
+      LEFT JOIN users u ON u.user_id = ol.operator_id
+      WHERE ol.operation_type = 'data_cleanup'
+      ORDER BY ol.created_at DESC
       LIMIT :limit OFFSET :offset
     `,
       { replacements: { limit: page_size, offset } }
@@ -1036,7 +1043,7 @@ class DataManagementService {
 
     const [countResult] = await sequelize.query(`
       SELECT COUNT(*) AS total
-      FROM admin_operation_logs
+      FROM operation_logs
       WHERE operation_type = 'data_cleanup'
     `)
 
@@ -1044,9 +1051,9 @@ class DataManagementService {
 
     return {
       items: rows.map(r => ({
-        log_id: r.admin_operation_log_id,
+        log_id: r.operation_log_id,
         operator_id: r.operator_id,
-        operator_mobile: r.operator_mobile,
+        operator_name: r.operator_name,
         action: r.action,
         before_data: this._safeJsonParse(r.before_data),
         after_data: this._safeJsonParse(r.after_data),
@@ -1762,7 +1769,7 @@ class DataManagementService {
   /**
    * 写入上线前清行为治理任务的审计日志
    *
-   * 说明（拍板项2）：admin_operation_logs 在步骤1已整表清空，本审计在清理完成后写入，
+   * 说明（拍板项2）：operation_logs（操作日志合并单表）在步骤1已整表清空，本审计在清理完成后写入，
    * 因此"本次清档审计"被自然保留（新记录晚于清空动作）。
    * @param {number} operatorId - 操作人用户ID
    * @param {string} reason - 操作原因

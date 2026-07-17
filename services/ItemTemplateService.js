@@ -23,6 +23,14 @@
 const { Op } = require('sequelize')
 const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
+const BusinessSeqCodeGenerator = require('../utils/BusinessSeqCodeGenerator')
+
+/**
+ * 物品模板编码前缀（自动生成：IT + YYYYMMDD + 3 位日序号，如 IT20260717001）
+ * 运营新建模板时无需手填编码，由后端统一生成，保证格式一致、全局唯一。
+ * @constant {string}
+ */
+const TEMPLATE_CODE_PREFIX = 'IT'
 
 /**
  * 物品模板管理服务类
@@ -214,9 +222,9 @@ class ItemTemplateService {
    * 创建物品模板
    *
    * @param {Object} data - 模板数据
-   * @param {string} data.template_code - 模板代码（唯一）
    * @param {string} data.item_type - 物品类型
    * @param {string} data.display_name - 显示名称
+   * @description template_code（模板编码）由后端自动生成（IT+YYYYMMDD+序号），运营无需传入
    * @param {number} [data.category_id] - 品类主键（categories.category_id）
    * @param {string} [data.rarity_code] - 稀有度代码
    * @param {string} [data.description] - 描述
@@ -234,7 +242,6 @@ class ItemTemplateService {
 
     try {
       const {
-        template_code,
         item_type,
         display_name,
         category_id,
@@ -259,15 +266,24 @@ class ItemTemplateService {
         resolvedCategoryIdOrNull = n
       }
 
-      // 检查模板代码唯一性
-      const existing = await this.ItemTemplate.findOne({
-        where: { template_code },
+      /*
+       * 模板编码后端自动生成（2026-07-17）：运营无需手填 template_code，
+       * 由 BusinessSeqCodeGenerator 按 IT+YYYYMMDD+序号 统一生成（与采购单/批次码同范式），
+       * 带 UNIQUE 冲突重试，保证格式一致、全局唯一。事务必传（路由已用 TransactionManager 包裹）。
+       */
+      if (!transaction) {
+        throw new BusinessError(
+          '创建物品模板必须在事务中执行（编码生成依赖事务）',
+          'TRANSACTION_REQUIRED',
+          500
+        )
+      }
+      const template_code = await BusinessSeqCodeGenerator.generateWithRetry({
+        prefix: TEMPLATE_CODE_PREFIX,
+        model: this.ItemTemplate,
+        field: 'template_code',
         transaction
       })
-
-      if (existing) {
-        throw new BusinessError(`模板代码 ${template_code} 已存在`, 'TEMPLATE_CODE_EXISTS', 409)
-      }
 
       // 验证类目
       if (resolvedCategoryIdOrNull != null) {

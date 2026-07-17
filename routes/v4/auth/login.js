@@ -258,6 +258,12 @@ router.post(
 
     const responseData = {
       access_token: tokens.access_token,
+      /*
+       * refresh_token 双通道：浏览器端已通过上方 HttpOnly Cookie 下发（更安全，可忽略此字段）；
+       * 小程序端无 Cookie 机制，需从响应体拿到 refresh_token 存入 wx storage，
+       * 供 access_token 过期时调 POST /auth/refresh（请求体传 refresh_token）续期。
+       */
+      refresh_token: tokens.refresh_token,
       user: {
         user_id: user.user_id,
         mobile: user.mobile,
@@ -517,7 +523,11 @@ router.post(
 
     const responseData = {
       access_token: tokens.access_token,
-      // 🔐 安全升级：refresh_token不再通过响应体返回，改为HttpOnly Cookie
+      /*
+       * refresh_token 双通道：浏览器端走上方 HttpOnly Cookie（更安全，可忽略此字段）；
+       * 小程序端无 Cookie，需从响应体取 refresh_token 存 wx storage，供 /auth/refresh 续期。
+       */
+      refresh_token: tokens.refresh_token,
       user: {
         user_id: user.user_id,
         mobile: user.mobile,
@@ -760,6 +770,11 @@ async function handleWxLoginSuccess(req, res, user, isNewUser) {
     {
       need_bind: false,
       access_token: tokens.access_token,
+      /*
+       * refresh_token 双通道：浏览器端走上方 HttpOnly Cookie（更安全，可忽略此字段）；
+       * 小程序端无 Cookie，需从响应体取 refresh_token 存 wx storage，供 /auth/refresh 续期。
+       */
+      refresh_token: tokens.refresh_token,
       user: {
         user_id: user.user_id,
         mobile: user.mobile,

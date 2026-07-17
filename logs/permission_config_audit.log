@@ -3,3 +3,4 @@
 {"action":"CHANGE_USER_ROLE","operator_id":32,"target_user_id":32,"old_role":"unknown","new_role":"unknown","reason":"manual_cache_invalidate","level":"INFO","ip_address":"unknown","timestamp":"2026-07-11T08:28:33.185+08:00"}
 {"action":"CHANGE_USER_ROLE","operator_id":32,"target_user_id":32,"old_role":"unknown","new_role":"unknown","reason":"manual_cache_invalidate","level":"INFO","ip_address":"unknown","timestamp":"2026-07-11T08:28:48.379+08:00"}
 {"action":"CHANGE_USER_ROLE","operator_id":32,"target_user_id":32,"old_role":"unknown","new_role":"unknown","reason":"manual_cache_invalidate","level":"INFO","ip_address":"unknown","timestamp":"2026-07-11T10:02:32.508+08:00"}
+{"action":"CHANGE_USER_ROLE","operator_id":32,"target_user_id":32,"old_role":"unknown","new_role":"unknown","reason":"manual_cache_invalidate","level":"INFO","ip_address":"unknown","timestamp":"2026-07-16T04:37:43.499+08:00"}
